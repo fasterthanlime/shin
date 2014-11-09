@@ -1,2 +1,2 @@
 require 'shin/version'
-require 'shin/parser'
+require 'shin/compiler'
