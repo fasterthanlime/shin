@@ -52,6 +52,9 @@ module Shin
 
     def read_sequence(sequence_type, ldelim, rdelim)
       skip_ws
+      sequence_name = lambda do
+        sequence_type.name.split('::').last.downcase
+      end
 
       return nil unless (char = peek_char).chr == ldelim
       skip_char
@@ -66,15 +69,16 @@ module Shin
           break
         else
           child = read_expr
-          unless child
-            ser! "expected expression"
+          if child.nil?
+            ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'", node.token)
           end
           node.inner << child
+          node.token.extend!(pos)
         end
       end
 
       unless (char = read_char).chr == rdelim
-        ser! "Unclosed sequence literal, expected: '#{rdelim}' got '#{char}'"
+        ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'", node.token)
       end
 
       node.token.extend!(pos)
