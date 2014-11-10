@@ -36,11 +36,11 @@ module Shin
     end
 
     class Sequence < Node
-      attr_accessor :children
+      attr_accessor :inner
 
       def initialize(token)
         super(token)
-        @children = []
+        @inner = []
       end
     end
 
@@ -72,6 +72,15 @@ module Shin
     end
 
     class Identifier < Node
+      attr_accessor :value
+
+      def initialize(token ,value)
+        super(token)
+        @value = value
+      end
+    end
+
+    class Keyword < Node
       attr_accessor :value
 
       def initialize(token ,value)
