@@ -157,7 +157,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Identifier.new(t.extend!(pos), s.to_sym)
+      Shin::AST::Identifier.new(t.extend!(pos), s)
     end
 
     def read_keyword
@@ -180,7 +180,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Keyword.new(t.extend!(pos), s.to_sym)
+      Shin::AST::Keyword.new(t.extend!(pos), s)
     end
 
     def skip_ws
