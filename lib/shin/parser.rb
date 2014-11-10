@@ -153,7 +153,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Identifier.new(t.extend!(pos), s)
+      Shin::AST::Identifier.new(t.extend!(pos), s.to_sym)
     end
 
     def read_keyword
