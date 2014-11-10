@@ -144,7 +144,7 @@ module Shin
 
       until eof?
         case (char = peek_char).chr
-        when /[A-Za-z\-_\*]/
+        when /[A-Za-z\-_\*']/
           s += char
           skip_char
         else
