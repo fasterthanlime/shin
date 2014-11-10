@@ -82,12 +82,18 @@ module Shin
         first = list.first
         case
         when first.instance_of?(Shin::AST::MethodCall)
-
           property = translate_expr(list[0].id)
           object = translate_expr(list[1])
           mexp = Shin::JST::MemberExpression.new(object, property, false)
           call = Shin::JST::CallExpression.new(mexp)
           list[2..-1].each do |arg|
+            call.arguments << translate_expr(arg)
+          end
+          return call
+        when first.identifier?
+          # function call
+          call = Shin::JST::CallExpression.new(make_ident(first.value))
+          list[1..-1].each do |arg|
             call.arguments << translate_expr(arg)
           end
           return call

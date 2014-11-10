@@ -30,6 +30,12 @@ module Shin
 
     class Node
       attr_accessor :loc
+
+      def to_hash
+        res = {:type => self.class.name.split('::').last}
+        res[:loc] = loc if loc
+        res
+      end
     end
 
     class Program < Node
@@ -37,6 +43,10 @@ module Shin
 
       def initialize
         @body = []
+      end
+
+      def to_hash
+        super.merge(:body => body)
       end
     end
 
@@ -48,6 +58,11 @@ module Shin
       def initialize(id)
         @id = id
         @params = []
+      end
+
+      def to_hash
+        super.merge(:id => id, :params => params, :body => body,
+                   :rest => nil, :defaults => [], :generator => false, :expression => false)
       end
     end
 
@@ -65,13 +80,21 @@ module Shin
       def initialize
         @body = []
       end
+
+      def to_hash
+        super.merge(:body => body)
+      end
     end
 
     class Identifier < Node
-      attr_reader :id
+      attr_reader :name
 
-      def initialize(id)
-        @id = id
+      def initialize(name)
+        @name = name
+      end
+
+      def to_hash
+        super.merge(:name => name)
       end
     end
 
@@ -81,6 +104,10 @@ module Shin
       def initialize(argument)
         @argument = argument
       end
+
+      def to_hash
+        super.merge(:argument => argument)
+      end
     end
 
     class ExpressionStatement < Node
@@ -88,6 +115,10 @@ module Shin
 
       def initialize(expression)
         @expression = expression
+      end
+
+      def to_hash
+        super.merge(:expression => expression)
       end
     end
 
@@ -98,6 +129,10 @@ module Shin
       def initialize(callee)
         @callee = callee
         @arguments = []
+      end
+
+      def to_hash
+        super.merge(:callee => callee, :arguments => arguments)
       end
     end
 
@@ -111,6 +146,10 @@ module Shin
         @property = property
         @computed = computed
       end
+
+      def to_hash
+        super.merge(:object => object, :property => property, :computed => computed)
+      end
     end
 
     class Literal < Node
@@ -118,6 +157,10 @@ module Shin
 
       def initialize(value)
         @value = value
+      end
+
+      def to_hash
+        super.merge(:value => value)
       end
     end
   end
