@@ -5,6 +5,7 @@ require 'shin/utils'
 module Shin
   class Parser
     include Shin::LineColumn
+    include Shin::Snippet
 
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
@@ -38,12 +39,10 @@ module Shin
       skip_ws
 
       until eof?
-        nodes << read_list
+        node = read_list
+        ser! "Expected S-expression!" unless node
+        nodes << node
         skip_ws
-      end
-
-      if nodes.empty?
-        ser! "Expected S-expression"
       end
 
       return nodes
@@ -93,7 +92,7 @@ module Shin
     def read_map
       node = read_sequence(Shin::AST::Map, LBRACE, RBRACE)
       return nil unless node
-      ser!("Map literal requires even number of forms") unless node.inner.count % 2 == 0
+      ser!("Map literal requires even number of forms", node.token) unless node.inner.count % 2 == 0
       node
     end
 
@@ -238,9 +237,14 @@ module Shin
       @input.eof?
     end
 
-    def ser!(msg)
-      line, column = line_column(@input, pos)
-     raise "#{msg} at #{file}:#{line}:#{column}"
+    def ser!(msg, token = nil)
+      start = token ? token.start : pos
+      length = token ? token.length : 1
+
+      line, column = line_column(@input, start)
+      snippet = snippet(@input, pos, length)
+
+      raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
     end
 
   end

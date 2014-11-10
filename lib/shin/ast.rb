@@ -14,6 +14,10 @@ module Shin
         compute_linecol
       end
 
+      def length
+        @end - @start
+      end
+
       def extend!(pos)
         fail unless pos >= @start
         @end = pos
