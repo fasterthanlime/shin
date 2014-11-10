@@ -6,6 +6,10 @@ module Shin
   class Parser
     include Shin::LineColumn
 
+    LPAREN = '('.freeze; RPAREN = ')'.freeze
+    LBRACK = '['.freeze; RBRACK = ']'.freeze
+    LBRACE = '{'.freeze; RBRACE = '}'.freeze
+
     def self.parse_file(path)
       Shin::Parser.new(File.read(path), :file => path).parse
     end
@@ -79,15 +83,15 @@ module Shin
     end
 
     def read_list
-      read_sequence(Shin::AST::List, '(', ')')
+      read_sequence(Shin::AST::List, LPAREN, RPAREN)
     end
 
     def read_vector
-      read_sequence(Shin::AST::Vector, '[', ']')
+      read_sequence(Shin::AST::Vector, LBRACK, RBRACK)
     end
 
     def read_map
-      node = read_sequence(Shin::AST::Map, '{', '}')
+      node = read_sequence(Shin::AST::Map, LBRACE, RBRACE)
       return nil unless node
       ser!("Map literal requires even number of forms") unless node.inner.count % 2 == 0
       node
@@ -176,7 +180,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Keyword.new(t.extend!(pos), s)
+      Shin::AST::Keyword.new(t.extend!(pos), s.to_sym)
     end
 
     def skip_ws
