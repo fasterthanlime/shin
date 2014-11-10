@@ -12,7 +12,7 @@ module Shin
       # Lifted from sxp-ruby
       # @see https://github.com/bendiken/sxp-ruby
       case
-      when %i(getc ungetc eof).all? { |x| input.respond_to? x }
+      when %i(getc ungetc eof seek).all? { |x| input.respond_to? x }
         @input = input
       when input.respond_to?(:to_str)
         require 'stringio' unless defined?(StringIO)
