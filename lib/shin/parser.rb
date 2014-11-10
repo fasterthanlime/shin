@@ -7,6 +7,8 @@ module Shin
     include Shin::LineColumn
     include Shin::Snippet
 
+    attr_reader :input
+
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
@@ -101,7 +103,7 @@ module Shin
     end
 
     def read_expr
-      read_identifier || read_list || read_vector || read_map || read_number || read_string || read_keyword
+      read_identifier || read_list || read_vector || read_map || read_number || read_string || read_keyword || read_object_access
     end
 
     def read_number
@@ -144,6 +146,32 @@ module Shin
       Shin::AST::String.new(t.extend!(pos), s)
     end
 
+    def read_object_access
+      skip_ws
+      t = token
+      type = :call
+
+      return nil unless peek_char.chr == '.'
+      skip_char
+
+      if peek_char.chr == '-'
+        type = :access
+        skip_char
+      end
+
+      id = read_identifier
+      ser!("Expected identifier after method call operator") unless id
+
+      case type
+      when :access
+        Shin::AST::FieldAccess.new(t.extend!(pos), id)
+      when :call
+        Shin::AST::MethodCall.new(t.extend!(pos), id)
+      else
+        ser!("Invalid object access type: #{type}")
+      end
+    end
+
     def read_identifier
       skip_ws
       s = ""
@@ -151,7 +179,7 @@ module Shin
 
       until eof?
         case (char = peek_char).chr
-        when /[A-Za-z\-_\*']/
+        when /[A-Za-z\-_\*'\+\/]/
           s += char
           skip_char
         else
@@ -246,7 +274,7 @@ module Shin
       length = token ? token.length : 1
 
       line, column = line_column(@input, start)
-      snippet = snippet(@input, pos, length)
+      snippet = snippet(@input, start, length)
 
       raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
     end

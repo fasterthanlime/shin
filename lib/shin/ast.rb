@@ -37,6 +37,22 @@ module Shin
       def initialize(token)
         @token = token
       end
+      
+      def identifier?(value = nil)
+        false
+      end
+
+      def list?
+        false
+      end
+
+      def vector?
+        false
+      end
+
+      def map?
+        false
+      end
     end
 
     class Sequence < Node
@@ -49,12 +65,21 @@ module Shin
     end
 
     class List < Sequence
+      def list?
+        true
+      end
     end
 
     class Vector < Sequence
+      def vector?
+        true
+      end
     end
 
     class Map < Sequence
+      def map?
+        true
+      end
     end
 
     class Number < Node
@@ -82,15 +107,35 @@ module Shin
         super(token)
         @value = value
       end
+
+      def identifier?(value = nil)
+        return true if value.nil?
+        @value == value
+      end
     end
 
     class Keyword < Node
       attr_accessor :value
 
-      def initialize(token ,value)
+      def initialize(token, value)
         super(token)
         @value = value
       end
+    end
+
+    class ObjectAccess < Node
+      attr_accessor :id
+
+      def initialize(token, id)
+        super(token)
+        @id = id
+      end
+    end
+
+    class MethodCall < ObjectAccess
+    end
+
+    class FieldAccess < ObjectAccess
     end
   end
 end
