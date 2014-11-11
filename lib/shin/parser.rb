@@ -18,6 +18,9 @@ module Shin
     IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&]/
 
     def self.parse(source)
+      # parse is a no-op if source is not a String.
+      # it might be a piece of already-parsed AST.
+      return source unless String === source
       Shin::Parser.new(source).parse
     end
 

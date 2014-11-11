@@ -34,11 +34,7 @@ module Shin
       end
 
       def matches?(ast, pattern, &block)
-        specs = if String === pattern
-          Shin::Parser.parse(pattern)
-        else
-          pattern
-        end
+        specs = Shin::Parser.parse(pattern)
 
         if block && specs.length != block.arity
           raise "Wrong arity for matches?, got #{block.arity}, expected #{specs.length}"
