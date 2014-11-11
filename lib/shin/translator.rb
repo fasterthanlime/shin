@@ -8,6 +8,7 @@ module Shin
   class Translator
     include Shin::LineColumn
     include Shin::Snippet
+    include Shin::Matcher
 
     def initialize(p_input, options)
       @input = p_input.dup
@@ -36,40 +37,35 @@ module Shin
     protected
 
     def translate_defn(list)
-      unless list.first.identifier?
-        ser!("Expected function name", list.first.token)
-      end
+      decl = nil
 
-      id = list.first
-      decl = Shin::JST::FunctionDeclaration.new(make_ident(id.value))
-      list = list[1..-1]
-
-      unless list.first.vector?
-        ser!("Expected argument vector after function name", id.token)
-      end
-      list.first.inner.each do |arg|
-        unless arg.identifier?
-          ser!("Expected identifier in function arg list", arg.token)
-        end
-        decl.params << make_ident(arg.value)
-      end
-      list = list[1..-1]
-
-      decl.body = block = Shin::JST::BlockStatement.new()
-      inner_count = list.count
-      list.each_with_index do |expr, i|
-        last = (inner_count - 1 == i)
-
-        node = translate_expr(expr)
-        node = if last
-          make_rstat(node)
-        else
-          make_estat(node)
+      success = matches?(list, [:id, :vec, [:expr]]) do |name, args, body|
+        unless matches?(args.inner, [[:id]])
+          ser!("Expected identifiers as function arguments", args.token)
         end
 
-        block.body << node
+        decl = Shin::JST::FunctionDeclaration.new(make_ident(name.value))
+        args.inner.each do |arg|
+          decl.params << make_ident(arg.value)
+        end
+
+        decl.body = block = Shin::JST::BlockStatement.new
+        inner_count = body.count
+        body.each_with_index do |expr, i|
+          last = (inner_count - 1 == i)
+
+          node = translate_expr(expr)
+          node = if last
+            make_rstat(node)
+          else
+            make_estat(node)
+          end
+
+          block.body << node
+        end
       end
 
+      ser!("Expected valid defn", list[0].token) unless success
       decl
     end
 
