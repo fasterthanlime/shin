@@ -7,12 +7,19 @@ module Shin
     include Shin::LineColumn
     include Shin::Snippet
 
+    class Error < StandardError; end
+    class EOF < Error; end
+
     attr_reader :input
 
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
-    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$]/
+    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&]/
+
+    def self.parse(source)
+      Shin::Parser.new(source).parse
+    end
 
     def self.parse_file(path)
       Shin::Parser.new(File.read(path), :file => path).parse
@@ -64,9 +71,8 @@ module Shin
       skip_ws
 
       node = sequence_type.new(token)
+      skip_ws
       until eof?
-        skip_ws
-
         case (char = peek_char.chr)
         when rdelim
           break
@@ -78,6 +84,8 @@ module Shin
           node.inner << child
           node.token.extend!(pos)
         end
+
+        skip_ws
       end
 
       unless (char = read_char).chr == rdelim
@@ -208,8 +216,16 @@ module Shin
     def skip_ws
       until eof?
         case (char = peek_char).chr
-        when /\s+/ then skip_char
-        else break
+        when /\s+/
+          skip_char
+        when /;/
+          skip_char
+          until eof?
+            char = read_char.chr
+            break if char == "\n"
+          end
+        else
+          break
         end
       end
     end

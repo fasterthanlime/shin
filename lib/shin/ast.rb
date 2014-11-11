@@ -82,7 +82,7 @@ module Shin
       end
     end
 
-    class Number < Node
+    class Literal < Node
       attr_accessor :value
 
       def initialize(token ,value)
@@ -91,13 +91,10 @@ module Shin
       end
     end
 
-    class String < Node
-      attr_accessor :value
+    class Number < Literal
+    end
 
-      def initialize(token ,value)
-        super(token)
-        @value = value
-      end
+    class String < Literal
     end
 
     class Identifier < Node

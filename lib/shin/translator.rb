@@ -39,18 +39,14 @@ module Shin
     def translate_defn(list)
       decl = nil
 
-      success = matches?(list, [:id, :vec, [:expr]]) do |name, args, body|
-        unless matches?(args.inner, [[:id]])
-          ser!("Expected identifiers as function arguments", args.token)
-        end
-
+      success = matches?(list, ":id :str? [:id*] :expr*") do |name, doc, args, body|
         decl = Shin::JST::FunctionDeclaration.new(make_ident(name.value))
         args.inner.each do |arg|
           decl.params << make_ident(arg.value)
         end
 
         decl.body = block = Shin::JST::BlockStatement.new
-        inner_count = body.count
+        inner_count = body.length
         body.each_with_index do |expr, i|
           last = (inner_count - 1 == i)
 
