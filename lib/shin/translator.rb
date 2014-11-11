@@ -17,16 +17,22 @@ module Shin
 
     def translate(ast)
       program = Shin::JST::Program.new
+      anon = Shin::JST::FunctionExpression.new(nil)
+      anon.body = Shin::JST::BlockStatement.new
+      program.body << Shin::JST::ExpressionStatement.new(Shin::JST::CallExpression.new(anon))
+
+      body = anon.body.body
+
       ast.each do |node|
         case
         when matches?(node, "(defn :expr*)")
           # it's a function!
-          program.body << translate_defn(node.inner.drop 1)
-        when matches?(node, "(:id :expr*)")
-          # it's a call.
+          body << translate_defn(node.inner.drop 1)
+        when matches?(node, ":expr")
+          # any expression is a statement, after all.
           expr = translate_expr(node)
           ser!("Couldn't parse expr") if expr.nil?
-          program.body << Shin::JST::ExpressionStatement.new(expr)
+          body << Shin::JST::ExpressionStatement.new(expr)
         else
           ser!("Unknown form in Program", node.token)
         end
@@ -70,6 +76,8 @@ module Shin
       case
       when expr.identifier?
         return make_ident(expr.value)
+      when expr.literal?
+        return make_literal(expr.value)
       when expr.list?
         list = expr.inner
         first = list.first
@@ -101,8 +109,20 @@ module Shin
       end
     end
 
+    def make_literal(id)
+      Shin::JST::Literal.new(id)
+    end
+
     def make_ident(id)
-      Shin::JST::Identifier.new(id)
+      escaped_id = id.
+        gsub('-', '$_').
+        gsub('?', '$q').
+        gsub('!', '$e').
+        gsub('*', '$m').
+        gsub('/', '$d').
+        gsub('+', '$p').
+        to_s
+      Shin::JST::Identifier.new(escaped_id)
     end
 
     def make_rstat(node)

@@ -115,7 +115,14 @@ module Shin
     end
 
     def read_expr
-      read_identifier || read_list || read_vector || read_map || read_number || read_string || read_keyword || read_object_access
+      read_identifier_like ||
+        read_list ||
+        read_vector ||
+        read_map ||
+        read_number ||
+        read_string ||
+        read_keyword ||
+        read_object_access
     end
 
     def read_number
@@ -181,6 +188,22 @@ module Shin
         Shin::AST::MethodCall.new(t.extend!(pos), id)
       else
         ser!("Invalid object access type: #{type}")
+      end
+    end
+
+    def read_identifier_like
+      id = read_identifier
+      return nil if id.nil?
+
+      case id.value
+      when "true"
+        Shin::AST::Bool.new(id.token, true)
+      when "false"
+        Shin::AST::Bool.new(id.token, false)
+      when "nil"
+        Shin::AST::Nil.new(id.token)
+      else
+        id
       end
     end
 

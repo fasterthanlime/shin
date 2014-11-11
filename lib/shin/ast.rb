@@ -42,6 +42,10 @@ module Shin
         false
       end
 
+      def literal?
+        false
+      end
+
       def list?
         false
       end
@@ -89,12 +93,25 @@ module Shin
         super(token)
         @value = value
       end
+
+      def literal?
+        true
+      end
     end
 
     class Number < Literal
     end
 
     class String < Literal
+    end
+
+    class Bool < Literal
+    end
+
+    class Nil < Literal
+      def initialize(token)
+        super(token, nil)
+      end
     end
 
     class Identifier < Node
