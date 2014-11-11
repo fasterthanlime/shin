@@ -6,9 +6,9 @@ require 'shin/utils'
 module Shin
   # Converts Shin AST to JST
   class Translator
-    include Shin::LineColumn
-    include Shin::Snippet
-    include Shin::Matcher
+    include Shin::Utils::LineColumn
+    include Shin::Utils::Snippet
+    include Shin::Utils::Matcher
 
     def initialize(p_input, options)
       @input = p_input.dup

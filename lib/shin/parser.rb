@@ -4,8 +4,8 @@ require 'shin/utils'
 
 module Shin
   class Parser
-    include Shin::LineColumn
-    include Shin::Snippet
+    include Shin::Utils::LineColumn
+    include Shin::Utils::Snippet
 
     class Error < StandardError; end
     class EOF < Error; end
