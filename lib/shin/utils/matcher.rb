@@ -13,6 +13,7 @@ module Shin
         "num"  => Shin::AST::Number,
         "list" => Shin::AST::List,
         "map"  => Shin::AST::Map,
+        "kw"   => Shin::AST::Keyword,
       }
 
       def single_matches?(node, spec)
@@ -33,7 +34,11 @@ module Shin
       end
 
       def matches?(ast, pattern, &block)
-        specs = Shin::Parser.parse(pattern)
+        specs = if String === pattern
+          Shin::Parser.parse(pattern)
+        else
+          pattern
+        end
 
         if block && specs.length != block.arity
           raise "Wrong arity for matches?, got #{block.arity}, expected #{specs.length}"
@@ -48,17 +53,19 @@ module Shin
 
         specs.each do |spec|
           if list.empty?
-            puts "Empty list, remaining specs."
             return false
           end
           node = list.first
 
           case spec
           when Shin::AST::Sequence
-            # TODO: match the inside of sequences.
-            if spec.class === node then 
-              matches << node
-              list = list.drop 1
+            if spec.class === node
+              if spec.inner.empty? || matches?(node.inner, spec.inner)
+                matches << node
+                list = list.drop 1
+              else
+                return false
+              end
             else
               return false
             end
@@ -100,7 +107,6 @@ module Shin
             end
 
             if min_occ > coll.length
-              puts "Expected at least #{min_occ} #{type}"
               return false
             end
 
@@ -113,7 +119,6 @@ module Shin
         end
 
         unless list.empty?
-          puts "Empty specs, remaining list #{list}"
           return false
         end
 

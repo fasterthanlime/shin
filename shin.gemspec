@@ -11,8 +11,11 @@ Gem::Specification.new do |s|
   s.summary       = %q{Something about s-exprs.}
   s.description   = %q{Something about s-exprs.}
 
-  s.add_dependency 'oj'
-  s.add_dependency 'therubyracer'
+  s.add_dependency "oj"
+  s.add_dependency "therubyracer"
+
+  s.add_development_dependency "pry"
+  s.add_development_dependency "rspec"
 
   s.require_paths = ["lib"]
   s.license = "MIT"
