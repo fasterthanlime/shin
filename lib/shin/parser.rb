@@ -12,6 +12,7 @@ module Shin
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
+    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$]/
 
     def self.parse_file(path)
       Shin::Parser.new(File.read(path), :file => path).parse
@@ -41,7 +42,7 @@ module Shin
       skip_ws
 
       until eof?
-        node = read_list
+        node = read_expr
         ser! "Expected S-expression!" unless node
         nodes << node
         skip_ws
@@ -179,7 +180,7 @@ module Shin
 
       until eof?
         case (char = peek_char).chr
-        when /[A-Za-z\-_\*'\+\/]/
+        when IDENTIFIER_REGEXP
           s += char
           skip_char
         else
@@ -193,25 +194,15 @@ module Shin
 
     def read_keyword
       skip_ws
+      t = token
 
       return nil unless peek_char.chr == ':'
       skip_char
 
-      s = ""
-      t = token
+      id = read_identifier
+      return nil if id.nil?
 
-      until eof?
-        case (char = peek_char).chr
-        when /[A-Za-z\-_\*]/
-          s += char
-          skip_char
-        else
-          break
-        end
-      end
-
-      return nil if s.empty?
-      Shin::AST::Keyword.new(t.extend!(pos), s)
+      Shin::AST::Keyword.new(t.extend!(pos), id.value)
     end
 
     def skip_ws
