@@ -48,13 +48,11 @@ module Shin
         matches = []
 
         specs.each do |spec|
-          if list.empty?
-            return false
-          end
           node = list.first
 
           case spec
           when Shin::AST::Sequence
+            return false if node.nil?
             if spec.class === node
               if spec.inner.empty? || matches?(node.inner, spec.inner)
                 matches << node
@@ -66,6 +64,7 @@ module Shin
               return false
             end
           when Shin::AST::Literal, Shin::AST::Identifier
+            return false if node.nil?
             if spec.class === node && spec.value == node.value
               matches << node
               list = list.drop 1

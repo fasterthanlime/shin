@@ -49,6 +49,24 @@ RSpec.describe "Matcher", "matches?" do
     expect { Shin::Utils::Matcher.send(:matches?, Shin::AST::Keyword.new(nil, ""), "(unclosed") }.to raise_error
   end
 
+  it "applies the star operator correctly" do
+    expect(%Q{()}).to ast_match("(:str*)")
+    expect(%Q{("a")}).to ast_match("(:str*)")
+    expect(%Q{("a" "b")}).to ast_match("(:str*)")
+  end
+
+  it "applies the plus operator correctly" do
+    expect(%Q{()}).to_not ast_match("(:str+)")
+    expect(%Q{("a")}).to ast_match("(:str+)")
+    expect(%Q{("a" "b")}).to ast_match("(:str+)")
+  end
+
+  it "applies the question mark operator correctly" do
+    expect(%Q{()}).to ast_match("(:str?)")
+    expect(%Q{("a")}).to ast_match("(:str?)")
+    expect(%Q{("a" "b")}).to_not ast_match("(:str?)")
+  end
+
   it "rejects unmatched strings" do
     expect(%Q{42}).to_not ast_match(":str")
     expect(%Q{42}).to_not ast_match(%Q{"hello"})

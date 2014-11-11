@@ -138,6 +138,10 @@ module Shin
       @context[key] = val
     end
 
+    def context
+      @context
+    end
+
     private
 
     def parse_spec(spec_input)

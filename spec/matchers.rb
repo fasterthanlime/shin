@@ -1,4 +1,6 @@
 
+require 'shin/js_context'
+require 'shin/compiler'
 require 'shin/parser'
 require 'shin/utils/matcher'
 include Shin::Utils::Matcher
@@ -15,6 +17,28 @@ RSpec::Matchers.define :ast_match do |pattern|
 
   failure_message_when_negated do |actual|
     "expected '#{actual}' not to match AST pattern '#{pattern}'"
+  end
+end
+
+RSpec::Matchers.define :have_output do |expected_output|
+  output = []
+  code = nil
+
+  match do |actual|
+    res = Shin::Compiler.new.compile(actual)
+
+    js = Shin::JsContext.new
+    js.context['print'] = lambda do |_, msg|
+      output << msg
+    end
+    code = res[:code]
+    js.eval code
+
+    output.join(" ") === expected_output
+  end
+
+  failure_message do |actual|
+    "expected output '#{expected_output}', got '#{output.join(" ")}', code = '#{code}'"
   end
 end
 

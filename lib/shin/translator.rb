@@ -19,15 +19,16 @@ module Shin
       program = Shin::JST::Program.new
       ast.each do |node|
         case
-        when node.list?
-          first = node.inner.first
-          case
-          when first.identifier?("defn")
-            program.body << translate_defn(node.inner[1..-1])
-          else
-            puts "Unknown node: #{first.inspect}"
-          end
+        when matches?(node, "(defn :expr*)")
+          # it's a function!
+          program.body << translate_defn(node.inner.drop 1)
+        when matches?(node, "(:id :expr*)")
+          # it's a call.
+          expr = translate_expr(node)
+          ser!("Couldn't parse expr") if expr.nil?
+          program.body << Shin::JST::ExpressionStatement.new(expr)
         else
+          ser!("Unknown form in Program", node.token)
         end
       end
 
