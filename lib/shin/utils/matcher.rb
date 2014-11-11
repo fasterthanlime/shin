@@ -16,23 +16,6 @@ module Shin
         "kw"   => Shin::AST::Keyword,
       }
 
-      def single_matches?(node, spec)
-        case spec
-        when :expr
-          true
-        when :id
-          node.is_a?(Shin::AST::Identifier)
-        when :str
-          node.is_a?(Shin::AST::StringLiteral)
-        when :vec
-          node.is_a?(Shin::AST::Vector)
-        when :map
-          node.is_a?(Shin::AST::Map)
-        when :list
-          node.is_a?(Shin::AST::List)
-        end
-      end
-
       def matches?(ast, pattern, &block)
         specs = Shin::Parser.parse(pattern)
 
