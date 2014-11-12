@@ -192,6 +192,34 @@ module Shin
         super.merge(:test => test, :consequent => consequent, :alternate => alternate)
       end
     end
+
+    class VariableDeclaration < Node
+      attr_reader :declarations
+      attr_accessor :kind
+
+      def initialize(kind = 'var')
+        @declarations = []
+        @kind = kind
+      end
+
+      def to_hash
+        super.merge(:declarations => declarations, :kind => kind)
+      end
+    end
+
+    class VariableDeclarator < Node
+      attr_reader :id
+      attr_accessor :init
+
+      def initialize(id, init = nil)
+        @id = id
+        @init = init
+      end
+
+      def to_hash
+        super.merge(:id => id, :init => init)
+      end
+    end
   end
 end
 

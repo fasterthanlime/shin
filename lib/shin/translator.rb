@@ -56,10 +56,12 @@ module Shin
         when matches?(node, "(defn :expr*)")
           # it's a function!
           body << translate_defn(node.inner.drop 1)
+        when matches?(node, "(def :expr*)")
+          body << translate_def(node.inner.drop 1)
         when matches?(node, ":expr")
           # any expression is a statement, after all.
           expr = translate_expr(node)
-          ser!("Couldn't parse expr") if expr.nil?
+          ser!("Couldn't parse expr", node.token) if expr.nil?
           body << ExpressionStatement.new(expr)
         else
           ser!("Unknown form in Program", node.token)
@@ -70,6 +72,31 @@ module Shin
     end
 
     protected
+
+    def translate_def(list)
+      decl = nil
+
+      success = matches?(list, ":id :expr*") do |name, rest|
+        decl = VariableDeclaration.new
+        dtor = VariableDeclarator.new(make_ident(name.value))
+
+        case
+        when matches?(rest, ":str :expr")
+          doc, expr = rest
+          dtor.init = translate_expr(expr)
+        when matches?(rest, ":expr")
+          expr = rest.first
+          dtor.init = translate_expr(expr)
+        else
+          ser!("Invalid def form", list.first.token)
+        end
+
+        decl.declarations << dtor
+      end
+
+      ser!("Invalid def form", list.first.token) unless success
+      decl
+    end
 
     def translate_defn(list)
       decl = nil
@@ -84,7 +111,7 @@ module Shin
         translate_body_into_block(body, block)
       end
 
-      ser!("Expected valid defn", list[0].token) unless success
+      ser!("Invalid defn form", list.first.token) unless success
       decl
     end
 
