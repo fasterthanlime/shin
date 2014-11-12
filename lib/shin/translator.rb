@@ -20,8 +20,8 @@ module Shin
 
       program = Shin::JST::Program.new
       load_shim = Shin::JST::FunctionExpression.new(nil)
-      load_shim.params << make_ident("root");
-      load_shim.params << make_ident("factory")
+      load_shim.params << make_ident('root');
+      load_shim.params << make_ident('factory')
       load_shim.body = Shin::JST::BlockStatement.new
       define_call = Shin::JST::CallExpression.new(make_ident('define'))
       require_arr = Shin::JST::ArrayExpression.new
@@ -38,12 +38,17 @@ module Shin
       end
       factory.body = Shin::JST::BlockStatement.new
 
-      call = Shin::JST::CallExpression.new(load_shim)
-      call.arguments << Shin::JST::ThisExpression.new
-      call.arguments << factory
-      program.body << Shin::JST::ExpressionStatement.new(call)
+      shim_call = Shin::JST::CallExpression.new(load_shim)
+      shim_call.arguments << Shin::JST::ThisExpression.new
+      shim_call.arguments << factory
+      program.body << Shin::JST::ExpressionStatement.new(shim_call)
 
       body = factory.body.body
+      shin_init = Shin::JST::MemberExpression.new(make_ident('shin'), make_ident('init'), false)
+      init_call = Shin::JST::CallExpression.new(shin_init)
+      init_call.arguments << make_ident('this')
+      init_call.arguments << make_literal('shin_module')
+      body << Shin::JST::ExpressionStatement.new(init_call)
 
       ast.each do |node|
         case
