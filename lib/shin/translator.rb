@@ -148,6 +148,7 @@ module Shin
         gsub('*', '$m').
         gsub('/', '$d').
         gsub('+', '$p').
+        gsub('=', '$l').
         to_s
       Shin::JST::Identifier.new(escaped_id)
     end
