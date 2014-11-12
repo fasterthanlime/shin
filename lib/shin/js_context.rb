@@ -5,7 +5,7 @@ require 'oj'
 module Shin
   class JsContext
 
-    DEBUG = true
+    DEBUG = false
 
     def initialize
       @context = V8::Context.new
