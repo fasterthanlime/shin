@@ -1,5 +1,5 @@
 
-RSpec.describe "Compiler", "defn" do
+RSpec.describe "Language", "defn" do
   it "defines and calls a simple function" do
     expect(%Q{
            (defn hello [] (print "Hello"))

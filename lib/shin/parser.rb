@@ -15,7 +15,7 @@ module Shin
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
-    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&]/
+    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=]/
 
     def self.parse(source)
       # parse is a no-op if source is not a String.

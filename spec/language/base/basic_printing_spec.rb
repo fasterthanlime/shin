@@ -1,5 +1,5 @@
 
-RSpec.describe "Compiler", "basic printing" do
+RSpec.describe "Language", "basic printing" do
   it "tests output correctly (positive)" do
     expect(%Q{(print "Hello")}).to have_output("Hello")
   end
