@@ -6,6 +6,7 @@ module Shin
   class Parser
     include Shin::Utils::LineColumn
     include Shin::Utils::Snippet
+    include Shin::AST
 
     class Error < StandardError; end
     class EOF < Error; end
@@ -20,7 +21,7 @@ module Shin
     def self.parse(source)
       # parse is a no-op if source is not a String.
       # it might be a piece of already-parsed AST.
-      return source unless String === source
+      return source unless ::String === source
       Shin::Parser.new(source).parse
     end
 
@@ -100,15 +101,15 @@ module Shin
     end
 
     def read_list
-      read_sequence(Shin::AST::List, LPAREN, RPAREN)
+      read_sequence(List, LPAREN, RPAREN)
     end
 
     def read_vector
-      read_sequence(Shin::AST::Vector, LBRACK, RBRACK)
+      read_sequence(Vector, LBRACK, RBRACK)
     end
 
     def read_map
-      node = read_sequence(Shin::AST::Map, LBRACE, RBRACE)
+      node = read_sequence(Map, LBRACE, RBRACE)
       return nil unless node
       ser!("Map literal requires even number of forms", node.token) unless node.inner.count % 2 == 0
       node
@@ -141,7 +142,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Number.new(t.extend!(pos), s.to_f)
+      Number.new(t.extend!(pos), s.to_f)
     end
 
     def read_string
@@ -162,7 +163,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::String.new(t.extend!(pos), s)
+      String.new(t.extend!(pos), s)
     end
 
     def read_object_access
@@ -183,9 +184,9 @@ module Shin
 
       case type
       when :access
-        Shin::AST::FieldAccess.new(t.extend!(pos), id)
+        FieldAccess.new(t.extend!(pos), id)
       when :call
-        Shin::AST::MethodCall.new(t.extend!(pos), id)
+        MethodCall.new(t.extend!(pos), id)
       else
         ser!("Invalid object access type: #{type}")
       end
@@ -197,11 +198,11 @@ module Shin
 
       case id.value
       when "true"
-        Shin::AST::Bool.new(id.token, true)
+        Bool.new(id.token, true)
       when "false"
-        Shin::AST::Bool.new(id.token, false)
+        Bool.new(id.token, false)
       when "nil"
-        Shin::AST::Nil.new(id.token)
+        Nil.new(id.token)
       else
         id
       end
@@ -223,7 +224,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Shin::AST::Identifier.new(t.extend!(pos), s)
+      Identifier.new(t.extend!(pos), s)
     end
 
     def read_keyword
@@ -236,7 +237,7 @@ module Shin
       id = read_identifier
       return nil if id.nil?
 
-      Shin::AST::Keyword.new(t.extend!(pos), id.value)
+      Keyword.new(t.extend!(pos), id.value)
     end
 
     def skip_ws
@@ -257,7 +258,7 @@ module Shin
     end
 
     def token
-      Shin::AST::Token.new(file, pos)
+      Token.new(file, pos)
     end
 
     def file
