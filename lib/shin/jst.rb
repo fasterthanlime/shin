@@ -178,6 +178,20 @@ module Shin
         super.merge(:elements => elements)
       end
     end
+
+    class IfStatement < Node
+      attr_reader :test
+      attr_accessor :consequent
+      attr_accessor :alternate
+
+      def initialize(test)
+        @test = test
+      end
+
+      def to_hash
+        super.merge(:test => test, :consequent => consequent, :alternate => alternate)
+      end
+    end
   end
 end
 

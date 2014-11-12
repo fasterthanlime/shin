@@ -32,7 +32,8 @@ RSpec::Matchers.define :have_output do |expected_output|
     js.context['print'] = lambda do |_, msg|
       output << msg
     end
-    js.load(res[:code], :inline => true)
+    code = res[:code]
+    js.load(code, :inline => true)
 
     output.join(" ") === expected_output
   end

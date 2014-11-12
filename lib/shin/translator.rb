@@ -81,23 +81,27 @@ module Shin
         end
 
         decl.body = block = BlockStatement.new
-        inner_count = body.length
-        body.each_with_index do |expr, i|
-          last = (inner_count - 1 == i)
-
-          node = translate_expr(expr)
-          node = if last
-            make_rstat(node)
-          else
-            make_estat(node)
-          end
-
-          block.body << node
-        end
+        translate_body_into_block(body, block)
       end
 
       ser!("Expected valid defn", list[0].token) unless success
       decl
+    end
+
+    def translate_body_into_block(body, block)
+      inner_count = body.length
+      body.each_with_index do |expr, i|
+        last = (inner_count - 1 == i)
+
+        node = translate_expr(expr)
+        node = if last
+                 make_rstat(node)
+               else
+                 make_estat(node)
+               end
+
+        block.body << node
+      end
     end
 
     def translate_expr(expr)
@@ -115,14 +119,28 @@ module Shin
           object = translate_expr(list[1])
           mexp = MemberExpression.new(object, property, false)
           call = CallExpression.new(mexp)
-          list[2..-1].each do |arg|
+          list.drop(2).each do |arg|
             call.arguments << translate_expr(arg)
           end
           return call
+        when first.identifier?("if")
+          anon = FunctionExpression.new(nil)
+          anon.body = BlockStatement.new
+          body = anon.body.body
+
+          test, consequent, alternate = list.drop 1
+          fi = IfStatement.new(translate_expr(test))
+          fi.consequent  = BlockStatement.new
+          translate_body_into_block([consequent], fi.consequent)
+          fi.alternate = BlockStatement.new
+          translate_body_into_block([alternate], fi.alternate)
+          body << fi
+
+          return CallExpression.new(anon)
         when first.identifier?
           # function call
           call = CallExpression.new(make_ident(first.value))
-          list[1..-1].each do |arg|
+          list.drop(1).each do |arg|
             call.arguments << translate_expr(arg)
           end
           return call
