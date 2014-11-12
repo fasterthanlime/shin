@@ -219,6 +219,7 @@ module Shin
         gsub('=', '$l').
         gsub('>', '$g').
         gsub('<', '$s').
+        gsub('.', '$d').
         to_s
       Identifier.new(escaped_id)
     end

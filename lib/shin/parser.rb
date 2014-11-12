@@ -16,7 +16,8 @@ module Shin
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
-    IDENTIFIER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=]/
+    ID_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.]/
+    ID_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.#\$0-9]/
 
     def self.parse(source)
       # parse is a no-op if source is not a String.
@@ -123,7 +124,13 @@ module Shin
         read_number ||
         read_string ||
         read_keyword ||
-        read_object_access
+        read_object_access ||
+        read_metadata ||
+        read_closure ||
+        read_quote ||
+        read_syntax_quote ||
+        read_unquote ||
+        read_deref
     end
 
     def read_number
@@ -211,11 +218,14 @@ module Shin
     def read_identifier
       skip_ws
       s = ""
+
+      return nil unless peek_char.chr =~ ID_START_REGEXP
       t = token
+      s << read_char
 
       until eof?
         case (char = peek_char).chr
-        when IDENTIFIER_REGEXP
+        when ID_INNER_REGEXP
           s += char
           skip_char
         else
@@ -227,11 +237,83 @@ module Shin
       Identifier.new(t.extend!(pos), s)
     end
 
+    def read_closure
+      skip_ws
+
+      return nil unless peek_char.chr == '#'
+      t = token
+      skip_char
+
+      inner = read_list
+      ser!("Expected list form after closure start #") unless inner
+      Closure.new(t.extend!(pos), inner)
+    end
+
+    def read_quote
+      skip_ws
+
+      return nil unless peek_char.chr == '\''
+      t = token
+      skip_char
+
+      inner = read_expr
+      ser!("Expected expr after quote start") unless inner
+      Quote.new(t.extend!(pos), inner)
+    end
+
+    def read_syntax_quote
+      skip_ws
+
+      return nil unless peek_char.chr == '`'
+      t = token
+      skip_char
+
+      inner = read_expr
+      ser!("Expected expr after syntax quote start") unless inner
+      SyntaxQuote.new(t.extend!(pos), inner)
+    end
+
+    def read_unquote
+      skip_ws
+
+      return nil unless peek_char.chr == '~'
+      t = token
+      skip_char
+
+      inner = read_expr
+      ser!("Expected expr after unquote start") unless inner
+      Unquote.new(t.extend!(pos), inner)
+    end
+
+    def read_deref
+      skip_ws
+
+      return nil unless peek_char.chr == '@'
+      t = token
+      skip_char
+
+      inner = read_expr
+      ser!("Expected expr after deref start") unless inner
+      Deref.new(t.extend!(pos), inner)
+    end
+
+    def read_metadata
+      skip_ws
+
+      return nil unless peek_char.chr == '^'
+      t = token
+      skip_char
+
+      inner = read_expr
+      ser!("Expected metadata expr after ^") unless inner
+      MetaData.new(t.extend!(pos), inner)
+    end
+
     def read_keyword
       skip_ws
-      t = token
 
       return nil unless peek_char.chr == ':'
+      t = token
       skip_char
 
       id = read_identifier

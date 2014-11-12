@@ -72,17 +72,29 @@ module Shin
       def list?
         true
       end
+
+      def to_s
+        "(#{inner.map(&:to_s).join(" ")})"
+      end
     end
 
     class Vector < Sequence
       def vector?
         true
       end
+
+      def to_s
+        "[#{inner.map(&:to_s).join(" ")}]"
+      end
     end
 
     class Map < Sequence
       def map?
         true
+      end
+
+      def to_s
+        "{#{inner.map(&:to_s).join(" ")}}"
       end
     end
 
@@ -96,6 +108,10 @@ module Shin
 
       def literal?
         true
+      end
+
+      def to_s
+        value.inspect
       end
     end
 
@@ -126,6 +142,10 @@ module Shin
         return true if value.nil?
         @value == value
       end
+
+      def to_s
+        value
+      end
     end
 
     class Keyword < Node
@@ -134,6 +154,10 @@ module Shin
       def initialize(token, value)
         super(token)
         @value = value
+      end
+
+      def to_s
+        ":#{value}"
       end
     end
 
@@ -147,9 +171,93 @@ module Shin
     end
 
     class MethodCall < ObjectAccess
+      def to_s
+        ".#{id.value})"
+      end
     end
 
     class FieldAccess < ObjectAccess
+      def to_s
+        ".-#{id.value})"
+      end
+    end
+
+    class MetaData < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "^#{inner}"
+      end
+    end
+
+    class Closure < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "##{inner}"
+      end
+    end
+
+    class Quote < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "'#{inner}"
+      end
+    end
+
+    class SyntaxQuote < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "`#{inner}"
+      end
+    end
+
+    class Unquote < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "~#{inner}"
+      end
+    end
+
+    class Deref < Node
+      attr_reader :inner
+
+      def initialize(token, inner)
+        super(token)
+        @inner = inner
+      end
+
+      def to_s
+        "@#{inner}"
+      end
     end
   end
 end
