@@ -16,12 +16,34 @@ module Shin
     end
 
     def translate(ast)
-      program = Shin::JST::Program.new
-      anon = Shin::JST::FunctionExpression.new(nil)
-      anon.body = Shin::JST::BlockStatement.new
-      program.body << Shin::JST::ExpressionStatement.new(Shin::JST::CallExpression.new(anon))
+      requires = %w(exports shin mori)
 
-      body = anon.body.body
+      program = Shin::JST::Program.new
+      load_shim = Shin::JST::FunctionExpression.new(nil)
+      load_shim.params << make_ident("root");
+      load_shim.params << make_ident("factory")
+      load_shim.body = Shin::JST::BlockStatement.new
+      define_call = Shin::JST::CallExpression.new(make_ident('define'))
+      require_arr = Shin::JST::ArrayExpression.new
+      requires.each do |req|
+        require_arr.elements << make_literal(req)
+      end
+      define_call.arguments << require_arr
+      define_call.arguments << make_ident('factory')
+      load_shim.body.body << Shin::JST::ExpressionStatement.new(define_call)
+
+      factory = Shin::JST::FunctionExpression.new(nil)
+      requires.each do |req|
+        factory.params << make_ident(req)
+      end
+      factory.body = Shin::JST::BlockStatement.new
+
+      call = Shin::JST::CallExpression.new(load_shim)
+      call.arguments << Shin::JST::ThisExpression.new
+      call.arguments << factory
+      program.body << Shin::JST::ExpressionStatement.new(call)
+
+      body = factory.body.body
 
       ast.each do |node|
         case

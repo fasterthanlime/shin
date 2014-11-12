@@ -5,10 +5,11 @@ require 'oj'
 module Shin
   class JsContext
 
-    DEBUG = false
+    DEBUG = true
 
     def initialize
       @context = V8::Context.new
+      @seed = 0
 
       @context.eval %Q{
         this.$kir = {
@@ -37,20 +38,26 @@ module Shin
       @context.eval("$kir.modules[#{escape(spec.name)}] != null")
     end
 
-    def load(spec_input)
-      spec = parse_spec(spec_input)
+    def fresh_seed
+      @seed += 1
+    end
+
+    def load(spec_input, inline: false)
+      spec = if inline
+        parse_spec("anon_#{fresh_seed}")
+      else
+        parse_spec(spec_input)
+      end
+
       debug "Loading #{spec.name}"
 
       if spec.text?
-        path = resource_path(spec.name)
-        text_content = File.read(path);
+        text_content = File.read(resource_path(spec.name))
         @context.eval %Q{
           $kir.define(#{escape(spec.name)}, [], null).exports = #{escape(text_content)};
         }
         return
       end
-
-      path = resource_path(spec.name + ".js")
 
       # use globals so we can use V8::Context.load
       # and retain stack trace information.
@@ -61,7 +68,9 @@ module Shin
         this.$define_called = false;
         this.define = function (a, b, c) {
           $define_called = true; 
-          if (typeof a === 'string') {
+          if (typeof a === 'function') {
+            $kir.define(#{escape(spec.name)}, [], a);
+          } else if (typeof a === 'string') {
             $kir.define(a, b, c);
           } else {
             $kir.define(#{escape(spec.name)}, a, b);
@@ -70,7 +79,12 @@ module Shin
         this.define.amd = true;
       }
 
-      @context.load path
+      if inline
+        @context.eval spec_input
+      else
+        path = resource_path(spec.name + ".js")
+        @context.load path
+      end
 
       mod = @context.eval %Q{
         var name = #{escape(spec.name)};

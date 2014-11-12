@@ -163,6 +163,21 @@ module Shin
         super.merge(:value => value)
       end
     end
+
+    class ThisExpression < Node
+    end
+
+    class ArrayExpression < Node
+      attr_reader :elements
+
+      def initialize
+        @elements = []
+      end
+
+      def to_hash
+        super.merge(:elements => elements)
+      end
+    end
   end
 end
 
