@@ -150,6 +150,11 @@ module Shin
             call.arguments << translate_expr(arg)
           end
           return call
+        when first.identifier?("do")
+          anon = FunctionExpression.new(nil)
+          anon.body = BlockStatement.new
+          translate_body_into_block(list.drop(1), anon.body)
+          return CallExpression.new(anon)
         when first.identifier?("if")
           anon = FunctionExpression.new(nil)
           anon.body = BlockStatement.new
