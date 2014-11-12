@@ -49,6 +49,10 @@ module Shin
       def list?
         false
       end
+      
+      def set?
+        false
+      end
 
       def vector?
         false
@@ -88,6 +92,16 @@ module Shin
       end
     end
 
+    class Set < Sequence
+      def set?
+        true
+      end
+
+      def to_s
+        "\#{#{inner.map(&:to_s).join(" ")}}"
+      end
+    end
+
     class Map < Sequence
       def map?
         true
@@ -119,6 +133,9 @@ module Shin
     end
 
     class String < Literal
+    end
+
+    class RegExp < Literal
     end
 
     class Bool < Literal

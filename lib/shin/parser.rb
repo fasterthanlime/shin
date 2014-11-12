@@ -84,7 +84,7 @@ module Shin
         else
           child = read_expr
           if child.nil?
-            ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'", node.token)
+            ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'")
           end
           node.inner << child
           node.token.extend!(pos)
@@ -94,7 +94,7 @@ module Shin
       end
 
       unless (char = read_char).chr == rdelim
-        ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'", node.token)
+        ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'")
       end
 
       node.token.extend!(pos)
@@ -126,7 +126,7 @@ module Shin
         read_keyword ||
         read_object_access ||
         read_metadata ||
-        read_closure ||
+        read_closure_or_set ||
         read_quote ||
         read_syntax_quote ||
         read_unquote ||
@@ -169,7 +169,6 @@ module Shin
         end
       end
 
-      return nil if s.empty?
       String.new(t.extend!(pos), s)
     end
 
@@ -237,16 +236,26 @@ module Shin
       Identifier.new(t.extend!(pos), s)
     end
 
-    def read_closure
+    def read_closure_or_set
       skip_ws
 
       return nil unless peek_char.chr == '#'
       t = token
       skip_char
 
-      inner = read_list
-      ser!("Expected list form after closure start #") unless inner
-      Closure.new(t.extend!(pos), inner)
+      follower = read_expr
+      case follower
+      when Map
+        set = Set.new(t.extend!(pos))
+        follower.inner.each { |el| set.inner << el }
+        set
+      when List
+        Closure.new(t.extend!(pos), follower)
+      when String
+        RegExp.new(t.extend!(pos), follower.value)
+      else
+        ser!("Invalid #-form")
+      end
     end
 
     def read_quote
