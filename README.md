@@ -10,3 +10,7 @@ compiler, heavily inspired by [ki].
 
 It's also the way Sean connery pronounces "sin".
 
+## License
+
+Shin is released under the MIT license. See `LICENSE.txt` for the complete text.
+
