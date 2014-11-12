@@ -20,6 +20,8 @@ RSpec::Matchers.define :ast_match do |pattern|
   end
 end
 
+js = Shin::JsContext.new
+
 RSpec::Matchers.define :have_output do |expected_output|
   output = []
   code = nil
@@ -27,7 +29,6 @@ RSpec::Matchers.define :have_output do |expected_output|
   match do |actual|
     res = Shin::Compiler.new.compile(actual)
 
-    js = Shin::JsContext.new
     js.context['print'] = lambda do |_, msg|
       output << msg
     end
