@@ -115,6 +115,23 @@ module Shin
       decl
     end
 
+    def translate_fn(list)
+      expr = nil
+
+      success = matches?(list, "[:id*] :expr*") do |args, body|
+        expr = FunctionExpression.new(nil)
+        args.inner.each do |arg|
+          expr.params << make_ident(arg.value)
+        end
+
+        expr.body = BlockStatement.new
+        translate_body_into_block(list.drop(1), expr.body)
+      end
+
+      ser!("Invalid fn form", list.first.token) unless success
+      expr
+    end
+
     def translate_body_into_block(body, block)
       inner_count = body.length
       body.each_with_index do |expr, i|
@@ -150,6 +167,8 @@ module Shin
             call.arguments << translate_expr(arg)
           end
           return call
+        when first.identifier?("fn")
+          return translate_fn(list.drop(1))
         when first.identifier?("do")
           anon = FunctionExpression.new(nil)
           anon.body = BlockStatement.new
@@ -169,15 +188,13 @@ module Shin
           body << fi
 
           return CallExpression.new(anon)
-        when first.identifier?
+        else
           # function call
-          call = CallExpression.new(make_ident(first.value))
+          call = CallExpression.new(translate_expr(first))
           list.drop(1).each do |arg|
             call.arguments << translate_expr(arg)
           end
           return call
-        else
-          ser!("Unknown list expr form", expr.token)
         end
       when expr.instance_of?(Shin::AST::String)
         Literal.new(expr.value)

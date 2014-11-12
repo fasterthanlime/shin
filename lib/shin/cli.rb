@@ -12,6 +12,7 @@ module Shin
         on 'e=', 'exec', 'Eval the given code and exit'
         on 'o=', 'output', 'Output directory', :default => "."
         on 'c', 'check', 'Check syntax only'
+        on 'S', 'sexpr', 'Dump parsed S-exprs and exit'
         on 'a', 'ast', 'Dump AST and exit'
         on 'A', 'ast2', 'Dump mutated AST (after macro expansion) and exit'
         on 'J', 'jst', 'Dump JST (Mozilla Parse API AST) and exit'
@@ -43,6 +44,13 @@ module Shin
       ast = parser.parse
 
       if opts.check?
+        exit 0
+      end
+
+      if opts.sexpr?
+        ast.each do |node|
+          puts node.to_s
+        end
         exit 0
       end
 

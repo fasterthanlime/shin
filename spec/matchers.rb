@@ -29,8 +29,8 @@ RSpec::Matchers.define :have_output do |expected_output|
   match do |actual|
     res = Shin::Compiler.new.compile(actual)
 
-    js.context['print'] = lambda do |_, msg|
-      output << msg
+    js.context['print'] = lambda do |_, *args|
+      output << args.join(" ")
     end
     code = res[:code]
     js.load(code, :inline => true)
