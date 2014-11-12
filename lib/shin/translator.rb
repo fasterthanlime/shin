@@ -152,6 +152,11 @@ module Shin
       case
       when expr.identifier?
         return make_ident(expr.value)
+      when Shin::AST::RegExp === expr
+        newe = NewExpression.new(make_ident("RegExp"))
+        newe.arguments << make_literal(expr.value)
+        return newe
+        Literal.new({}, "/#{expr.value}/")
       when expr.literal?
         return make_literal(expr.value)
       when expr.list?
@@ -196,10 +201,8 @@ module Shin
           end
           return call
         end
-      when expr.instance_of?(Shin::AST::String)
-        Literal.new(expr.value)
       else
-        ser!("Unknown expr form", expr.token)
+        ser!("Unknown expr form #{expr.inspect}", expr.token)
         nil
       end
     end

@@ -136,6 +136,9 @@ module Shin
     end
 
     class RegExp < Literal
+      def to_s
+        "#\"#{value.to_s}\""
+      end
     end
 
     class Bool < Literal

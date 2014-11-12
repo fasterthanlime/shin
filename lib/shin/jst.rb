@@ -136,6 +136,9 @@ module Shin
       end
     end
 
+    class NewExpression < CallExpression
+    end
+
     class MemberExpression < Node
       attr_reader :object
       attr_reader :property
@@ -154,13 +157,15 @@ module Shin
 
     class Literal < Node
       attr_reader :value
+      attr_reader :raw
 
-      def initialize(value)
+      def initialize(value, raw = nil)
         @value = value
+        @raw = raw
       end
 
       def to_hash
-        super.merge(:value => value)
+        super.merge(:value => value, :raw => raw)
       end
     end
 
