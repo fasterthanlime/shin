@@ -175,8 +175,8 @@ module Shin
     class ArrayExpression < Node
       attr_reader :elements
 
-      def initialize
-        @elements = []
+      def initialize(elements = [])
+        @elements = elements
       end
 
       def to_hash

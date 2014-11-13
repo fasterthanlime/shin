@@ -109,26 +109,23 @@ module Shin
     end
 
     def read_map
-      node = read_sequence(Map, LBRACE, RBRACE)
-      return nil unless node
-      ser!("Map literal requires even number of forms", node.token) unless node.inner.count % 2 == 0
-      node
+      read_sequence(Map, LBRACE, RBRACE)
     end
 
     def read_expr
-      read_symbol_like ||
+      read_object_access ||
+        read_quote ||
+        read_syntax_quote ||
+        read_unquote ||
+        read_symbol_like ||
         read_list ||
         read_vector ||
         read_map ||
         read_number ||
         read_string ||
         read_keyword ||
-        read_object_access ||
         read_metadata ||
         read_closure_or_set ||
-        read_quote ||
-        read_syntax_quote ||
-        read_unquote ||
         read_deref
     end
 
@@ -260,7 +257,7 @@ module Shin
     def read_quote
       skip_ws
 
-      return nil unless peek_char.chr == '\''
+      return nil unless peek_char.chr == "'"
       t = token
       skip_char
 

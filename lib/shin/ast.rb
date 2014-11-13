@@ -182,23 +182,23 @@ module Shin
     end
 
     class ObjectAccess < Node
-      attr_accessor :id
+      attr_accessor :sym
 
-      def initialize(token, id)
+      def initialize(token, sym)
         super(token)
-        @id = id
+        @sym = sym
       end
     end
 
     class MethodCall < ObjectAccess
       def to_s
-        ".#{id.value})"
+        ".#{sym.value})"
       end
     end
 
     class FieldAccess < ObjectAccess
       def to_s
-        ".-#{id.value})"
+        ".-#{sym.value})"
       end
     end
 

@@ -167,12 +167,38 @@ module Shin
       when Shin::AST::Deref
         t = expr.token
         return translate_expr(Shin::AST::List.new(t, [Shin::AST::Symbol.new(t, "deref"), expr.inner]))
+      when Shin::AST::Quote
+        t = expr.token
+        case expr.inner
+        when Shin::AST::List
+          els = expr.inner.inner.map { |el| translate_expr(el) }
+          return CallExpression.new(make_ident("list"), els)
+        when Shin::AST::Symbol
+          return CallExpression.new(make_ident("symbol"), [make_literal(expr.inner.value)])
+        when Shin::AST::Literal, Shin::AST::Sequence
+          # useless quoting?
+          return translate_expr(expr.inner)
+        else
+          ser!("Quoting unknown form", expr)
+        end
+      when Shin::AST::Vector
+        els = expr.inner.map { |el| translate_expr(el) }
+        return CallExpression.new(make_ident("vector"), els)
+      when Shin::AST::Set
+        arr = ArrayExpression.new(expr.inner.map { |el| translate_expr(el) })
+        return CallExpression.new(make_ident("set"), [arr])
+      when Shin::AST::Map
+        ser!("Map literal requires even number of forms", expr) unless expr.inner.count.even?
+        els = expr.inner.map { |el| translate_expr(el) }
+        return CallExpression.new(make_ident("hash-map"), els)
+      when Shin::AST::Keyword
+        return CallExpression.new(make_ident("keyword"), [make_literal(expr.value)])
       when Shin::AST::List
         list = expr.inner
         first = list.first
         case
         when Shin::AST::MethodCall === first
-          property = translate_expr(list[0].id)
+          property = make_ident(list[0].sym.value)
           object = translate_expr(list[1])
           mexp = MemberExpression.new(object, property, false)
           call = CallExpression.new(mexp)
@@ -180,6 +206,10 @@ module Shin
             call.arguments << translate_expr(arg)
           end
           return call
+        when Shin::AST::FieldAccess === first
+          property = make_ident(list[0].sym.value)
+          object = translate_expr(list[1])
+          return MemberExpression.new(object, property, false)
         when first.sym?("let")
           return translate_let(list.drop(1))
         when first.sym?("fn")
