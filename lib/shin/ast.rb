@@ -38,7 +38,7 @@ module Shin
         @token = token
       end
       
-      def identifier?(value = nil)
+      def sym?(value = nil)
         false
       end
 
@@ -150,7 +150,7 @@ module Shin
       end
     end
 
-    class Identifier < Node
+    class Symbol < Node
       attr_accessor :value
 
       def initialize(token ,value)
@@ -158,7 +158,7 @@ module Shin
         @value = value
       end
 
-      def identifier?(value = nil)
+      def sym?(value = nil)
         return true if value.nil?
         @value == value
       end

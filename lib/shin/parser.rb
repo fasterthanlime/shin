@@ -116,7 +116,7 @@ module Shin
     end
 
     def read_expr
-      read_identifier_like ||
+      read_symbol_like ||
         read_list ||
         read_vector ||
         read_map ||
@@ -184,8 +184,8 @@ module Shin
         skip_char
       end
 
-      id = read_identifier
-      ser!("Expected identifier after method call operator") unless id
+      id = read_symbol
+      ser!("Expected symbol after method call operator") unless id
 
       case type
       when :access
@@ -197,8 +197,8 @@ module Shin
       end
     end
 
-    def read_identifier_like
-      id = read_identifier
+    def read_symbol_like
+      id = read_symbol
       return nil if id.nil?
 
       case id.value
@@ -213,7 +213,7 @@ module Shin
       end
     end
 
-    def read_identifier
+    def read_symbol
       skip_ws
       s = ""
 
@@ -232,7 +232,7 @@ module Shin
       end
 
       return nil if s.empty?
-      Identifier.new(t.extend!(pos), s)
+      Symbol.new(t.extend!(pos), s)
     end
 
     def read_closure_or_set
@@ -324,7 +324,7 @@ module Shin
       t = token
       skip_char
 
-      id = read_identifier
+      id = read_symbol
       return nil if id.nil?
 
       Keyword.new(t.extend!(pos), id.value)

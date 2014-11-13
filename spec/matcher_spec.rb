@@ -1,7 +1,7 @@
 
 RSpec.describe "Matcher", "matches?" do
-  it "matches any identifier via keyword" do
-    expect(%Q{defn}).to ast_match(":id")
+  it "matches any symbol via keyword" do
+    expect(%Q{defn}).to ast_match(":sym")
   end
   it "matches any keyword via keyword" do
     expect(%Q{:keys}).to ast_match(":kw")

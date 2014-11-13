@@ -84,10 +84,10 @@ module Shin
           case name
           when Shin::AST::Sequence
             ser!("Destructuring isn't supported yet.", name)
-          when Shin::AST::Identifier
+          when Shin::AST::Symbol
             # all good
           else
-            ser!("Invalid let form: first binding form should be an identifier or collection", name)
+            ser!("Invalid let form: first binding form should be a symbol or collection", name)
           end
 
           anon.params << make_ident(name.value)
@@ -101,7 +101,7 @@ module Shin
     end
 
     def translate_def(list)
-      matches?(list, ":id :expr*") do |name, rest|
+      matches?(list, ":sym :expr*") do |name, rest|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
 
@@ -122,7 +122,7 @@ module Shin
     end
 
     def translate_defn(list)
-      matches?(list, ":id :str? [:id*] :expr*") do |name, doc, args, body|
+      matches?(list, ":sym :str? [:sym*] :expr*") do |name, doc, args, body|
         decl = FunctionDeclaration.new(make_ident(name.value))
         args.inner.each do |arg|
           decl.params << make_ident(arg.value)
@@ -135,7 +135,7 @@ module Shin
     end
 
     def translate_fn(list)
-      matches?(list, "[:id*] :expr*") do |args, body|
+      matches?(list, "[:sym*] :expr*") do |args, body|
         expr = FunctionExpression.new
         args.inner.each do |arg|
           expr.params << make_ident(arg.value)
@@ -158,7 +158,7 @@ module Shin
 
     def translate_expr(expr)
       case expr
-      when Shin::AST::Identifier
+      when Shin::AST::Symbol
         return make_ident(expr.value)
       when Shin::AST::RegExp
         return NewExpression.new(make_ident("RegExp"), [make_literal(expr.value)])
@@ -181,16 +181,16 @@ module Shin
             call.arguments << translate_expr(arg)
           end
           return call
-        when first.identifier?("let")
+        when first.sym?("let")
           return translate_let(list.drop(1))
-        when first.identifier?("fn")
+        when first.sym?("fn")
           return translate_fn(list.drop(1))
-        when first.identifier?("do")
+        when first.sym?("do")
           anon = FunctionExpression.new
           anon.body = BlockStatement.new
           translate_body_into_block(list.drop(1), anon.body)
           return CallExpression.new(anon)
-        when first.identifier?("if")
+        when first.sym?("if")
           anon = FunctionExpression.new
           anon.body = BlockStatement.new
           body = anon.body.body

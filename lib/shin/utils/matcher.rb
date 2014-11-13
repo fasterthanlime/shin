@@ -4,16 +4,18 @@ require 'shin/parser'
 module Shin
   module Utils
     module Matcher
+      include Shin::AST
+
       TYPE_REGEXP = /^([\w]*)(.*)$/
       TYPE_MAP = {
-        "expr" => Shin::AST::Node,
-        "id"   => Shin::AST::Identifier,
-        "vec"  => Shin::AST::Vector,
-        "str"  => Shin::AST::String,
-        "num"  => Shin::AST::Number,
-        "list" => Shin::AST::List,
-        "map"  => Shin::AST::Map,
-        "kw"   => Shin::AST::Keyword,
+        "expr" => Node,
+        "sym"  => Symbol,
+        "vec"  => Vector,
+        "str"  => String,
+        "num"  => Number,
+        "list" => List,
+        "map"  => Map,
+        "kw"   => Keyword,
       }
 
       def matches?(ast, pattern, &block)
@@ -34,7 +36,7 @@ module Shin
           node = list.first
 
           case spec
-          when Shin::AST::Sequence
+          when Sequence
             return false if node.nil?
             if spec.class === node
               if spec.inner.empty? || matches?(node.inner, spec.inner)
@@ -46,7 +48,7 @@ module Shin
             else
               return false
             end
-          when Shin::AST::Literal, Shin::AST::Identifier
+          when Literal, Symbol
             return false if node.nil?
             if spec.class === node && spec.value == node.value
               matches << node
@@ -54,7 +56,7 @@ module Shin
             else
               return false
             end
-          when Shin::AST::Keyword
+          when Keyword
             type_name, mods = spec.value.match(TYPE_REGEXP).to_a[1..-1]
             type = TYPE_MAP[type_name]
             raise "Invalid pattern type: '#{spec.value}'" if type.nil?
