@@ -157,18 +157,22 @@ module Shin
     end
 
     def translate_expr(expr)
-      case
-      when expr.identifier?
+      case expr
+      when Shin::AST::Identifier
         return make_ident(expr.value)
-      when Shin::AST::RegExp === expr
+      when Shin::AST::RegExp
         return NewExpression.new(make_ident("RegExp"), [make_literal(expr.value)])
-      when expr.literal?
+      when Shin::AST::Literal
         return make_literal(expr.value)
-      when expr.list?
+      when Shin::AST::Deref
+        inner = translate_expr(expr.inner)
+        mexp = MemberExpression.new(inner, make_ident("deref"), false)
+        return CallExpression.new(mexp)
+      when Shin::AST::List
         list = expr.inner
         first = list.first
         case
-        when first.instance_of?(Shin::AST::MethodCall)
+        when Shin::AST::MethodCall === first
           property = translate_expr(list[0].id)
           object = translate_expr(list[1])
           mexp = MemberExpression.new(object, property, false)
