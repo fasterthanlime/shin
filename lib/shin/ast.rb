@@ -66,9 +66,9 @@ module Shin
     class Sequence < Node
       attr_accessor :inner
 
-      def initialize(token)
+      def initialize(token, inner = [])
         super(token)
-        @inner = []
+        @inner = inner
       end
     end
 

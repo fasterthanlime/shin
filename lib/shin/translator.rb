@@ -165,9 +165,8 @@ module Shin
       when Shin::AST::Literal
         return make_literal(expr.value)
       when Shin::AST::Deref
-        inner = translate_expr(expr.inner)
-        mexp = MemberExpression.new(inner, make_ident("deref"), false)
-        return CallExpression.new(mexp)
+        t = expr.token
+        return translate_expr(Shin::AST::List.new(t, [Shin::AST::Symbol.new(t, "deref"), expr.inner]))
       when Shin::AST::List
         list = expr.inner
         first = list.first
