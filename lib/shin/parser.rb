@@ -6,6 +6,7 @@ module Shin
   class Parser
     include Shin::Utils::LineColumn
     include Shin::Utils::Snippet
+    include Shin::Utils::Mangler
     include Shin::AST
 
     class Error < StandardError; end
@@ -16,8 +17,6 @@ module Shin
     LPAREN = '('.freeze; RPAREN = ')'.freeze
     LBRACK = '['.freeze; RBRACK = ']'.freeze
     LBRACE = '{'.freeze; RBRACE = '}'.freeze
-    ID_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.]/
-    ID_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.#\$0-9]/
 
     def self.parse(source)
       # parse is a no-op if source is not a String.

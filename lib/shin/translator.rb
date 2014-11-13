@@ -9,6 +9,7 @@ module Shin
     include Shin::Utils::LineColumn
     include Shin::Utils::Snippet
     include Shin::Utils::Matcher
+    include Shin::Utils::Mangler
     include Shin::JST
 
     def initialize(p_input, options)
@@ -20,7 +21,7 @@ module Shin
       requires = %w(exports shin mori)
 
       program = Program.new
-      load_shim = FunctionExpression.new(nil)
+      load_shim = FunctionExpression.new
       load_shim.params << make_ident('root');
       load_shim.params << make_ident('factory')
       load_shim.body = BlockStatement.new
@@ -33,7 +34,7 @@ module Shin
       define_call.arguments << make_ident('factory')
       load_shim.body.body << ExpressionStatement.new(define_call)
 
-      factory = FunctionExpression.new(nil)
+      factory = FunctionExpression.new
       requires.each do |req|
         factory.params << make_ident(req)
       end
@@ -54,17 +55,15 @@ module Shin
       ast.each do |node|
         case
         when matches?(node, "(defn :expr*)")
-          # it's a function!
           body << translate_defn(node.inner.drop 1)
         when matches?(node, "(def :expr*)")
           body << translate_def(node.inner.drop 1)
         when matches?(node, ":expr")
           # any expression is a statement, after all.
-          expr = translate_expr(node)
-          ser!("Couldn't parse expr", node.token) if expr.nil?
+          expr = translate_expr(node) or ser!("Couldn't parse expr", node)
           body << ExpressionStatement.new(expr)
         else
-          ser!("Unknown form in Program", node.token)
+          ser!("Unknown form in Program", node)
         end
       end
 
@@ -75,7 +74,7 @@ module Shin
 
     def translate_let(list)
       matches?(list, "[] :expr*") do |bindings, exprs|
-        anon = FunctionExpression.new(nil)
+        anon = FunctionExpression.new
         call = CallExpression.new(anon)
 
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
@@ -102,9 +101,7 @@ module Shin
     end
 
     def translate_def(list)
-      decl = nil
-
-      success = matches?(list, ":id :expr*") do |name, rest|
+      matches?(list, ":id :expr*") do |name, rest|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
 
@@ -116,20 +113,16 @@ module Shin
           expr = rest.first
           dtor.init = translate_expr(expr)
         else
-          ser!("Invalid def form", list.first.token)
+          ser!("Invalid def form", list)
         end
 
         decl.declarations << dtor
-      end
-
-      ser!("Invalid def form", list.first.token) unless success
-      decl
+        return decl
+      end or ser!("Invalid def form", list)
     end
 
     def translate_defn(list)
-      decl = nil
-
-      success = matches?(list, ":id :str? [:id*] :expr*") do |name, doc, args, body|
+      matches?(list, ":id :str? [:id*] :expr*") do |name, doc, args, body|
         decl = FunctionDeclaration.new(make_ident(name.value))
         args.inner.each do |arg|
           decl.params << make_ident(arg.value)
@@ -137,42 +130,29 @@ module Shin
 
         decl.body = block = BlockStatement.new
         translate_body_into_block(body, block)
-      end
-
-      ser!("Invalid defn form", list.first.token) unless success
-      decl
+        return decl
+      end or ser!("Invalid defn form", list)
     end
 
     def translate_fn(list)
-      expr = nil
-
-      success = matches?(list, "[:id*] :expr*") do |args, body|
-        expr = FunctionExpression.new(nil)
+      matches?(list, "[:id*] :expr*") do |args, body|
+        expr = FunctionExpression.new
         args.inner.each do |arg|
           expr.params << make_ident(arg.value)
         end
 
         expr.body = BlockStatement.new
         translate_body_into_block(list.drop(1), expr.body)
-      end
-
-      ser!("Invalid fn form", list.first.token) unless success
-      expr
+        return expr
+      end or ser!("Invalid fn form", list)
     end
 
     def translate_body_into_block(body, block)
       inner_count = body.length
       body.each_with_index do |expr, i|
-        last = (inner_count - 1 == i)
-
         node = translate_expr(expr)
-        node = if last
-                 make_rstat(node)
-               else
-                 make_estat(node)
-               end
-
-        block.body << node
+        last = (inner_count - 1 == i)
+        block.body << (last ? ReturnStatement : ExpressionStatement).new(node)
       end
     end
 
@@ -181,10 +161,7 @@ module Shin
       when expr.identifier?
         return make_ident(expr.value)
       when Shin::AST::RegExp === expr
-        newe = NewExpression.new(make_ident("RegExp"))
-        newe.arguments << make_literal(expr.value)
-        return newe
-        Literal.new({}, "/#{expr.value}/")
+        return NewExpression.new(make_ident("RegExp"), [make_literal(expr.value)])
       when expr.literal?
         return make_literal(expr.value)
       when expr.list?
@@ -205,12 +182,12 @@ module Shin
         when first.identifier?("fn")
           return translate_fn(list.drop(1))
         when first.identifier?("do")
-          anon = FunctionExpression.new(nil)
+          anon = FunctionExpression.new
           anon.body = BlockStatement.new
           translate_body_into_block(list.drop(1), anon.body)
           return CallExpression.new(anon)
         when first.identifier?("if")
-          anon = FunctionExpression.new(nil)
+          anon = FunctionExpression.new
           anon.body = BlockStatement.new
           body = anon.body.body
 
@@ -242,33 +219,12 @@ module Shin
     end
 
     def make_ident(id)
-      escaped_id = id.
-        gsub('-', '$_').
-        gsub('?', '$q').
-        gsub('!', '$e').
-        gsub('*', '$m').
-        gsub('/', '$d').
-        gsub('+', '$p').
-        gsub('=', '$l').
-        gsub('>', '$g').
-        gsub('<', '$s').
-        gsub('.', '$d').
-        to_s
-      Identifier.new(escaped_id)
-    end
-
-    def make_rstat(node)
-      ReturnStatement.new(node)
-    end
-
-    def make_estat(node)
-      ExpressionStatement.new(node)
+      Identifier.new(mangle(id))
     end
 
     def file
       @options[:file] || "<stdin>"
     end
-
 
     def ser!(msg, token)
       token = token.to_a.first if token.respond_to?(:to_a)

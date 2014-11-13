@@ -55,7 +55,7 @@ module Shin
       attr_reader :params
       attr_accessor :body
 
-      def initialize(id)
+      def initialize(id = nil)
         @id = id
         @params = []
       end
@@ -126,9 +126,9 @@ module Shin
       attr_reader :callee
       attr_reader :arguments
 
-      def initialize(callee)
+      def initialize(callee, arguments = [])
         @callee = callee
-        @arguments = []
+        @arguments = arguments
       end
 
       def to_hash
