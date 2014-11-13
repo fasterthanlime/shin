@@ -73,6 +73,34 @@ module Shin
 
     protected
 
+    def translate_let(list)
+      matches?(list, "[] :expr*") do |bindings, exprs|
+        anon = FunctionExpression.new(nil)
+        call = CallExpression.new(anon)
+
+        ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
+        bindings.inner.each_slice(2) do |binding|
+          name, val = binding
+
+          case name
+          when Shin::AST::Sequence
+            ser!("Destructuring isn't supported yet.", name)
+          when Shin::AST::Identifier
+            # all good
+          else
+            ser!("Invalid let form: first binding form should be an identifier or collection", name)
+          end
+
+          anon.params << make_ident(name.value)
+          call.arguments << translate_expr(val)
+        end
+
+        anon.body = BlockStatement.new
+        translate_body_into_block(exprs, anon.body)
+        return call
+      end or ser!("Invalid let form", list)
+    end
+
     def translate_def(list)
       decl = nil
 
@@ -172,6 +200,8 @@ module Shin
             call.arguments << translate_expr(arg)
           end
           return call
+        when first.identifier?("let")
+          return translate_let(list.drop(1))
         when first.identifier?("fn")
           return translate_fn(list.drop(1))
         when first.identifier?("do")
@@ -202,7 +232,7 @@ module Shin
           return call
         end
       else
-        ser!("Unknown expr form #{expr.inspect}", expr.token)
+        ser!("Unknown expr form #{expr}", expr.token)
         nil
       end
     end
@@ -241,8 +271,12 @@ module Shin
 
 
     def ser!(msg, token)
-      start = token.start
-      length = token.length
+      token = token.to_a.first if token.respond_to?(:to_a)
+      token = token.token if Shin::AST::Node === token
+      token = nil unless Shin::AST::Token === token
+
+      start  = token ? token.start  : 0
+      length = token ? token.length : 1
 
       line, column = line_column(@input, start)
       snippet = snippet(@input, start, length)
