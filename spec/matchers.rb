@@ -39,7 +39,7 @@ RSpec::Matchers.define :have_output do |expected_output|
   end
 
   failure_message do |actual|
-    "expected output '#{expected_output}', got '#{output.join(" ")}', code = '#{code}'"
+    "expected output '#{expected_output}', got '#{output.join(" ")}', JS code:\n#{code}"
   end
 end
 
