@@ -18,7 +18,7 @@ module Shin
     end
 
     def translate(ast)
-      requires = %w(exports shin mori)
+      requires = %w(exports shin)
 
       program = Program.new
       load_shim = FunctionExpression.new
