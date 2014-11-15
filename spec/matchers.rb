@@ -21,6 +21,9 @@ RSpec::Matchers.define :ast_match do |pattern|
 end
 
 js = Shin::JsContext.new
+js.context['debug'] = lambda do |_, *args|
+  puts "[debug] #{args.join(" ")}"
+end
 
 RSpec::Matchers.define :have_output do |expected_output|
   output = []

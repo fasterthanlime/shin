@@ -115,6 +115,10 @@ module Shin
         if dep_spec.exports?
           uses_exports = true
           js << "$kir.modules[#{escape(spec.name)}].exports, "
+        elsif dep_spec.name == 'require'
+          # workaround for hamt
+          debug "#{spec.name} => require hack"
+          js << "null, "
         else
           debug "#{spec.name} => #{dep_spec.name}"
           unless spec_loaded?(dep_spec)
