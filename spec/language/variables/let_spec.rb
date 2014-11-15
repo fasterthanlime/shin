@@ -11,6 +11,14 @@ RSpec.describe "Language", "let" do
            }).to have_output("Pomplamoose")
   end
 
+  it "cascading let" do
+    expect(%Q{
+           (let [a "Boromir"
+                 b a]
+            (print b))
+           }).to have_output("Boromir")
+  end
+
   it "lets and accesses multiple variables" do
     expect(%Q{
            (let [band "Pomplamoose"

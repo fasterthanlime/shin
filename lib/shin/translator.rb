@@ -75,6 +75,7 @@ module Shin
     def translate_let(list)
       matches?(list, "[] :expr*") do |bindings, exprs|
         anon = FunctionExpression.new
+        anon.body = BlockStatement.new
         call = CallExpression.new(anon)
 
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
@@ -90,11 +91,11 @@ module Shin
             ser!("Invalid let form: first binding form should be a symbol or collection", name)
           end
 
-          anon.params << make_ident(name.value)
-          call.arguments << translate_expr(val)
+          decl = VariableDeclaration.new
+          decl.declarations << VariableDeclarator.new(make_ident(name.value), translate_expr(val))
+          anon.body.body << decl;
         end
 
-        anon.body = BlockStatement.new
         translate_body_into_block(exprs, anon.body)
         return call
       end or ser!("Invalid let form", list)
