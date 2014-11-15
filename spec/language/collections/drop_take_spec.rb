@@ -27,5 +27,33 @@ RSpec.describe "Language" do
       expect(%Q{ (print (= [1 2 3] (take 3 [1 2 3]))) }).to have_output("true")
     end
   end
+
+  describe "take-while" do
+    it "works on lists" do
+      expect(%Q{
+             (print (= '(2 4 6) (take-while even? '(2 4 6 1 3 5))))
+             }).to have_output("true")
+    end
+
+    it "works on vector" do
+      expect(%Q{
+             (print (= [2 4 6] (take-while even? [2 4 6 1 3 5])))
+             }).to have_output("true")
+    end
+  end
+
+  describe "drop-while" do
+    it "works on lists" do
+      expect(%Q{
+             (print (= '(1 3 5) (drop-while even? '(2 4 6 1 3 5))))
+             }).to have_output("true")
+    end
+
+    it "works on vector" do
+      expect(%Q{
+             (print (= [1 3 5] (drop-while even? [2 4 6 1 3 5])))
+             }).to have_output("true")
+    end
+  end
 end
 
