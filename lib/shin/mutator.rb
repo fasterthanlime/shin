@@ -7,9 +7,8 @@ module Shin
   #   - Optimizations
   class Mutator
 
-    def mutate(ast)
-      # I guarantee this method is bug-free!
-      ast
+    def mutate(mod)
+      mod.ast2 = mod.ast
     end
 
   end

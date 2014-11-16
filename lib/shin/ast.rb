@@ -42,6 +42,10 @@ module Shin
         false
       end
 
+      def kw?(value = nil)
+        false
+      end
+
       def literal?
         false
       end
@@ -174,6 +178,11 @@ module Shin
       def initialize(token, value)
         super(token)
         @value = value
+      end
+
+      def kw?(value = nil)
+        return true if value.nil?
+        @value == value
       end
 
       def to_s

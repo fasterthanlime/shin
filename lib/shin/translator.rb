@@ -12,13 +12,25 @@ module Shin
     include Shin::Utils::Mangler
     include Shin::JST
 
-    def initialize(p_input, options)
-      @input = p_input.dup
-      @options = options
+    def initialize(mod)
+      @mod = mod
+      @input = mod.source.dup
+      @options = {:file => mod.file}
     end
 
-    def translate(ast)
-      requires = %w(exports shin)
+    def translate
+      ast = @mod.ast
+
+      requires = [
+        {:name => 'exports', :aka => 'exports'}
+      ]
+      unless @mod.ns == 'shin.core'
+        requires << {:name => 'shin.core', :aka => 'shin'}
+      end
+
+      @mod.requires.each do |req|
+        requires << req
+      end
 
       program = Program.new
       load_shim = FunctionExpression.new
@@ -28,7 +40,7 @@ module Shin
       define_call = CallExpression.new(make_ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
-        require_arr.elements << make_literal(req)
+        require_arr.elements << make_literal(req[:name])
       end
       define_call.arguments << require_arr
       define_call.arguments << make_ident('factory')
@@ -36,7 +48,7 @@ module Shin
 
       factory = FunctionExpression.new
       requires.each do |req|
-        factory.params << make_ident(req)
+        factory.params << make_ident(req[:aka])
       end
       factory.body = BlockStatement.new
 
@@ -49,7 +61,7 @@ module Shin
       shin_init = MemberExpression.new(make_ident('shin'), make_ident('init'), false)
       init_call = CallExpression.new(shin_init)
       init_call.arguments << make_ident('this')
-      init_call.arguments << make_literal('shin_module')
+      init_call.arguments << make_literal(@mod.ns)
       body << ExpressionStatement.new(init_call)
 
       ast.each do |node|
@@ -67,7 +79,7 @@ module Shin
         end
       end
 
-      program
+      @mod.jst = program
     end
 
     protected
