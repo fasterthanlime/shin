@@ -74,6 +74,22 @@ module Shin
       include Function
     end
 
+    class AssignmentExpression < Node
+      attr_reader :left
+      attr_reader :right
+      attr_reader :operator
+
+      def initialize(left, right, operator = '=')
+        @left = left
+        @right = right
+        @operator = operator
+      end
+
+      def to_hash
+        super.merge(:left => left, :right => right, :operator => operator)
+      end
+    end
+
     class BlockStatement < Node
       attr_reader :body
 

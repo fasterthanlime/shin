@@ -199,6 +199,8 @@ module Shin
           end
         end or throw "invalid ns def #{nsdef}"
       end
+      # get rid of nsdef (don't translate it)
+      mod.ast = mod.ast.drop(1)
 
       ns ||= "anonymous#{fresh}"
       mod.ns = ns

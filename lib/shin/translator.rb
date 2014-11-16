@@ -24,9 +24,6 @@ module Shin
       requires = [
         {:name => 'exports', :aka => 'exports'}
       ]
-      unless @mod.ns == 'shin.core'
-        requires << {:name => 'shin.core', :aka => 'shin'}
-      end
 
       @mod.requires.each do |req|
         requires << req
@@ -83,6 +80,14 @@ module Shin
     end
 
     protected
+
+    def translate_export(list)
+      matches?(list, ":sym :sym?") do |name, aka|
+        aka ||= name
+        mexp = MemberExpression.new(make_ident('exports'), make_ident(aka.value), false)
+        return AssignmentExpression.new(mexp, make_ident(name.value))
+      end or ser!("Invalid export form")
+    end
 
     def translate_let(list)
       matches?(list, "[] :expr*") do |bindings, exprs|
@@ -223,6 +228,8 @@ module Shin
           property = make_ident(list[0].sym.value)
           object = translate_expr(list[1])
           return MemberExpression.new(object, property, false)
+        when first.sym?("export")
+          return translate_export(list.drop(1))
         when first.sym?("let")
           return translate_let(list.drop(1))
         when first.sym?("fn")
