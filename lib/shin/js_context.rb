@@ -7,9 +7,16 @@ module Shin
 
     DEBUG = false
 
+    attr_reader :file_provider
+    attr_reader :providers
+
     def initialize
       @context = V8::Context.new
       @seed = 0
+
+      @file_provider = FileJsProvider.new
+      @file_provider.sourcepath << File.expand_path("../js", __FILE__)
+      @providers = [@file_provider]
 
       @context.eval %Q{
         this.$kir = {
@@ -82,8 +89,24 @@ module Shin
       if inline
         @context.eval spec_input
       else
-        path = resource_path(spec.name + ".js")
-        @context.load path
+        done = false
+        name = spec.name + ".js"
+        @providers.each do |provider|
+          res = provider.provide_js_module(name)
+          case res
+          when nil
+            next
+          when Pathname
+            debug "Loading from pathname #{name} -> #{res}"
+            @context.load res.to_s
+            done = true
+          else
+            debug "Evaling from memory #{name}"
+            @context.eval res
+            done = true
+          end
+        end
+        throw "JS file not found: #{spec.name}" unless done
       end
 
       mod = @context.eval %Q{
@@ -173,6 +196,22 @@ module Shin
       puts(*args) if DEBUG
     end
 
+  end
+
+  class FileJsProvider
+    attr_reader :sourcepath
+
+    def initialize(sourcepath = [])
+      @sourcepath = sourcepath
+    end
+
+    def provide_js_module(name)
+      @sourcepath.each do |sp|
+        path = Pathname.new("#{sp}/#{name}")
+        return path if path.exist?
+      end
+      nil
+    end
   end
 end
 

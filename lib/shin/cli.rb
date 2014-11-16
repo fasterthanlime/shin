@@ -4,6 +4,7 @@ require 'oj'
 
 require 'shin'
 require 'shin/utils'
+require 'shin/compiler'
 
 module Shin
   class CLI
@@ -109,13 +110,13 @@ module Shin
 
     def parse_module(source, file = nil)
       compiler_opts = {}
-      mod = Module.new
+      mod = Shin::Module.new
       if file
         mod.file = file
         compiler_opts[:file] = file
       end
 
-      parser = Shin::Parser.new(source, compiler_opts) 
+      parser = Shin::Parser.new(source, compiler_opts)
       mod.ast = parser.parse
       mod.source = parser.input
 
@@ -249,22 +250,6 @@ module Shin
         return path if File.exists?(path)
       end
       nil
-    end
-  end
-
-  class Module
-    attr_accessor :ns
-    attr_accessor :source
-    attr_accessor :file
-    attr_accessor :ast
-    attr_accessor :ast2
-    attr_accessor :jst
-    attr_accessor :out
-    attr_accessor :requires
-    attr_accessor :code
-
-    def initialize
-      @requires = []
     end
   end
 end

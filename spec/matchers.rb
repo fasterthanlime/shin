@@ -30,13 +30,17 @@ RSpec::Matchers.define :have_output do |expected_output|
   code = nil
 
   match do |actual|
-    res = Shin::Compiler.new.compile(actual)
+    opts = {}
+    compiler = Shin::Compiler.new(opts)
+    res = compiler.compile(actual)
 
+    js.providers << compiler
     js.context['print'] = lambda do |_, *args|
       output << args.join(" ")
     end
-    code = res[:code]
+    code = res.code
     js.load(code, :inline => true)
+    js.providers.delete(compiler)
 
     output.join(" ") === expected_output
   end
