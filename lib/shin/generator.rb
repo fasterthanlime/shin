@@ -11,12 +11,17 @@ module Shin
     end
 
     def generate
-      context = Shin::JsContext.new
-      context.load("escodegen")
-
       jst_json = Oj.dump(@mod.jst, :mode => :compat, :indent => 2)
       context.set("jst_json", jst_json)
       @mod.code = context.eval("escodegen.generate(JSON.parse(jst_json))")
+    end
+
+    def context
+      unless defined? @@context
+        @@context = Shin::JsContext.new
+        @@context.load("escodegen")
+      end
+      @@context
     end
   end
 end

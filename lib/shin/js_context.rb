@@ -42,7 +42,9 @@ module Shin
     end
 
     def spec_loaded?(spec)
-      @context.eval("$kir.modules[#{escape(spec.name)}] != null")
+      loaded = @context.eval("$kir.modules[#{escape(spec.name)}] != null")
+      debug "spec '#{spec.name}' loaded? #{loaded}."
+      loaded
     end
 
     def fresh_seed
