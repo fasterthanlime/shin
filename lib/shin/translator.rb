@@ -40,7 +40,11 @@ module Shin
         require_arr.elements << make_literal(req[:name])
       end
       define_call.arguments << require_arr
-      define_call.arguments << make_ident('factory')
+
+      bound_factory = CallExpression.new(
+        MemberExpression.new(make_ident('factory'), make_ident('bind'), false),
+        [make_ident('this')])
+      define_call.arguments << bound_factory
       load_shim.body.body << ExpressionStatement.new(define_call)
 
       factory = FunctionExpression.new

@@ -8,6 +8,9 @@ require 'shin/utils'
 module Shin
   class Compiler
     include Shin::Utils::Matcher
+
+    attr_reader :opts
+
     def self.compile_file(path)
       Shin::Compiler.new.compile(File.read(path), :file => path)
     end
@@ -27,15 +30,56 @@ module Shin
 
     def compile(source, file = nil)
       main = parse_module(source, file)
-      mutator = Shin::Mutator.new
-      mutator.mutate(main)
+
+      @modules.each do |ns, mod|
+        Shin::Mutator.new(mod).mutate
+      end
+
+      if opts[:ast2]
+        puts Oj.dump(main.ast2, :mode => :object, :indent => 2)
+        exit 0
+      end
 
       @modules.each do |ns, mod|
         Shin::Translator.new(mod).translate
       end
 
+      if opts[:jst]
+        puts Oj.dump(main.jst, :mode => :compat, :indent => 2)
+        exit 0
+      end
+
       @modules.each do |ns, mod|
         Shin::Generator.new(mod).generate
+      end
+
+      if opts[:js]
+        puts main.code
+        exit 0
+      end
+
+      if opts[:exec]
+        js = JsContext.new
+        js.context['print'] = lambda do |_, *args|
+          print args.join(" ")
+        end
+        js.context['println'] = lambda do |_, *args|
+          puts args.join(" ")
+        end
+        js.load(code, :inline => true)
+      elsif opts[:output]
+        outdir = opts[:output]
+        FileUtils.mkdir_p(outdir)
+
+        @modules.each do |ns, mod|
+          File.open("#{outdir}/#{ns}.js", "wb") do |f|
+            f.write(mod.code)
+          end
+        end
+
+        @js_modules.each do |ns, path|
+          FileUtils.cp(path, "#{outdir}/#{ns}.js")
+        end
       end
 
       return main
@@ -48,20 +92,18 @@ module Shin
         mod.file = file
         compiler_opts[:file] = file
       end
+
       parser = Shin::Parser.new(source, compiler_opts)
       mod.source = parser.input
       mod.ast = parser.parse
 
+      if opts[:ast]
+        puts Oj.dump(main.ast2, :mode => :object, :indent => 2)
+        exit 0
+      end
+
       handle_ns(mod)
       parse_reqs(mod)
-
-      mutator = Shin::Mutator.new
-      mutator.mutate(mod)
-
-      Shin::Translator.new(mod).translate
-
-      generator = Shin::Generator.new(mod)
-      generator.generate
 
       return mod
     end

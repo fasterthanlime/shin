@@ -7,7 +7,13 @@ module Shin
   #   - Optimizations
   class Mutator
 
-    def mutate(mod)
+    attr_reader :mod
+
+    def initialize(mod)
+      @mod = mod
+    end
+
+    def mutate
       mod.ast2 = mod.ast
     end
 
