@@ -79,8 +79,7 @@ module Shin
 
     def parse_reqs(mod)
       mod.requires.each do |req|
-        case req[:type]
-        when 'require-js'
+        if req[:type].end_with?('-js')
           name = req[:name]
           cached = @js_modules[name]
           unless cached
@@ -89,17 +88,17 @@ module Shin
             if path
               @js_modules[name] = path
             else
-              puts "[WARN] Module not found: #{name}" unless path
+              puts "[WARN] JS Module not found: #{name}" unless path
             end
           end
-        when 'require'
+        else
           name = req[:name]
           cached = @modules[name]
           unless cached
             #puts "Parsing #{name}"
             path = find_module(name)
             parse_module(File.read(path), path)
-            throw "Module not found: #{name}" unless path
+            raise "Module not found: #{name}" unless path
           end
         end
       end
@@ -147,7 +146,7 @@ module Shin
 
       if mod.ns != 'shin.core'
         mod.requires << {
-          :type => 'require',
+          :type => 'use',
           :name => 'shin.core',
           :aka => 'shin'
         }

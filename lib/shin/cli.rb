@@ -210,7 +210,7 @@ module Shin
 
       if mod.ns != 'shin.core'
         mod.requires << {
-          :type => 'require',
+          :type => 'use',
           :name => 'shin.core',
           :aka => 'shin'
         }

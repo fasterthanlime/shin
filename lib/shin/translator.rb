@@ -22,7 +22,7 @@ module Shin
       ast = @mod.ast
 
       requires = [
-        {:name => 'exports', :aka => 'exports'}
+        {:type => 'require', :name => 'exports', :aka => 'exports'}
       ]
 
       @mod.requires.each do |req|
@@ -60,6 +60,19 @@ module Shin
       init_call.arguments << make_ident('this')
       init_call.arguments << make_literal(@mod.ns)
       body << ExpressionStatement.new(init_call)
+
+      @mod.requires.each do |req|
+        _, type, js = /^(require|use)(?:(-js)?)$/.match(req[:type]).to_a
+
+        if type == 'use'
+          intern_expr = MemberExpression.new(make_ident('shin'), make_ident('intern'), false)
+          call_expr = MemberExpression.new(intern_expr, make_ident('call'), false)
+          intern_call = CallExpression.new(call_expr)
+          intern_call.arguments << make_ident('this')
+          intern_call.arguments << make_ident(req[:aka])
+          body << ExpressionStatement.new(intern_call)
+        end
+      end
 
       ast.each do |node|
         case
