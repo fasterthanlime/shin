@@ -12,7 +12,8 @@ module Shin
     include Shin::Utils::Mangler
     include Shin::JST
 
-    def initialize(mod)
+    def initialize(compiler, mod)
+      @compiler = compiler
       @mod = mod
       @input = mod.source.dup
       @options = {:file => mod.file}
@@ -68,13 +69,18 @@ module Shin
       @mod.requires.each do |req|
         _, type, js = /^(require|use)(?:(-js)?)$/.match(req[:type]).to_a
 
-        if type == 'use'
-          intern_expr = MemberExpression.new(make_ident('shin'), make_ident('intern'), false)
-          call_expr = MemberExpression.new(intern_expr, make_ident('call'), false)
-          intern_call = CallExpression.new(call_expr)
-          intern_call.arguments << make_ident('this')
-          intern_call.arguments << make_ident(req[:aka])
-          body << ExpressionStatement.new(intern_call)
+        if type == 'use' && !js
+          dep = @compiler.modules[req[:name]]
+          raise "Couldn't find req #{req[:name]}" unless dep
+          defs = dep.defs
+          dep_id = make_ident(req[:aka])
+          decl = VariableDeclaration.new
+          body << decl
+          defs.each do |d|
+            id = make_ident(d)
+            mexpr = MemberExpression.new(dep_id, id, false)
+            decl.declarations << VariableDeclarator.new(id, mexpr)
+          end
         end
       end
 
@@ -151,6 +157,8 @@ module Shin
           ser!("Invalid def form", list)
         end
 
+        ex = make_ident("exports/#{name}")
+        dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
         return decl
       end or ser!("Invalid def form", list)
@@ -158,13 +166,20 @@ module Shin
 
     def translate_defn(list)
       matches?(list, ":sym :str? [:sym*] :expr*") do |name, doc, args, body|
-        decl = FunctionDeclaration.new(make_ident(name.value))
+        f = FunctionExpression.new(make_ident(name.value))
         args.inner.each do |arg|
-          decl.params << make_ident(arg.value)
+          f.params << make_ident(arg.value)
         end
 
-        decl.body = block = BlockStatement.new
+        f.body = block = BlockStatement.new
         translate_body_into_block(body, block)
+
+        decl = VariableDeclaration.new
+        dtor = VariableDeclarator.new(make_ident(name.value))
+        ex = make_ident("exports/#{name}")
+        dtor.init = AssignmentExpression.new(ex, f)
+        decl.declarations << dtor
+
         return decl
       end or ser!("Invalid defn form", list)
     end
@@ -289,16 +304,10 @@ module Shin
     end
 
     def make_ident(id)
-      tokens = id.split("/")
-      if tokens.length > 1
-        mangled = tokens.map { |x| mangle(x) }
-        curr = Identifier.new(mangled.first)
-        mangled = mangled.drop(1)
-        until mangled.empty?
-          curr = MemberExpression.new(curr, Identifier.new(mangled.first), false)
-          mangled = mangled.drop(1)
-        end
-        curr
+      matches = /^([^\/]+)\/(.*)?$/.match(id)
+      if matches
+        ns, name = matches.to_a.drop(1)
+        MemberExpression.new(make_ident(ns), make_ident(name), false)
       else
         Identifier.new(mangle(id))
       end

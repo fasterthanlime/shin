@@ -10,6 +10,7 @@ module Shin
     include Shin::Utils::Matcher
 
     attr_reader :opts
+    attr_reader :modules
 
     def self.compile_file(path)
       Shin::Compiler.new.compile(File.read(path), :file => path)
@@ -41,7 +42,7 @@ module Shin
       end
 
       @modules.each do |ns, mod|
-        Shin::Translator.new(mod).translate
+        Shin::Translator.new(self, mod).translate
       end
 
       if opts[:jst]
@@ -245,6 +246,18 @@ module Shin
 
     def initialize
       @requires = []
+    end
+
+    def defs
+      defs = []
+      ast2.each do |node|
+        next unless node.list?
+        first = node.inner.first
+        if first.sym? && first.value.start_with?("def")
+          defs << node.inner[1].value
+        end
+      end
+      defs
     end
   end
 end
