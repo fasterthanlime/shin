@@ -289,7 +289,19 @@ module Shin
     end
 
     def make_ident(id)
-      Identifier.new(mangle(id))
+      tokens = id.split("/")
+      if tokens.length > 1
+        mangled = tokens.map { |x| mangle(x) }
+        curr = Identifier.new(mangled.first)
+        mangled = mangled.drop(1)
+        until mangled.empty?
+          curr = MemberExpression.new(curr, Identifier.new(mangled.first), false)
+          mangled = mangled.drop(1)
+        end
+        curr
+      else
+        Identifier.new(mangle(id))
+      end
     end
 
     def file
