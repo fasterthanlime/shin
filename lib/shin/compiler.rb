@@ -11,6 +11,7 @@ module Shin
 
     attr_reader :opts
     attr_reader :modules
+    attr_accessor :cache
 
     def self.compile_file(path)
       Shin::Compiler.new.compile(File.read(path), :file => path)
@@ -24,15 +25,21 @@ module Shin
       @opts[:libpath] ||= []
       @opts[:libpath] << File.expand_path("../js", __FILE__)
 
-      @modules = {}
       @js_modules = {}
       @seed = 0
+
+      if opts[:cache]
+        @modules = opts[:cache]
+      else
+        @modules = ModuleCache.new
+      end
     end
 
     def compile(source, file = nil)
       main = parse_module(source, file)
 
       @modules.each do |ns, mod|
+        next if mod.ast2
         Shin::Mutator.new(mod).mutate
       end
 
@@ -42,6 +49,7 @@ module Shin
       end
 
       @modules.each do |ns, mod|
+        next if mod.jst
         Shin::Translator.new(self, mod).translate
       end
 
@@ -51,6 +59,7 @@ module Shin
       end
 
       @modules.each do |ns, mod|
+        next if mod.code
         Shin::Generator.new(mod).generate
       end
 
@@ -185,7 +194,7 @@ module Shin
       ns ||= "anonymous#{fresh}"
       mod.ns = ns
 
-      @modules[ns] = mod
+      @modules << mod
 
       if mod.ns != 'shin.core'
         mod.requires << {
@@ -258,6 +267,24 @@ module Shin
         end
       end
       defs
+    end
+  end
+
+  class ModuleCache
+    def initialize
+      @modules = {}
+    end
+
+    def <<(mod)
+      @modules[mod.ns] = mod
+    end
+
+    def [](ns)
+      @modules[ns]
+    end
+
+    def each(&block)
+      @modules.each(&block)
     end
   end
 end

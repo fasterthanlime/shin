@@ -24,13 +24,14 @@ js = Shin::JsContext.new
 js.context['debug'] = lambda do |_, *args|
   puts "[debug] #{args.join(" ")}"
 end
+cache = Shin::ModuleCache.new
 
 RSpec::Matchers.define :have_output do |expected_output|
   output = []
   code = nil
 
   match do |actual|
-    opts = {}
+    opts = {:cache => cache}
     compiler = Shin::Compiler.new(opts)
     res = compiler.compile(actual)
 
