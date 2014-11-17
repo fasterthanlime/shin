@@ -46,6 +46,8 @@ module Shin
 
       compiler = Shin::Compiler.new(opts)
       compiler.compile(source, file)
+
+      puts "Compiled #{file || "<stdin>"}" if opts[:output]
     end
   end
 end

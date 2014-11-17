@@ -14,6 +14,10 @@ RSpec.describe "Language", "vector" do
     end
   end
 
+  it "has working count" do
+    expect(%Q{ (print (count [1 2 3])) }).to have_output("3")
+  end
+
   %w(vector collection sequential associative counted indexed reduceable seqable reversible).each do |property|
     it "satisfies #{property}?" do
       expect("(print (#{property}? [1 2 3]))").to have_output("true")
