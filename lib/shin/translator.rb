@@ -232,7 +232,8 @@ module Shin
           ser!("Quoting unknown form", expr)
         end
       when Shin::AST::Vector
-        if expr.inner.first.sym?('$')
+        first = expr.inner.first
+        if first && first.sym?('$')
           els = expr.inner.drop(1).map { |el| translate_expr(el) }
           return ArrayExpression.new(els)
         else
@@ -243,7 +244,8 @@ module Shin
         arr = ArrayExpression.new(expr.inner.map { |el| translate_expr(el) })
         return CallExpression.new(make_ident("set"), [arr])
       when Shin::AST::Map
-        if expr.inner.first.sym?('$')
+        first = expr.inner.first
+        if first && first.sym?('$')
           list = expr.inner.drop(1)
           props = []
           list.each_slice(2) do |pair|
