@@ -232,15 +232,30 @@ module Shin
           ser!("Quoting unknown form", expr)
         end
       when Shin::AST::Vector
-        els = expr.inner.map { |el| translate_expr(el) }
-        return CallExpression.new(make_ident("vector"), els)
+        if expr.inner.first.sym?('$')
+          els = expr.inner.drop(1).map { |el| translate_expr(el) }
+          return ArrayExpression.new(els)
+        else
+          els = expr.inner.map { |el| translate_expr(el) }
+          return CallExpression.new(make_ident("vector"), els)
+        end
       when Shin::AST::Set
         arr = ArrayExpression.new(expr.inner.map { |el| translate_expr(el) })
         return CallExpression.new(make_ident("set"), [arr])
       when Shin::AST::Map
-        ser!("Map literal requires even number of forms", expr) unless expr.inner.count.even?
-        els = expr.inner.map { |el| translate_expr(el) }
-        return CallExpression.new(make_ident("hash-map"), els)
+        if expr.inner.first.sym?('$')
+          list = expr.inner.drop(1)
+          props = []
+          list.each_slice(2) do |pair|
+            key, val = pair
+            props << Property.new(translate_expr(key), translate_expr(val))
+          end
+          return ObjectExpression.new(props)
+        else
+          ser!("Map literal requires even number of forms", expr) unless expr.inner.count.even?
+          els = expr.inner.map { |el| translate_expr(el) }
+          return CallExpression.new(make_ident("hash-map"), els)
+        end
       when Shin::AST::Keyword
         return CallExpression.new(make_ident("keyword"), [make_literal(expr.value)])
       when Shin::AST::List

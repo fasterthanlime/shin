@@ -4,7 +4,7 @@ RSpec.describe "Language", "object" do
     expect(%Q{
            (def dude {$ "name" "buddy holly"
                         "job"  "singer"})
-           (print (aget dude "name") (aget job "job"))
+           (print (aget dude "name") (aget dude "job"))
            }).to have_output("buddy holly singer")
   end
 end

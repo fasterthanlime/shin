@@ -200,6 +200,32 @@ module Shin
       end
     end
 
+    class ObjectExpression < Node
+      attr_reader :properties
+
+      def initialize(properties = [])
+        @properties = properties
+      end
+
+      def to_hash
+        super.merge(:properties => properties)
+      end
+    end
+
+    class Property < Node
+      attr_reader :key
+      attr_reader :value
+
+      def initialize(key, value)
+        @key = key
+        @value = value
+      end
+
+      def to_hash
+        super.merge(:key => key, :value => value)
+      end
+    end
+
     class IfStatement < Node
       attr_reader :test
       attr_accessor :consequent
