@@ -90,6 +90,11 @@ module Shin
         case
         when matches?(node, "(defn :expr*)")
           body << translate_defn(node.inner.drop 1)
+        when matches?(node, "(defmacro :expr*)")
+          unless @mod.is_macro
+            ser!("Macro in a non-macro module", node)
+          end
+          body << translate_defn(node.inner.drop 1)
         when matches?(node, "(def :expr*)")
           body << translate_def(node.inner.drop 1)
         when matches?(node, ":expr")

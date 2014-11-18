@@ -1,5 +1,6 @@
 
 require 'shin/parser'
+require 'shin/ns_parser'
 require 'shin/mutator'
 require 'shin/translator'
 require 'shin/generator'
@@ -26,7 +27,6 @@ module Shin
       @opts[:libpath] << File.expand_path("../js", __FILE__)
 
       @js_modules = {}
-      @seed = 0
 
       if opts[:cache]
         @modules = opts[:cache]
@@ -38,7 +38,8 @@ module Shin
     def compile(source, additionals = {})
       main = parse_module(source, additionals)
 
-      @modules.each do |ns, mod|
+      all_mods = collect_deps(main)
+      all_mods.each do |ns, mod|
         next if mod.ast2
         Shin::Mutator.new(self, mod).mutate
       end
@@ -48,7 +49,7 @@ module Shin
         exit 0
       end
 
-      @modules.each do |ns, mod|
+      all_mods.each do |ns, mod|
         next if mod.jst
         Shin::Translator.new(self, mod).translate
       end
@@ -58,7 +59,7 @@ module Shin
         exit 0
       end
 
-      @modules.each do |ns, mod|
+      all_mods.each do |ns, mod|
         next if mod.code
         Shin::Generator.new(mod).generate
       end
@@ -81,7 +82,7 @@ module Shin
         outdir = opts[:output]
         FileUtils.mkdir_p(outdir)
 
-        @modules.each do |ns, mod|
+        all_mods.each do |ns, mod|
           File.open("#{outdir}/#{ns}.js", "wb") do |f|
             f.write(mod.code)
           end
@@ -107,6 +108,7 @@ module Shin
       macros = additionals[:macros]
       if macros
         mod.macros = parse_module(macros)
+        mod.macros.is_macro = true
         puts "Got macros: #{mod.macros.ast.join(" ")}"
       end
 
@@ -119,7 +121,8 @@ module Shin
         exit 0
       end
 
-      handle_ns(mod)
+      Shin::NsParser.new(mod).parse
+      @modules << mod
       parse_reqs(mod)
 
       return mod
@@ -164,58 +167,6 @@ module Shin
       nil
     end
 
-
-    def handle_ns(mod)
-      nsdef = mod.ast[0]
-      ns = nil
-      if nsdef && nsdef.list?
-        matches?(nsdef.inner, "ns :sym :expr*") do |_, name, specs|
-          # get rid of nsdef (don't translate it)
-          mod.ast = mod.ast.drop(1)
-
-          ns = name.value
-          specs.each do |spec|
-            matches?(spec.inner, ":kw []") do |type, vec|
-              list = vec.inner
-              until list.empty?
-                aka = name = list.first
-                throw "invalid spec, expected sym got #{name}" unless name.sym?
-                list = list.drop(1)
-                if !list.empty? && list.first.kw?('as')
-                  list = list.drop(1)
-                  aka = list.first
-                  list = list.drop(1)
-                end
-
-                mod.requires << {
-                  :type => type.value,
-                  :name => name.value,
-                  :aka  => aka.value,
-                }
-              end
-            end or throw "invalid spec #{spec}"
-          end
-        end
-      end
-
-      ns ||= "anonymous#{fresh}"
-      mod.ns = ns
-
-      @modules << mod
-
-      if mod.ns != 'shin.core'
-        mod.requires << {
-          :type => 'use',
-          :name => 'shin.core',
-          :aka => 'shin'
-        }
-      end
-    end
-
-    def fresh
-      @seed += 1
-    end
-
     def find_module(ns)
       @opts[:sourcepath].each do |sp|
         tokens = ns.split('.')
@@ -247,6 +198,20 @@ module Shin
       nil
     end
 
+    def collect_deps(mod, all = {})
+      all[mod.ns] = mod
+
+      mod.requires.each do |req|
+        next if req[:type].end_with?("js")
+        dep = @modules[req[:name]]
+
+        unless all.include?(dep)
+          collect_deps(dep, all)
+        end
+      end
+      all
+    end
+
   end
 
   class Module
@@ -259,10 +224,12 @@ module Shin
     attr_accessor :requires
     attr_accessor :code
 
+    attr_accessor :is_macro
     attr_accessor :macros
 
     def initialize
       @requires = []
+      @is_macro = false
     end
 
     def defs
