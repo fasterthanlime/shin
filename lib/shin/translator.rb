@@ -17,6 +17,8 @@ module Shin
       @mod = mod
       @input = mod.source.dup
       @options = {:file => mod.file}
+
+      @quoting = false
     end
 
     def translate
@@ -76,7 +78,7 @@ module Shin
           dep_id = make_ident(req[:aka])
           decl = VariableDeclaration.new
           body << decl
-          defs.each do |d|
+          defs.each_key do |d|
             id = make_ident(d)
             mexpr = MemberExpression.new(dep_id, id, false)
             decl.declarations << VariableDeclarator.new(id, mexpr)
@@ -209,6 +211,10 @@ module Shin
     def translate_expr(expr)
       case expr
       when Shin::AST::Symbol
+        if @quoting
+          return CallExpression.new(make_ident("symbol"), [make_literal(expr.value)])
+        end
+
         return make_ident(expr.value)
       when Shin::AST::RegExp
         return NewExpression.new(make_ident("RegExp"), [make_literal(expr.value)])
@@ -217,20 +223,12 @@ module Shin
       when Shin::AST::Deref
         t = expr.token
         return translate_expr(Shin::AST::List.new(t, [Shin::AST::Symbol.new(t, "deref"), expr.inner]))
-      when Shin::AST::Quote
-        t = expr.token
-        case expr.inner
-        when Shin::AST::List
-          els = expr.inner.inner.map { |el| translate_expr(el) }
-          return CallExpression.new(make_ident("list"), els)
-        when Shin::AST::Symbol
-          return CallExpression.new(make_ident("symbol"), [make_literal(expr.inner.value)])
-        when Shin::AST::Literal, Shin::AST::Sequence
-          # useless quoting?
-          return translate_expr(expr.inner)
-        else
-          ser!("Quoting unknown form", expr)
-        end
+      when Shin::AST::Quote, Shin::AST::SyntaxQuote
+        # TODO: find a less terrible solution.
+        @quoting = true
+        expr = translate_expr(expr.inner)
+        @quoting = false
+        return expr
       when Shin::AST::Vector
         first = expr.inner.first
         if first && first.sym?('$')
@@ -261,6 +259,11 @@ module Shin
       when Shin::AST::Keyword
         return CallExpression.new(make_ident("keyword"), [make_literal(expr.value)])
       when Shin::AST::List
+        if @quoting
+          els = expr.inner.map { |el| translate_expr(el) }
+          return CallExpression.new(make_ident("list"), els)
+        end
+
         list = expr.inner
         first = list.first
         case

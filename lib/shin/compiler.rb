@@ -35,12 +35,12 @@ module Shin
       end
     end
 
-    def compile(source, file = nil)
-      main = parse_module(source, file)
+    def compile(source, additionals = {})
+      main = parse_module(source, additionals)
 
       @modules.each do |ns, mod|
         next if mod.ast2
-        Shin::Mutator.new(mod).mutate
+        Shin::Mutator.new(self, mod).mutate
       end
 
       if opts[:ast2]
@@ -95,12 +95,19 @@ module Shin
       return main
     end
 
-    def parse_module(source, file = nil)
+    def parse_module(source, additionals = {})
       compiler_opts = {}
+      file = additionals[:file]
       mod = Shin::Module.new
       if file
         mod.file = file
         compiler_opts[:file] = file
+      end
+
+      macros = additionals[:macros]
+      if macros
+        mod.macros = parse_module(macros)
+        puts "Got macros: #{mod.macros.ast.join(" ")}"
       end
 
       parser = Shin::Parser.new(source, compiler_opts)
@@ -149,7 +156,7 @@ module Shin
           unless cached
             #puts "Parsing #{name}"
             path = find_module(name)
-            parse_module(File.read(path), path)
+            parse_module(File.read(path), :file => path)
             raise "Module not found: #{name}" unless path
           end
         end
@@ -249,21 +256,23 @@ module Shin
     attr_accessor :ast
     attr_accessor :ast2
     attr_accessor :jst
-    attr_accessor :out
     attr_accessor :requires
     attr_accessor :code
+
+    attr_accessor :macros
 
     def initialize
       @requires = []
     end
 
     def defs
-      defs = []
+      defs = {}
       ast2.each do |node|
         next unless node.list?
         first = node.inner.first
         if first.sym? && first.value.start_with?("def")
-          defs << node.inner[1].value
+          name = node.inner[1].value
+          defs[name] = node
         end
       end
       defs
