@@ -234,7 +234,10 @@ module Shin
 
     def defs
       defs = {}
-      ast2.each do |node|
+      # FIXME: oh god this is terrible.
+      a = ast2 || ast
+    
+      a.each do |node|
         next unless node.list?
         first = node.inner.first
         if first.sym? && first.value.start_with?("def")
