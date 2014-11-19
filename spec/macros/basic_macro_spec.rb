@@ -20,5 +20,15 @@ RSpec.describe "Language", "basic macros" do
       :macros => %Q{ (defmacro inverted-call [f a b] `(~f ~b ~a)) }
     ).to have_output("hello world")
   end
+
+  it "compiles a basic vector-call macro" do
+    expect(
+      :source => %Q{ (vector-call [print "hello" "world"]) },
+      :macros => %Q{
+        (defmacro vector-call [v]
+          `(apply ~(first v) ~(rest v)))
+      }
+    ).to have_output("hello world")
+  end
 end
 
