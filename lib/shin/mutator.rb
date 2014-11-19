@@ -30,68 +30,65 @@ module Shin
     end
 
     def expand(node)
+      if Sequence === node
+        node.inner = node.inner.map { |x| expand(x) }
+      end
+
       case node
       when List
         first = node.inner.first
         case first
         when Symbol
-          macros = @mod.macros
-          if macros
-            unless macros.code
-              Shin::NsParser.new(macros).parse
-              Shin::Mutator.new(@compiler, macros).mutate
-              Shin::Translator.new(@compiler, macros).translate
-              Shin::Generator.new(macros).generate
-              @compiler.modules << macros
-              puts "Generated macro code #{macros.code}"
+          info = resolve_macro(first.value)
+          if info
+            macros = info[:module]
+            puts "Should expand #{first} with #{info[:macro]}"
+
+            puts "eval_ast = #{node}"
+            eval_mod = Shin::Module.new
+
+            _yield = Symbol.new(node.token, "yield")
+            pr_str = Symbol.new(node.token, "pr-str")
+
+            eval_node = List.new(node.token, [node.inner.first])
+            node.inner.drop(1).each do |arg|
+              eval_node.inner << SyntaxQuote.new(arg.token, arg)
             end
 
-            defs = macros.defs
-            puts "Defs in macros: #{defs}"
-            res = defs[first.value]
-            if res
-              puts "Should expand #{first} with #{res}"
+            eval_ast = List.new(node.token, [_yield, List.new(node.token, [pr_str, eval_node])])
+            eval_mod.ast = eval_mod.ast2 = [eval_ast]
+            eval_mod.requires << {
+              :type => 'use',
+              :name => macros.ns,
+              :aka => macros.ns
+            }
 
-              puts "eval_ast = #{node}"
-              eval_mod = Shin::Module.new
+            eval_mod.source = @mod.source
+            Shin::NsParser.new(eval_mod).parse
+            Shin::Translator.new(@compiler, eval_mod).translate
+            Shin::Generator.new(eval_mod).generate
+            puts "eval_mod.code = #{eval_mod.code}"
 
-              _yield = Symbol.new(node.token, "yield")
-              pr_str = Symbol.new(node.token, "pr-str")
-              eval_ast = List.new(node.token, [_yield, List.new(node.token, [pr_str, node])])
-              eval_mod.ast = eval_mod.ast2 = [eval_ast]
-              eval_mod.requires << {
-                :type => 'use',
-                :name => macros.ns,
-                :aka => macros.ns
-              }
-
-              eval_mod.source = @mod.source
-              Shin::NsParser.new(eval_mod).parse
-              Shin::Translator.new(@compiler, eval_mod).translate
-              Shin::Generator.new(eval_mod).generate
-              puts "eval_mod.code = #{eval_mod.code}"
-
-              deps = @compiler.collect_deps(eval_mod)
-              deps.each do |ns, dep|
-                Shin::NsParser.new(dep).parse
-                Shin::Mutator.new(@compiler, dep).mutate
-                Shin::Translator.new(@compiler, dep).translate
-                Shin::Generator.new(dep).generate
-              end
-
-              js = Shin::JsContext.new
-              result = nil
-              js.context['yield'] = lambda do |_, res|
-                result = res
-              end
-              js.providers << @compiler
-              js.load(eval_mod.code, :inline => true)
-
-              res_parser = Shin::Parser.new(result.to_s)
-              transformed = res_parser.parse.first
-              puts "Got result back: #{transformed}"
-              return transformed
+            deps = @compiler.collect_deps(eval_mod)
+            deps.each do |ns, dep|
+              Shin::NsParser.new(dep).parse
+              Shin::Mutator.new(@compiler, dep).mutate
+              Shin::Translator.new(@compiler, dep).translate
+              Shin::Generator.new(dep).generate
             end
+
+            js = Shin::JsContext.new
+            result = nil
+            js.context['yield'] = lambda do |_, ast_back|
+              result = ast_back
+            end
+            js.providers << @compiler
+            js.load(eval_mod.code, :inline => true)
+
+            res_parser = Shin::Parser.new(result.to_s)
+            transformed = res_parser.parse.first
+            puts "Got result back: #{transformed}"
+            return transformed
           end
         end
       end
@@ -99,10 +96,33 @@ module Shin
       node
     end
 
+    def resolve_macro(name)
+      macros = @mod.macros
+      return nil unless macros
+
+      # compile macro code if needed
+      unless macros.code
+        Shin::NsParser.new(macros).parse
+        Shin::Mutator.new(@compiler, macros).mutate
+        Shin::Translator.new(@compiler, macros).translate
+        Shin::Generator.new(macros).generate
+        @compiler.modules << macros
+        puts "Generated macro code #{macros.code}"
+      end
+
+      defs = macros.defs
+      puts "Defs in macros: #{defs.keys}"
+      res = defs[name]
+      if res
+        return {:macro => res, :module => macros}
+      end
+
+      nil
+    end
+
     def fresh
       @seed += 1
     end
-
   end
 end
 
