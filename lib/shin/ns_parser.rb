@@ -1,6 +1,10 @@
 
+require 'shin/utils'
+
 module Shin
   class NsParser
+    include Shin::Utils::Matcher
+
     attr_reader :mod
     @@seed = 0
 
