@@ -271,6 +271,10 @@ module Shin
 
         list = expr.inner
         first = list.first
+        unless first
+          return CallExpression.new(make_ident("list"))
+        end
+
         case
         when Shin::AST::MethodCall === first
           property = make_ident(list[0].sym.value)
