@@ -9,6 +9,8 @@ module Shin
     end
 
     def parse
+      return if mod.ns
+
       nsdef = mod.ast[0]
       ns = nil
       if nsdef && nsdef.list?

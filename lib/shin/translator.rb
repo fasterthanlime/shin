@@ -22,7 +22,7 @@ module Shin
     end
 
     def translate
-      ast = @mod.ast
+      ast = @mod.ast2
 
       requires = [
         {:type => 'require', :name => 'exports', :aka => 'exports'}

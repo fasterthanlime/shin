@@ -58,7 +58,7 @@ module Shin
               _yield = Symbol.new(node.token, "yield")
               pr_str = Symbol.new(node.token, "pr-str")
               eval_ast = List.new(node.token, [_yield, List.new(node.token, [pr_str, node])])
-              eval_mod.ast = [eval_ast]
+              eval_mod.ast = eval_mod.ast2 = [eval_ast]
               eval_mod.requires << {
                 :type => 'use',
                 :name => macros.ns,
@@ -74,19 +74,23 @@ module Shin
               deps = @compiler.collect_deps(eval_mod)
               deps.each do |ns, dep|
                 Shin::NsParser.new(dep).parse
+                Shin::Mutator.new(@compiler, dep).mutate
                 Shin::Translator.new(@compiler, dep).translate
                 Shin::Generator.new(dep).generate
               end
 
               js = Shin::JsContext.new
               result = nil
-              js.context['yield'] = lambda do |res|
+              js.context['yield'] = lambda do |_, res|
                 result = res
               end
               js.providers << @compiler
               js.load(eval_mod.code, :inline => true)
 
-              puts "Got result back: #{result}"
+              res_parser = Shin::Parser.new(result.to_s)
+              transformed = res_parser.parse.first
+              puts "Got result back: #{transformed}"
+              return transformed
             end
           end
         end
