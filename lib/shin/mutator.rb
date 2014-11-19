@@ -106,12 +106,14 @@ module Shin
         :name => info_ns,
         :aka  => info_ns
       }
-      debug "eval_mod ast = #{eval_mod.ast.join(" ")}"
+      debug "eval_mod ast =\n\n#{eval_mod.ast.join(" ")}\n\n"
 
       eval_mod.source = @mod.source
       Shin::NsParser.new(eval_mod).parse
       Shin::Translator.new(@compiler, eval_mod).translate
       Shin::Generator.new(eval_mod).generate
+
+      debug "eval_mod code =\n\n#{eval_mod.code}\n\n"
 
       deps = @compiler.collect_deps(eval_mod)
       deps.each do |ns, dep|

@@ -40,5 +40,23 @@ RSpec.describe "Language", "basic macros" do
       }
     ).to have_output("hello world")
   end
+
+  it "compiles a splicing when macro" do
+    # when != if, because if has a if-cond-true-form and an
+    # otherwise-form, but when only has if-cond-true forms
+    expect(
+      :source => %Q{
+        (my-when [(> 3 1)
+          (print "hello")
+          (print "world")])
+      },
+      :macros => %Q{
+        (defmacro my-when [args]
+          (let [cond (first args)
+                body (rest args)]
+            `(if ~cond (do ~@body))))
+      }
+    ).to have_output("hello world")
+  end
 end
 

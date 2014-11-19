@@ -304,9 +304,9 @@ module Shin
           test, consequent, alternate = list.drop 1
           fi = IfStatement.new(translate_expr(test))
           fi.consequent  = BlockStatement.new
-          translate_body_into_block([consequent], fi.consequent)
+          translate_body_into_block([consequent], fi.consequent) if consequent
           fi.alternate = BlockStatement.new
-          translate_body_into_block([alternate], fi.alternate)
+          translate_body_into_block([alternate], fi.alternate) if alternate
           body << fi
 
           return CallExpression.new(anon)
