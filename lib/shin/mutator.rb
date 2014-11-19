@@ -9,6 +9,8 @@ module Shin
   #   - Desugaring
   #   - Optimizations
   class Mutator
+    DEBUG = ENV['DEBUG_MUTATOR']
+
     include Shin::AST
 
     attr_reader :mod
@@ -44,7 +46,7 @@ module Shin
           invoc = node
           info = resolve_macro(first.value)
           if info
-            puts "Should expand macro invoc #{invoc} with #{info[:macro]}"
+            debug "Should expand macro invoc #{invoc} with #{info[:macro]}"
 
             eval_mod = make_macro_module(invoc, info)
             expanded_ast = eval_macro_module(eval_mod)
@@ -67,11 +69,11 @@ module Shin
         Shin::Translator.new(@compiler, macros).translate
         Shin::Generator.new(macros).generate
         @compiler.modules << macros
-        puts "Generated macro code for #{macros.ns}."
+        debug "Generated macro code for #{macros.ns}."
       end
 
       defs = macros.defs
-      puts "Defs in macros: #{defs.keys}"
+      debug "Defs in macros: #{defs.keys}"
       res = defs[name]
       if res
         return {:macro => res, :module => macros}
@@ -102,7 +104,7 @@ module Shin
         :name => info_ns,
         :aka  => info_ns
       }
-      puts "eval_mod ast = #{eval_mod.ast.join(" ")}"
+      debug "eval_mod ast = #{eval_mod.ast.join(" ")}"
 
       eval_mod.source = @mod.source
       Shin::NsParser.new(eval_mod).parse
@@ -131,12 +133,16 @@ module Shin
 
       res_parser = Shin::Parser.new(result.to_s)
       expanded_ast = res_parser.parse.first
-      puts "Got result back: #{expanded_ast}"
+      debug "Got result back: #{expanded_ast}"
       expanded_ast
     end
 
     def fresh
       @seed += 1
+    end
+
+    def debug(*args)
+      puts(*args) if DEBUG
     end
   end
 end

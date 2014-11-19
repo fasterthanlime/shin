@@ -109,7 +109,6 @@ module Shin
       if macros
         mod.macros = parse_module(macros)
         mod.macros.is_macro = true
-        puts "Got macros: #{mod.macros.ast.join(" ")}"
       end
 
       parser = Shin::Parser.new(source, compiler_opts)
