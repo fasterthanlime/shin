@@ -58,5 +58,35 @@ RSpec.describe "Language", "basic macros" do
       }
     ).to have_output("hello world")
   end
+
+  it "compiles a recursive repeat macroe" do
+    expect(
+      :source => %Q{
+        (my-repeat 3 (print "knock"))
+      },
+      :macros => %Q{
+        (defmacro my-repeat [count body]
+          (if (> count 0)
+            `(do ~body ~(my-repeat (- count 1) body))))
+      }
+    ).to have_output("knock knock knock")
+  end
+
+  it "compiles a constructive repeat macro" do
+    expect(
+      :source => %Q{
+        (my-repeat 3 (print "knock"))
+      },
+      :macros => %Q{
+        (defmacro my-repeat [count body]
+          (let [inner (fn [count body]
+                         (if (> count 0)
+                             (cons body (inner (- count 1) body))
+                             '()))]
+            `(do ~@(inner count body))))
+      }
+    ).to have_output("knock knock knock")
+  end
+
 end
 
