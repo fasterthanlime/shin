@@ -30,5 +30,15 @@ RSpec.describe "Language", "basic macros" do
       }
     ).to have_output("hello world")
   end
+  
+  it "compiles a splicing vector-call macro" do
+    expect(
+      :source => %Q{ (vector-call [print "hello" "world"]) },
+      :macros => %Q{
+        (defmacro vector-call [v]
+          `(~(first v) ~@(rest v)))
+      }
+    ).to have_output("hello world")
+  end
 end
 

@@ -146,11 +146,28 @@ module Shin
     def dequote(node)
       case node
       when Sequence
-        node = node.clone
-        node.inner.map! { |x| dequote(x) }
-        return node
+        res = node.clone
+        res.inner = []
+        node.inner.each do |x|
+          deq = dequote(x)
+          if Array === deq
+            deq.each { |x| res.inner << x }
+          else
+            res.inner << deq
+          end
+        end
+
+        return res
       when Unquote
-        return node.inner
+        if Deref === node.inner
+          deref = node.inner
+          unless Sequence === deref.inner
+            ser!("Cannot use splicing on non-list form #{deref.inner}")
+          end
+          return deref.inner.inner.map { |x| dequote(x) }
+        else
+          return dequote(node.inner)
+        end
       end
 
       node
@@ -162,6 +179,10 @@ module Shin
 
     def debug(*args)
       puts(*args) if DEBUG
+    end
+
+    def ser!(msg)
+      raise msg
     end
   end
 end
