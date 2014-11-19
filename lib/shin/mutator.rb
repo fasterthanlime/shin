@@ -9,7 +9,7 @@ module Shin
   #   - Desugaring
   #   - Optimizations
   class Mutator
-    DEBUG = ENV['DEBUG_MUTATOR']
+    DEBUG = ENV['MUTATOR_DEBUG']
 
     include Shin::AST
 
@@ -35,7 +35,9 @@ module Shin
 
     def expand(node)
       if Sequence === node
-        node.inner = node.inner.map { |x| expand(x) }
+        # FIXME: mutator isn't supposed to mutate the old AST. is clone a proper fix?
+        node = node.clone
+        node.inner.map! { |x| expand(x) }
       end
 
       case node
@@ -46,7 +48,7 @@ module Shin
           invoc = node
           info = resolve_macro(first.value)
           if info
-            debug "Should expand macro invoc #{invoc} with #{info[:macro]}"
+            debug "Should expand macro invoc\n\n#{invoc}\n\nwith\n\n#{info[:macro]}\n\n"
 
             eval_mod = make_macro_module(invoc, info)
             expanded_ast = eval_macro_module(eval_mod)
@@ -133,8 +135,25 @@ module Shin
 
       res_parser = Shin::Parser.new(result.to_s)
       expanded_ast = res_parser.parse.first
-      debug "Got result back: #{expanded_ast}"
-      expanded_ast
+      debug "Expanded AST:\n\n#{expanded_ast}\n\n"
+
+      dequoted_ast = dequote(expanded_ast)
+      debug "Dequoted AST:\n\n#{dequoted_ast}\n\n"
+
+      dequoted_ast
+    end
+
+    def dequote(node)
+      case node
+      when Sequence
+        node = node.clone
+        node.inner.map! { |x| dequote(x) }
+        return node
+      when Unquote
+        return node.inner
+      end
+
+      node
     end
 
     def fresh

@@ -318,6 +318,14 @@ module Shin
           end
           return call
         end
+      when Shin::AST::Unquote
+        call_expr = CallExpression.new(make_ident('--unquote'))
+        ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
+        @quoting = false
+        call_expr.arguments << translate_expr(expr.inner)
+        @quoting = true
+
+        return call_expr
       else
         ser!("Unknown expr form #{expr}", expr.token)
         nil

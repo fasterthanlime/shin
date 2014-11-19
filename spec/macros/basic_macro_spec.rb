@@ -13,5 +13,12 @@ RSpec.describe "Language", "basic macros" do
       :macros => %Q{ (defmacro my-name [s] (.-_name s)) }
     ).to have_output("fruity-loops")
   end
+
+  it "compiles a basic inverted-call macro" do
+    expect(
+      :source => %Q{ (inverted-call print "world" "hello") },
+      :macros => %Q{ (defmacro inverted-call [f a b] `(~f ~b ~a)) }
+    ).to have_output("hello world")
+  end
 end
 
