@@ -5,7 +5,7 @@ require 'oj'
 module Shin
   class JsContext
 
-    DEBUG = false
+    DEBUG = !!ENV['JSCONTEXT_DEBUG']
 
     attr_reader :file_provider
     attr_reader :providers
@@ -89,6 +89,7 @@ module Shin
       }
 
       if inline
+        debug "Loading inline:\n\n#{spec_input}\n\n"
         @context.eval spec_input
       else
         done = false
