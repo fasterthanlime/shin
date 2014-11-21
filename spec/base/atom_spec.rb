@@ -85,6 +85,31 @@ RSpec.describe "Language", "atom" do
               (swap! a dec))
             }).to have_output("foobar 42 43 foobar 43 42")
     end
+
+    it "calls several watches" do
+      # FIXME: this depends on key ordering in hash-map, that's potentially bad ?
+      expect(%Q{
+            (let [a (atom 42)]
+              (add-watch a :foo
+                           (fn [key ref old kid]
+                             (print (name key) old kid)))
+              (add-watch a :bar
+                           (fn [key ref old kid]
+                             (print (name key) old kid)))
+              (reset! a 43))
+            }).to have_output("foo 42 43 bar 42 43")
+    end
+
+    it "doesn't call a watch if it's been removed" do
+      expect(%Q{
+            (let [a (atom 42)]
+              (add-watch a :foobar
+                           (fn [key ref old kid]
+                             (print (name key) old kid)))
+              (remove-watch a :foobar)
+              (reset! a 43))
+            }).to have_output("")
+    end
   end
 end
 
