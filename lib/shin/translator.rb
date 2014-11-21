@@ -24,9 +24,7 @@ module Shin
     def translate
       ast = @mod.ast2
 
-      requires = [
-        {:type => 'require', :name => 'exports', :aka => 'exports'}
-      ]
+      requires = [Shin::Require.new('exports')]
 
       @mod.requires.each do |req|
         requires << req
@@ -40,7 +38,7 @@ module Shin
       define_call = CallExpression.new(make_ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
-        require_arr.elements << make_literal(req[:name])
+        require_arr.elements << make_literal(req.ns)
       end
       define_call.arguments << require_arr
 
@@ -52,7 +50,7 @@ module Shin
 
       factory = FunctionExpression.new
       requires.each do |req|
-        factory.params << make_ident(req[:aka])
+        factory.params << make_ident(req.as)
       end
       factory.body = BlockStatement.new
 
@@ -69,16 +67,27 @@ module Shin
       body << ExpressionStatement.new(init_call)
 
       @mod.requires.each do |req|
-        _, type, js = /^(require|use)(?:(-js)?)$/.match(req[:type]).to_a
+        if req.all?
+          unless req.js?
+            dep = @compiler.modules[req.ns]
+            raise "Couldn't find req #{req.ns}" unless dep
+            defs = dep.defs
+            dep_id = make_ident(req.as)
 
-        if type == 'use' && !js
-          dep = @compiler.modules[req[:name]]
-          raise "Couldn't find req #{req[:name]}" unless dep
-          defs = dep.defs
-          dep_id = make_ident(req[:aka])
+            decl = VariableDeclaration.new
+            body << decl
+            defs.each_key do |d|
+              id = make_ident(d)
+              mexpr = MemberExpression.new(dep_id, id, false)
+              decl.declarations << VariableDeclarator.new(id, mexpr)
+            end
+          end
+        elsif !req.refer.empty?
+          dep_id = make_ident(req.as)
           decl = VariableDeclaration.new
           body << decl
-          defs.each_key do |d|
+
+          req.refer.each do |d|
             id = make_ident(d)
             mexpr = MemberExpression.new(dep_id, id, false)
             decl.declarations << VariableDeclarator.new(id, mexpr)

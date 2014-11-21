@@ -8,6 +8,8 @@ require 'shin/utils'
 
 module Shin
   class Compiler
+    DEBUG = ENV['COMPILER_DEBUG']
+
     include Shin::Utils::Matcher
 
     attr_reader :opts
@@ -71,13 +73,14 @@ module Shin
 
       if opts[:exec]
         js = JsContext.new
+        js.providers << self
         js.context['print'] = lambda do |_, *args|
           print args.join(" ")
         end
         js.context['println'] = lambda do |_, *args|
           puts args.join(" ")
         end
-        js.load(code, :inline => true)
+        js.load(main.code, :inline => true)
       elsif opts[:output]
         outdir = opts[:output]
         FileUtils.mkdir_p(outdir)
@@ -140,26 +143,22 @@ module Shin
 
     def parse_reqs(mod)
       mod.requires.each do |req|
-        if req[:type].end_with?('-js')
-          name = req[:name]
-          cached = @js_modules[name]
-          unless cached
-            # puts "Looking for JS module #{name}"
-            path = find_js_module(name)
+        if req.js?
+          unless cached = @js_modules[req.ns]
+            debug "Looking for JS module #{req.ns}"
+            path = find_js_module(req.ns)
             if path
-              @js_modules[name] = path
+              @js_modules[req.ns] = path
             else
-              puts "[WARN] JS Module not found: #{name}" unless path
+              puts "[WARN] JS Module not found: #{req.ns}" unless path
             end
           end
         else
-          name = req[:name]
-          cached = @modules[name]
-          unless cached
-            #puts "Parsing #{name}"
-            path = find_module(name)
+          unless cached = @modules[req.ns]
+            debug "Parsing #{req.ns}"
+            path = find_module(req.ns)
             parse_module(File.read(path), :file => path)
-            raise "Module not found: #{name}" unless path
+            raise "Module not found: #{req.ns}" unless path
           end
         end
       end
@@ -201,14 +200,20 @@ module Shin
       all[mod.ns] = mod
 
       mod.requires.each do |req|
-        next if req[:type].end_with?("js")
-        dep = @modules[req[:name]]
+        next if req.js?
+        dep = @modules[req.ns]
 
         unless all.include?(dep)
           collect_deps(dep, all)
         end
       end
       all
+    end
+
+    private
+
+    def debug(*args)
+      puts(*args) if DEBUG
     end
 
   end

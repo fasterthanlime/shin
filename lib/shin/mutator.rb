@@ -101,11 +101,9 @@ module Shin
       eval_mod.ast = eval_mod.ast2 = [eval_ast]
 
       info_ns = info[:module].ns
-      eval_mod.requires << {
-        :type => 'use',
-        :name => info_ns,
-        :aka  => info_ns
-      }
+      req = Shin::Require.new(info_ns)
+      req.refer = :all
+      eval_mod.requires << req
       debug "eval_mod ast =\n\n#{eval_mod.ast.join(" ")}\n\n"
 
       eval_mod.source = @mod.source
