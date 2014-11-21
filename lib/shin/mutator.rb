@@ -22,12 +22,20 @@ module Shin
     end
 
     def mutate
-      if @mod.is_macro
+      if mod.mutating
+        # FIXME oh god this is a terrible workaround.
+        mod.ast2 = mod.ast
+        return
+      end
+
+      if @mod.macro?
         # FIXME: this is probably wrong? or is it?
         mod.ast2 = mod.ast
         return
       end
 
+      debug "Mutating #{mod.slug}"
+      mod.mutating = true
       mod.ast2 = mod.ast.map { |x| expand(x) }
     end
 
@@ -61,34 +69,40 @@ module Shin
     end
 
     def resolve_macro(name)
-      macros = @mod.macros
-      return nil unless macros
+      @mod.requires.each do |req|
+        next unless req.macro?
 
-      # compile macro code if needed
-      unless macros.code
-        Shin::NsParser.new(macros).parse
-        Shin::Mutator.new(@compiler, macros).mutate
-        Shin::Translator.new(@compiler, macros).translate
-        Shin::Generator.new(macros).generate
-        @compiler.modules << macros
-        debug "Generated macro code for #{macros.ns}."
-      end
+        macros = @compiler.modules[req]
 
-      defs = macros.defs
-      debug "Defs in macros: #{defs.keys}"
-      res = defs[name]
-      if res
-        return {:macro => res, :module => macros}
+        # compile macro code if needed
+        unless macros.code
+          Shin::NsParser.new(macros).parse
+          Shin::Mutator.new(@compiler, macros).mutate
+          Shin::Translator.new(@compiler, macros).translate
+          Shin::Generator.new(macros).generate
+          @compiler.modules << macros
+          debug "Generated macro code for #{macros.ns}."
+        end
+
+        defs = macros.defs
+        res = defs[name]
+        if res
+          debug "Found '#{name}' in #{macros.slug}, which has defs #{defs.keys.join(", ")}"
+          return {:macro => res, :module => macros}
+        end
       end
 
       nil
     end
 
     def make_macro_module(invoc, info)
+      debug "Making macro_eval module for #{@mod.slug}"
+
       t = invoc.token
       macro_sym = invoc.inner.first
 
       eval_mod = Shin::Module.new
+      eval_mod.macro = true
       _yield = Symbol.new(t, "yield")
       pr_str = Symbol.new(t, "pr-str")
 
@@ -101,8 +115,7 @@ module Shin
       eval_mod.ast = eval_mod.ast2 = [eval_ast]
 
       info_ns = info[:module].ns
-      req = Shin::Require.new(info_ns)
-      req.refer = :all
+      req = Shin::Require.new(info_ns, :macro => true, :refer => :all)
       eval_mod.requires << req
       debug "eval_mod ast =\n\n#{eval_mod.ast.join(" ")}\n\n"
 
@@ -111,10 +124,14 @@ module Shin
       Shin::Translator.new(@compiler, eval_mod).translate
       Shin::Generator.new(eval_mod).generate
 
+      debug "eval_mod got NS: #{eval_mod.ns}"
       debug "eval_mod code =\n\n#{eval_mod.code}\n\n"
 
       deps = @compiler.collect_deps(eval_mod)
-      deps.each do |ns, dep|
+      debug "deps for eval_mod: #{deps.keys.join(", ")}"
+      deps.each do |slug, dep|
+        next if slug == eval_mod.ns
+        debug "Compiling dep #{dep.slug}"
         Shin::NsParser.new(dep).parse
         Shin::Mutator.new(@compiler, dep).mutate
         Shin::Translator.new(@compiler, dep).translate
@@ -178,7 +195,7 @@ module Shin
     end
 
     def debug(*args)
-      puts(*args) if DEBUG
+      puts("[MUTATOR] #{args.join(" ")}") if DEBUG
     end
 
     def ser!(msg)

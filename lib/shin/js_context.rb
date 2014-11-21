@@ -90,7 +90,7 @@ module Shin
 
       if inline
         debug "Loading inline:\n\n#{spec_input}\n\n"
-        @context.eval spec_input
+        @context.eval(spec_input, spec.name)
       else
         done = false
         name = spec.name + ".js"
@@ -101,11 +101,11 @@ module Shin
             next
           when Pathname
             debug "Loading from pathname #{name} -> #{res}"
-            @context.load res.to_s
+            @context.load(res.to_s)
             done = true
           else
-            debug "Evaling from memory #{name}"
-            @context.eval res
+            debug "Evaling from memory #{name}:\n\n#{res}"
+            @context.eval(res, spec.name)
             done = true
           end
         end
@@ -196,7 +196,7 @@ module Shin
     end
 
     def debug(*args)
-      puts(*args) if DEBUG
+      puts("[JS_CONTEXT] #{args.join(" ")}") if DEBUG
     end
 
   end

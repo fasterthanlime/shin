@@ -3,6 +3,8 @@ require 'shin/utils'
 
 module Shin
   class NsParser
+    DEBUG = ENV['NSPARSER_DEBUG']
+
     include Shin::Utils::Matcher
 
     attr_reader :mod
@@ -29,16 +31,27 @@ module Shin
       end
 
       mod.ns ||= "anonymous#{fresh}"
-      mod.requires << core_require if mod.ns != 'shin.core'
+      add_core_requires(mod)
 
-      puts "Requires for #{mod.ns}:\n#{mod.requires.join("\n")}"
+      #raise "Uhhhhhhhhh...." if mod.slug.end_with?('8')
+      debug "Requires for #{mod.slug}:\n#{mod.requires.join("\n")}"
     end
 
     def translate_spec(spec)
       list = spec.inner
       type = list.first.value rescue nil
+
       raise "invalid spec" unless type
-      raise "invalid spec type #{type}: expected 'use' or 'require'" unless ['use', 'require'].include? type
+      valid_directives = %w(use require require-macros)
+      unless valid_directives.include? type
+        raise "invalid spec type #{type}: expected one of #{valid_directives.join(", ")}"
+      end
+
+      macro = false
+      if type == 'require-macros'
+        type = 'require'
+        macro = true
+      end
 
       list.drop(1).each do |libspec|
         els = case libspec
@@ -52,7 +65,7 @@ module Shin
 
         raise "invalid libspec: shouldn't be empty #{els}" if els.empty?
         raise "expected sym" unless els.first.sym?
-        req = Require.new(els.first.value)
+        req = Require.new(els.first.value, :macro => macro)
         mod.requires << req
         req.refer = :all if 'use' === type
         els = els.drop(1)
@@ -96,15 +109,22 @@ module Shin
       end
     end
 
-    def core_require
-      req = Require.new('shin.core')
-      req.refer = :all
-      req.as = 'shin'
-      req
+    def add_core_requires(mod)
+      unless mod.core? && !mod.macro?
+        mod.requires << Require.new('shin.core', :refer => :all, :as => 'shin')
+      end
+
+      unless mod.core? && mod.macro?
+        mod.requires << Require.new('shin.core', :refer => :all, :as => 'shin', :macro => true)
+      end
     end
 
     def fresh
       @@seed += 1
+    end
+
+    def debug(*args)
+      puts("[NSPARSER] #{args.join(" ")}") if DEBUG
     end
 
   end
@@ -114,8 +134,9 @@ module Shin
     attr_accessor :refer
     attr_accessor :as
     attr_accessor :js
+    attr_accessor :macro
 
-    def initialize(ns, refer: [], as: nil)
+    def initialize(ns, refer: [], as: nil, macro: false)
       @js = false
       if ns.start_with? 'js/'
         # strip leading 'js/'
@@ -126,6 +147,7 @@ module Shin
       @ns = ns
       @as = as || ns
       @refer = refer
+      @macro = macro
     end
 
     def all?
@@ -136,8 +158,20 @@ module Shin
       @js
     end
 
+    def macro?
+      @macro
+    end
+
+    def slug
+      "#{ns}#{macro ? '..macro' : ''}"
+    end
+
+    def as_sym
+      "#{as}#{macro ? '__macro' : ''}"
+    end
+
     def to_s
-      "(:require [#{js ? 'js/' : ''}#{ns} :refer #{refer.inspect} :as #{as}])"
+      "(:require [#{js ? 'js/' : ''}#{ns} :refer#{macro ? '-macros' : ''} #{refer.inspect} :as #{as}])"
     end
   end
 end

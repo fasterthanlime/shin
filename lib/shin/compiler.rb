@@ -41,7 +41,7 @@ module Shin
       main = parse_module(source, additionals)
 
       all_mods = collect_deps(main)
-      all_mods.each do |ns, mod|
+      all_mods.each do |slug, mod|
         next if mod.ast2
         Shin::Mutator.new(self, mod).mutate
       end
@@ -51,7 +51,7 @@ module Shin
         exit 0
       end
 
-      all_mods.each do |ns, mod|
+      all_mods.each do |slug, mod|
         next if mod.jst
         Shin::Translator.new(self, mod).translate
       end
@@ -61,7 +61,7 @@ module Shin
         exit 0
       end
 
-      all_mods.each do |ns, mod|
+      all_mods.each do |slug, mod|
         next if mod.code
         Shin::Generator.new(mod).generate
       end
@@ -85,8 +85,9 @@ module Shin
         outdir = opts[:output]
         FileUtils.mkdir_p(outdir)
 
-        all_mods.each do |ns, mod|
-          File.open("#{outdir}/#{ns}.js", "wb") do |f|
+        all_mods.each do |slug, mod|
+          next if mod.macro?
+          File.open("#{outdir}/#{mod.ns}.js", "wb") do |f|
             f.write(mod.code)
           end
         end
@@ -103,15 +104,14 @@ module Shin
       compiler_opts = {}
       file = additionals[:file]
       mod = Shin::Module.new
+
       if file
         mod.file = file
         compiler_opts[:file] = file
       end
 
-      macros = additionals[:macros]
-      if macros
-        mod.macros = parse_module(macros)
-        mod.macros.is_macro = true
+      if additionals[:macro]
+        mod.macro = true
       end
 
       parser = Shin::Parser.new(source, compiler_opts)
@@ -125,6 +125,13 @@ module Shin
 
       Shin::NsParser.new(mod).parse
       @modules << mod
+
+      if macros = additionals[:macros]
+        macros_source = "(ns #{mod.ns})\n#{macros}"
+        parse_module(macros_source, :macro => true)
+        mod.requires << Require.new(mod.ns, :macro => true, :refer => :all)
+      end
+
       parse_reqs(mod)
 
       return mod
@@ -132,7 +139,7 @@ module Shin
 
     def provide_js_module(name)
       ns = name.gsub(/\.js$/, '')
-      mod = @modules[ns]
+      mod = @modules.lookup(ns, :macro => false)
       if mod
         #puts "Compiler: found #{ns}"
         mod.code
@@ -154,18 +161,20 @@ module Shin
             end
           end
         else
-          unless cached = @modules[req.ns]
-            debug "Parsing #{req.ns}"
-            path = find_module(req.ns)
-            parse_module(File.read(path), :file => path)
-            raise "Module not found: #{req.ns}" unless path
+          unless cached = @modules[req]
+            debug "Parsing #{req.slug}"
+            path = find_module(req.ns, :macro => req.macro)
+            raise "Module not found: #{req.slug}" unless path
+            parse_module(File.read(path), :file => path, :macro => req.macro?)
           end
         end
       end
       nil
     end
 
-    def find_module(ns)
+    def find_module(ns, macro: false)
+      ext = macro ? "clj" : "cljs"
+
       @opts[:sourcepath].each do |sp|
         tokens = ns.split('.')
 
@@ -174,7 +183,7 @@ module Shin
           dots = [tokens.last]
 
           while true
-            path = "#{[sp].concat(slashes).join("/")}/#{dots.join(".")}.cljs"
+            path = "#{[sp].concat(slashes).join("/")}/#{dots.join(".")}.#{ext}"
             return path if File.exist?(path)
 
             break if slashes.empty?
@@ -197,13 +206,14 @@ module Shin
     end
 
     def collect_deps(mod, all = {})
-      all[mod.ns] = mod
+      all[mod.slug] = mod
 
       mod.requires.each do |req|
         next if req.js?
-        dep = @modules[req.ns]
+        dep = @modules[req]
+        raise "While collecting deps for #{mod.slug}, couldn't find #{req.slug}" unless dep
 
-        unless all.include?(dep)
+        unless all[dep.slug]
           collect_deps(dep, all)
         end
       end
@@ -213,7 +223,7 @@ module Shin
     private
 
     def debug(*args)
-      puts(*args) if DEBUG
+      puts("[COMPILER] #{args.join(" ")}") if DEBUG
     end
 
   end
@@ -228,12 +238,17 @@ module Shin
     attr_accessor :requires
     attr_accessor :code
 
-    attr_accessor :is_macro
-    attr_accessor :macros
+    attr_accessor :mutating
+    attr_accessor :macro
 
     def initialize
       @requires = []
-      @is_macro = false
+      @macro = false
+      @mutating = false
+    end
+
+    def core?
+      @ns == 'shin.core'
     end
 
     def defs
@@ -251,6 +266,14 @@ module Shin
       end
       defs
     end
+
+    def macro?
+      @macro
+    end
+
+    def slug
+      "#{ns}#{macro ? '..macro' : ''}"
+    end
   end
 
   class ModuleCache
@@ -259,11 +282,16 @@ module Shin
     end
 
     def <<(mod)
-      @modules[mod.ns] = mod
+      @modules[mod.slug] = mod
     end
 
-    def [](ns)
-      @modules[ns]
+    def [](req)
+      raise "ModuleCache expecting Require, got : #{req}" unless Shin::Require === req
+      @modules[req.slug]
+    end
+
+    def lookup(ns, macro: false)
+      @modules["#{ns}#{macro ? '..macro' : ''}"]
     end
 
     def each(&block)

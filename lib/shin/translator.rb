@@ -38,7 +38,8 @@ module Shin
       define_call = CallExpression.new(make_ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
-        require_arr.elements << make_literal(req.ns)
+        next if req.macro? && !@mod.macro?
+        require_arr.elements << make_literal(req.slug)
       end
       define_call.arguments << require_arr
 
@@ -50,7 +51,8 @@ module Shin
 
       factory = FunctionExpression.new
       requires.each do |req|
-        factory.params << make_ident(req.as)
+        next if req.macro? && !@mod.macro?
+        factory.params << make_ident(req.as_sym)
       end
       factory.body = BlockStatement.new
 
@@ -60,38 +62,44 @@ module Shin
       program.body << ExpressionStatement.new(shim_call)
 
       body = factory.body.body
-      shin_init = MemberExpression.new(make_ident('shin'), make_ident('init'), false)
-      init_call = CallExpression.new(shin_init)
-      init_call.arguments << make_ident('this')
-      init_call.arguments << make_literal(@mod.ns)
-      body << ExpressionStatement.new(init_call)
+
+      unless @mod.macro?
+        shin_init = MemberExpression.new(make_ident('shin'), make_ident('init'), false)
+        init_call = CallExpression.new(shin_init)
+        init_call.arguments << make_ident('this')
+        init_call.arguments << make_literal(@mod.ns)
+        body << ExpressionStatement.new(init_call)
+      end
 
       @mod.requires.each do |req|
+        next if req.macro? && !@mod.macro?
         if req.all?
           unless req.js?
-            dep = @compiler.modules[req.ns]
-            raise "Couldn't find req #{req.ns}" unless dep
+            dep = @compiler.modules[req]
+            raise "Couldn't find req #{req.slug}" unless dep
             defs = dep.defs
-            dep_id = make_ident(req.as)
+            dep_id = make_ident(req.as_sym)
 
             decl = VariableDeclaration.new
-            body << decl
             defs.each_key do |d|
               id = make_ident(d)
               mexpr = MemberExpression.new(dep_id, id, false)
               decl.declarations << VariableDeclarator.new(id, mexpr)
             end
+
+            body << decl unless decl.declarations.empty?
           end
         elsif !req.refer.empty?
           dep_id = make_ident(req.as)
           decl = VariableDeclaration.new
-          body << decl
 
           req.refer.each do |d|
             id = make_ident(d)
             mexpr = MemberExpression.new(dep_id, id, false)
             decl.declarations << VariableDeclarator.new(id, mexpr)
           end
+
+          body << decl unless decl.declarations.empty?
         end
       end
 
@@ -100,7 +108,7 @@ module Shin
         when matches?(node, "(defn :expr*)")
           body << translate_defn(node.inner.drop 1)
         when matches?(node, "(defmacro :expr*)")
-          unless @mod.is_macro
+          unless @mod.macro?
             ser!("Macro in a non-macro module", node)
           end
           body << translate_defn(node.inner.drop 1)
