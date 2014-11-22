@@ -74,11 +74,46 @@ For examples, see `spec/infra/matcher_spec.rb`.
 
 ## Translator
 
-Basically walks the earth^WAST and produces a JST
+Basically walks the AST and produces a JST. For now, some forms that could
+be implemented as macros are recognized by the translator, for example `defn`.
+
+For example, literals are transformed to calls to `vector`, `list`, `hash-map`,
+`symbol`, `keyword`, etc. Function definitions are transformed into JavaScript
+functions, auto-returning the last value.
+
+`if` forms, `let` forms are implemented using closures, to establish a new
+scope in the produced JavaScript code - ideally there'd be no need for that,
+and perhaps targetting ES5/ES6 would let us have a cleaner solution (or just
+having a more intelligent compiler). For now, though, it works well enough.
+
+`def`s are local variable declarations + stored into the module's `exports`
+object (see `Modules` section).
+
+Usage of the `@` operator are translated to `deref` calls. Usage of `~` and
+`~@` are translated to `--unquote` calls (used internally for macro expansion).
+
+Some checks are only done at translation time - for example, the number of keys
+in a map literal, or in a let bindings vector.
+
+As a rule, the translator generates pretty errors, like the following:
+
+```
+$ be shin -o public/js -L src/js -I src src/my/app.cljs
+
+Invalid let form: odd number of binding forms at src/my/app.cljs:15:6 (RuntimeError)
+
+(let [initial-tree (render) a]
+      ~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+The output of the translator is what the compiler calls `JST`, which is just
+really [mozilla parser API][moz-parser-api] stored in Ruby data structures.
 
 ## Generator
 
-Uses [escodegen][] for convenience:
+Uses [escodegen][] for convenience, to generate JavaScript from the JST.
+
+Why use escodegen?
 
   - Proven codebase
   - Standard JavaScript AST format ([Mozilla Parser API][moz-parser-api])
