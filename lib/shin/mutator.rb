@@ -19,6 +19,7 @@ module Shin
       @compiler = compiler
       @mod = mod
       @seed = 0
+      @sym_seed = 0
     end
 
     def mutate
@@ -147,6 +148,15 @@ module Shin
       js.context['yield'] = lambda do |_, ast_back|
         result = ast_back
       end
+
+      js.context['fresh_sym'] = lambda do |_|
+        return fresh_sym
+      end
+
+      js.context['debug'] = lambda do |_, *args|
+        debug "[from JS] #{args.join(" ")}"
+      end
+
       js.providers << @compiler
       js.load(eval_mod.code, :inline => true)
 
@@ -192,6 +202,10 @@ module Shin
 
     def fresh
       @seed += 1
+    end
+
+    def fresh_sym
+      @sym_seed += 1
     end
 
     def debug(*args)
