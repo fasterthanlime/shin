@@ -1,5 +1,6 @@
 
 require 'shin/ast'
+require 'shin/mutator'
 require 'shin/utils'
 
 module Shin
@@ -57,6 +58,10 @@ module Shin
         ser! "Expected S-expression!" unless node
         nodes << node
         skip_ws
+      end
+
+      nodes.map! do |node|
+        post_parse(node)
       end
 
       return nodes
@@ -398,6 +403,94 @@ module Shin
       snippet = snippet(@input, start, length)
 
       raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
+    end
+
+    # Post-parsing logic (auto-gensym, etc.)
+    
+    def post_parse(node, trail = [])
+      case node
+      when Sequence
+        node = node.clone
+        _trail = trail + [node]
+        node.inner.map! do |child|
+          post_parse(child, _trail)
+        end
+        node
+      when SyntaxQuote
+        node = node.clone
+        candidate = LetCandidate.new(node)
+
+        _trail = trail + [node, candidate]
+        inner = post_parse(node.inner, _trail)
+
+        if candidate.useful?
+          candidate.let
+        else
+          SyntaxQuote.new(node.token, inner)
+        end
+      when Symbol
+        if node.value.end_with? '#'
+          t = node.token
+          candidate = nil
+          quote = nil
+          found = false
+          trail.reverse_each do |parent|
+            if SyntaxQuote === parent
+              found = true
+              quote = parent
+              break
+            end
+            candidate = parent
+          end
+
+          unless found
+            raise "auto-gensym used outside syntax quote: #{node}"
+          end
+
+          name = node.value[0..-2]
+          sym = candidate.lazy_make(name)
+          return Unquote.new(t, Symbol.new(t, sym))
+        end
+        node
+      else
+        node
+      end
+    end
+  end
+
+  class LetCandidate
+    include Shin::AST
+
+    attr_reader :t
+    attr_reader :let
+
+    def initialize(node)
+      @t = node.token
+      @let = List.new(t)
+      @let.inner << Symbol.new(t, "let")
+      @decls = Vector.new(t)
+      @let.inner << @decls
+      @let.inner << node
+      @cache = {}
+    end
+
+    def lazy_make(name)
+      sym = @cache[name]
+      unless sym
+        sym = "#{name}#{Shin::Mutator.fresh_sym}"
+        @cache[name] = sym
+        @decls.inner << Symbol.new(t, sym)
+        @decls.inner << List.new(t, [Symbol.new(t, "gensym"), String.new(t, name)])
+      end
+      sym
+    end
+
+    def to_s
+      "LetCandidate(#{@let}, cache = #{@cache})"
+    end
+
+    def useful?
+      !@decls.inner.empty?
     end
 
   end

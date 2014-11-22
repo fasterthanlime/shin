@@ -14,12 +14,12 @@ module Shin
     include Shin::AST
 
     attr_reader :mod
+    @@sym_seed = 2121
 
     def initialize(compiler, mod)
       @compiler = compiler
       @mod = mod
       @seed = 0
-      @sym_seed = 0
     end
 
     def mutate
@@ -150,7 +150,7 @@ module Shin
       end
 
       js.context['fresh_sym'] = lambda do |_|
-        return fresh_sym
+        return Mutator.fresh_sym
       end
 
       js.context['debug'] = lambda do |_, *args|
@@ -204,8 +204,8 @@ module Shin
       @seed += 1
     end
 
-    def fresh_sym
-      @sym_seed += 1
+    def self.fresh_sym
+      @@sym_seed += 1
     end
 
     def debug(*args)

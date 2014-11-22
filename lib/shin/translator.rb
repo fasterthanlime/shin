@@ -152,7 +152,7 @@ module Shin
           when Shin::AST::Symbol
             # all good
           else
-            ser!("Invalid let form: first binding form should be a symbol or collection", name)
+            ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{name.class}", name)
           end
 
           decl = VariableDeclaration.new
