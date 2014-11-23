@@ -83,6 +83,8 @@ module Shin
       skip_ws
       until eof?
         case (char = peek_char.chr)
+        when ','
+          skip_char
         when rdelim
           break
         else
