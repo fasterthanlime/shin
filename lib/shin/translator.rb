@@ -105,22 +105,31 @@ module Shin
       end
 
       ast.each do |node|
-        case
-        when matches?(node, "(defn :expr*)")
-          body << translate_defn(node.inner.drop 1)
-        when matches?(node, "(defmacro :expr*)")
-          unless @mod.macro?
-            ser!("Macro in a non-macro module", node)
+        case node
+        when Shin::AST::List
+          first = node.inner.first
+          if first
+            case
+            when first.sym?("def")
+              body << translate_def(node.inner.drop 1)
+            when first.sym?("defn")
+              body << translate_defn(node.inner.drop 1)
+            when first.sym?("defmacro")
+              ser!("Macro in a non-macro module", node) unless @mod.macro?
+              body << translate_defn(node.inner.drop 1)
+            when first.sym?("defprotocol")
+              ser!("defprotocol: stub", first)
+            when first.sym?("deftype")
+              ser!("deftype: stub", first)
+            else
+              expr = translate_expr(node) or ser!("Couldn't parse expr", node)
+              body << ExpressionStatement.new(expr)
+            end
+          else
+            expr = translate_expr(node) or ser!("Couldn't parse expr", node)
+            body << ExpressionStatement.new(expr)
           end
-          body << translate_defn(node.inner.drop 1)
-        when matches?(node, "(def :expr*)")
-          body << translate_def(node.inner.drop 1)
-        when matches?(node, ":expr")
-          # any expression is a statement, after all.
-          expr = translate_expr(node) or ser!("Couldn't parse expr", node)
-          body << ExpressionStatement.new(expr)
         else
-          ser!("Unknown form in Program", node)
         end
       end
 
@@ -249,13 +258,13 @@ module Shin
               ser!("Expected symbol in :#{directive} vector (in map destructuring)") unless sym.sym?
               binds << sym
               binds << case directive
-                  when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
-                  when 'strs' then Shin::AST::String.new(sym.token, sym.value)
-                  when 'syms'
-                    s = Shin::AST::Symbol.new(sym.token, sym.value)
-                    Shin::AST::Quote.new(sym.token, s)
-                  else raise Shin::SyntaxError, "Unknown directive #{directive}"
-                  end
+              when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
+              when 'strs' then Shin::AST::String.new(sym.token, sym.value)
+              when 'syms'
+                s = Shin::AST::Symbol.new(sym.token, sym.value)
+                Shin::AST::Quote.new(sym.token, s)
+              else raise Shin::SyntaxError, "Unknown directive #{directive}"
+              end
             end
             destructure_map(block, binds, rhs, alt_map)
           elsif 'as' === name.value
@@ -532,7 +541,7 @@ module Shin
                  else
                    CallExpression.new(translate_expr(first))
                  end
-          
+
           list.drop(1).each do |arg|
             call.arguments << translate_expr(arg)
           end
