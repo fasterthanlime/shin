@@ -159,7 +159,7 @@ module Shin
         list = lhs.inner
         rhs_memo = fresh("rhsmemo")
         vdfe(block, rhs_memo, rhs)
-        rhs_sym = Shin::AST::Symbol.new(lhs.token, rhs_sym)
+        rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_sym)
         rhs_id = make_ident(rhs_memo)
 
         i = 0
@@ -194,9 +194,34 @@ module Shin
         rhs_sym = Shin::AST::Symbol.new(lhs.token, rhs_sym)
         rhs_id = make_ident(rhs_memo)
 
-        lhs.inner.each_slice(2) do |pair|
+        list = lhs.inner
+        shortcut_directives = %w(keys strs syms)
+
+        if list.first && list.first.kw? && shortcut_directives.include?(list.first.value)
+          directive = list.first.value
+
+          ser!("Missing key vector after :#{directive} in map destructuring", list) unless list.size >= 2
+          keys_vec = list[1]
+          ser!("Expected vector after :#{directive} in map destructuring, got #{keys_vec.class.to_s}", keys_vec) unless keys_vec.vector?
+          rest = list.drop(2)
+
+          binds = []
+          keys_vec.inner.each do |sym|
+            binds << sym
+            binds << case directive
+            when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
+            when 'strs' then Shin::AST::String.new(sym.token, sym.value)
+            when 'syms'
+              s = Shin::AST::Symbol.new(sym.token, sym.value)
+              Shin::AST::Quote.new(sym.token, s)
+            else raise "Unknown directive #{directive}"
+            end
+          end
+          list = binds + rest
+        end
+
+        list.each_slice(2) do |pair|
           name, map_key = pair
-          ser!("Expected keyword in map destructuring", map_key) unless map_key.kw?
 
           part = CallExpression.new(make_ident('get'), [rhs_id, translate_expr(map_key)])
           if name.sym?

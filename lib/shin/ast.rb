@@ -157,7 +157,7 @@ module Shin
     class Symbol < Node
       attr_accessor :value
 
-      def initialize(token ,value)
+      def initialize(token, value)
         super(token)
         @value = value
       end

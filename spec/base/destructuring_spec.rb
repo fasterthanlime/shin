@@ -39,8 +39,32 @@ RSpec.describe "Language", "destructuring" do
   describe "on maps" do
     it "captures individual elements" do
       expect(%Q{
-             (let [m                {:a 1 :b 2 :c 3}
+             (let [m                {:a 1 :b 2 :c 3 :d 4}
                    {a :a b :b c :c} m]
+               (print a b c))
+             }).to have_output("1 2 3")
+    end
+
+    it "works with :keys directive" do
+      expect(%Q{
+             (let [m                {:a 1 :b 2 :c 3 :d 4}
+                   {:keys [a b c]} m]
+               (print a b c))
+             }).to have_output("1 2 3")
+    end
+
+    it "works with :strs directive" do
+      expect(%Q{
+             (let [m                {"a" 1 "b" 2 "c" 3 "d" 4}
+                   {:strs [a b c]} m]
+               (print a b c))
+             }).to have_output("1 2 3")
+    end
+
+    it "works with :syms directive" do
+      expect(%Q{
+             (let [m                {'a 1 'b 2 'c 3 'd 4}
+                   {:syms [a b c]} m]
                (print a b c))
              }).to have_output("1 2 3")
     end
