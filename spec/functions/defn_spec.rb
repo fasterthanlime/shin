@@ -12,10 +12,10 @@ RSpec.describe "Language", "defn" do
   end
 
   it "raises on invalid defn forms" do
-    expect { expect(%Q{(defn)}).to have_output("") }.to raise_error
-    expect { expect(%Q{(defn name)}).to have_output("") }.to raise_error
-    expect { expect(%Q{(defn name "Doc here." woops [])}).to have_output("") }.to raise_error
-    expect { expect(%Q{(defn name not-a-string [] expr)}).to have_output("") }.to raise_error
+    expect { expect(%Q{(defn)}).to have_output("") }.to raise_error(Shin::SyntaxError)
+    expect { expect(%Q{(defn name)}).to have_output("") }.to raise_error(Shin::SyntaxError)
+    expect { expect(%Q{(defn name "Doc here." woops [])}).to have_output("") }.to raise_error(Shin::SyntaxError)
+    expect { expect(%Q{(defn name woops [] expr)}).to have_output("") }.to raise_error(Shin::SyntaxError)
   end
 
   it "handles a simple argument list" do

@@ -1,5 +1,6 @@
 
 require 'shin/parser'
+require 'shin/errors'
 
 module Shin
   module Utils
@@ -22,7 +23,7 @@ module Shin
         specs = Shin::Parser.parse(pattern)
 
         if block && specs.length != block.arity
-          raise "Wrong arity for matches?, got #{block.arity}, expected #{specs.length}"
+          raise PatternError.new("Wrong arity for matches?, got #{block.arity}, expected #{specs.length}")
         end
 
         unless ast.respond_to?(:to_ary)
@@ -59,7 +60,7 @@ module Shin
           when Keyword
             type_name, mods = spec.value.match(TYPE_REGEXP).to_a[1..-1]
             type = TYPE_MAP[type_name]
-            raise "Invalid pattern type: '#{spec.value}'" if type.nil?
+            raise PatternError.new("Invalid pattern type: '#{spec.value}'") if type.nil?
 
             min_occ = 1
             multi = false

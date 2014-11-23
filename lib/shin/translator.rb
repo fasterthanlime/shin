@@ -77,7 +77,7 @@ module Shin
         if req.all?
           unless req.js?
             dep = @compiler.modules[req]
-            raise "Couldn't find req #{req.slug}" unless dep
+            raise Shin::Error, "Couldn't find req #{req.slug}" unless dep
             defs = dep.defs
             dep_id = make_ident(req.as_sym)
 
@@ -254,7 +254,7 @@ module Shin
                   when 'syms'
                     s = Shin::AST::Symbol.new(sym.token, sym.value)
                     Shin::AST::Quote.new(sym.token, s)
-                  else raise "Unknown directive #{directive}"
+                  else raise Shin::SyntaxError, "Unknown directive #{directive}"
                   end
             end
             destructure_map(block, binds, rhs, alt_map)
@@ -324,7 +324,6 @@ module Shin
     end
 
     def translate_defn(list)
-      # FIXME: express in terms of 'fn'
       matches?(list, ":sym :str? [:expr*] :expr*") do |name, doc, args, body|
         f = translate_fn_inner(args, body, :name => name.value)
 
@@ -336,6 +335,54 @@ module Shin
 
         return decl
       end or ser!("Invalid defn form", list)
+    end
+
+    def translate_closure(closure)
+      t = closure.token
+      arg_map = {}
+      body = desugar_closure_inner(closure.inner, arg_map)
+
+      num_args = arg_map.keys.max || 0
+      args = (0..num_args).map do |index|
+        name = arg_map[index] || fresh("aarg#{index}-")
+        Shin::AST::Symbol.new(t, name)
+      end
+      translate_fn_inner(Shin::AST::Vector.new(t, args), [body])
+    end
+
+    def desugar_closure_inner(node, arg_map)
+      case node
+      when Sequence
+        node = node.clone
+        node.inner.map! { |x| desugar_closure_inner(x, arg_map) }
+        node
+      when Symbol
+        if node.value.start_with?('%')
+          index = closure_arg_to_index(node)
+          name = arg_map[index]
+          unless name
+            name = arg_map[index] = fresh("aarg#{index}-")
+          end
+          return Shin::AST::Symbol.new(node.token, name)
+        end
+        node
+      when Closure
+        ser!("Nested closures are forbidden", node)
+      else
+        node
+      end
+    end
+
+    def closure_arg_to_index(sym)
+      name = sym.value
+      case name
+      when '%'  then 0
+      when '%%' then 1
+      else
+        num = name[1..-1]
+        ser!("Invalid closure argument: #{name}", sym) unless num =~ /^[0-9]+$/
+        num.to_i - 1
+      end
     end
 
     def translate_fn(list)
@@ -502,6 +549,8 @@ module Shin
 
         call_expr.arguments << Literal.new(spliced)
         return call_expr
+      when Shin::AST::Closure
+        translate_closure(expr)
       else
         ser!("Unknown expr form #{expr}", expr.token)
         nil
@@ -537,7 +586,7 @@ module Shin
       line, column = line_column(@input, start)
       snippet = snippet(@input, start, length)
 
-      raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
+      raise Shin::SyntaxError, "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
     end
 
     def fresh(prefix)

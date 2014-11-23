@@ -43,10 +43,10 @@ RSpec.describe "Matcher", "matches?" do
   end
 
   it "raises on invalid types by keyword" do
-    expect { Shin::Utils::Matcher.send(:matches?, Shin::AST::Keyword.new(nil, ""), ":nonsense") }.to raise_error
+    expect { Shin::Utils::Matcher.send(:matches?, Shin::AST::Keyword.new(nil, ""), ":nonsense") }.to raise_error(Shin::PatternError)
   end
   it "raises on invalid S-expr pattern" do
-    expect { Shin::Utils::Matcher.send(:matches?, Shin::AST::Keyword.new(nil, ""), "(unclosed") }.to raise_error
+    expect { Shin::Utils::Matcher.send(:matches?, Shin::AST::Keyword.new(nil, ""), "(unclosed") }.to raise_error(Shin::Error)
   end
 
   it "applies the star operator correctly" do

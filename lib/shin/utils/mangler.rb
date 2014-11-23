@@ -2,8 +2,8 @@
 module Shin
   module Utils
     module Mangler
-      ID_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.]/
-      ID_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$&<>=\.#\$0-9]/
+      ID_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.]/
+      ID_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.#\$0-9]/
 
       def mangle(id)
         id.
@@ -17,6 +17,7 @@ module Shin
           gsub('>', '$g').
           gsub('<', '$s').
           gsub('.', '$d').
+          gsub('%', '$c').
           to_s
       end
 
@@ -32,6 +33,7 @@ module Shin
           gsub('$g', '>').
           gsub('$s', '<').
           gsub('$d', '.').
+          gsub('$c', '%').
           to_s
       end
     end

@@ -373,7 +373,7 @@ module Shin
 
     def read_char
       char = @input.getc
-      raise EOF, 'unexpected end of input' if char.nil?
+      raise Shin::SyntaxError, 'unexpected end of input' if char.nil?
       char
     end
 
@@ -404,7 +404,7 @@ module Shin
       line, column = line_column(@input, start)
       snippet = snippet(@input, start, length)
 
-      raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
+      raise Shin::SyntaxError, "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
     end
 
     # Post-parsing logic (auto-gensym, etc.)
