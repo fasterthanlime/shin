@@ -465,7 +465,7 @@ module Shin
     end
 
     def fresh(prefix)
-      "#{prefix}#{@seed += 1}"
+      "$$__#{prefix}#{@seed += 1}"
     end
   end
 end
