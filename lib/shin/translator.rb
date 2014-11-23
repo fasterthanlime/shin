@@ -324,7 +324,8 @@ module Shin
     end
 
     def translate_defn(list)
-      matches?(list, ":sym :str? [:sym*] :expr*") do |name, doc, args, body|
+      # FIXME: express in terms of 'fn'
+      matches?(list, ":sym :str? [:expr*] :expr*") do |name, doc, args, body|
         f = FunctionExpression.new(make_ident(name.value))
         args.inner.each do |arg|
           f.params << make_ident(arg.value)
@@ -344,13 +345,25 @@ module Shin
     end
 
     def translate_fn(list)
-      matches?(list, "[:sym*] :expr*") do |args, body|
+      matches?(list, "[:expr*] :expr*") do |args, body|
         expr = FunctionExpression.new
-        args.inner.each do |arg|
-          expr.params << make_ident(arg.value)
+        expr.body = BlockStatement.new
+
+        if args.inner.any? { |x| destructuring_needed?(x) }
+          t = args.token
+          lhs = Shin::AST::Vector.new(t, args.inner)
+          apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
+          vector    = Shin::AST::Symbol.new(t, 'vector')
+          _nil      = Shin::AST::Nil.new(t)
+          arguments = Shin::AST::Symbol.new(t, 'arguments')
+          rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
+          destructure(expr.body, lhs, rhs)
+        else
+          args.inner.each do |arg|
+            expr.params << make_ident(arg.value)
+          end
         end
 
-        expr.body = BlockStatement.new
         translate_body_into_block(list.drop(1), expr.body)
         return expr
       end or ser!("Invalid fn form", list)

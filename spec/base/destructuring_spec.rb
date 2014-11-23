@@ -93,6 +93,20 @@ RSpec.describe "Language", "destructuring" do
     end
   end
 
+  describe "in functions" do
+    it "works with vectors" do
+      expect(%Q{
+             ((fn [[a b] c [[d] e [f]]] (print a b c d e f)) [1 2] 3 [[4] 5 [6]])
+             }).to have_output("1 2 3 4 5 6")
+    end
+
+    it "works with maps" do
+      expect(%Q{
+             ((fn [{:or {b 2 c 4} a :a :keys [b c]}] (print a b c)) {:a 1 :c 3})
+             }).to have_output("1 2 3")
+    end
+  end
+
   describe "stress test" do
     it "works with an example from clojure.org" do
       expect(%Q{
