@@ -136,54 +136,73 @@ module Shin
       end or ser!("Invalid export form")
     end
 
+    def destructuring_needed?(lhs)
+      !lhs.sym? || lhs.sym?('&')
+    end
+
+    # 'VDFE' = Variable-Decl from Expr - just an old acronym
+    # from the ooc days...
+    def vdfe(block, name, expr)
+      expr = translate_expr(expr) if Shin::AST::Node === expr
+
+      decl = VariableDeclaration.new
+      dtor = VariableDeclarator.new(make_ident(name), expr)
+      decl.declarations << dtor
+      block.body << decl
+    end
+
+    def destructure(block, lhs, rhs)
+      case lhs
+      when Shin::AST::Vector
+        t = lhs.token
+        i = 0
+        done = false
+        list = lhs.inner
+        until list.empty?
+          k = list.first
+          ser!("Unexpected argument", k) if done
+
+          if k.sym?('&')
+            done = true
+            list = list.drop(1)
+            if rest = list.first
+              part = CallExpression.new(make_ident('nthnext'), [translate_expr(rhs), make_literal(i)])
+              vdfe(block, rest.value, part)
+            end
+          else
+            part = CallExpression.new(make_ident('nth'), [translate_expr(rhs), make_literal(i)])
+            vdfe(block, k.value, part) 
+          end
+
+          list = list.drop(1)
+          i += 1
+        end
+      when Shin::AST::Map
+        ser!("Map destructuring isn't supported yet.", lhs)
+      when Shin::AST::Symbol
+        vdfe(block, lhs.value, rhs)
+      else
+        ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
+      end
+    end
+
     def translate_let(list)
       matches?(list, "[] :expr*") do |bindings, exprs|
         anon = FunctionExpression.new
-        anon.body = BlockStatement.new
+        block = anon.body = BlockStatement.new
         call = CallExpression.new(anon)
 
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
         bindings.inner.each_slice(2) do |binding|
-          name, val = binding
-
-          case name
-          when Shin::AST::Vector
-            t = name.token
-            i = 0
-            list = name.inner
-            until list.empty?
-              k = list.first
-              if k.sym?('&')
-                list = list.drop(1)
-                if rest = list.first
-                  part = CallExpression.new(make_ident('nthnext'), [translate_expr(val), make_literal(i)])
-                  decl = VariableDeclaration.new
-                  decl.declarations << VariableDeclarator.new(make_ident(rest.value), part)
-                  anon.body.body << decl
-                end
-              else
-                part = CallExpression.new(make_ident('nth'), [translate_expr(val), make_literal(i)])
-                decl = VariableDeclaration.new
-                decl.declarations << VariableDeclarator.new(make_ident(k.value), part)
-                anon.body.body << decl
-              end
-
-              list = list.drop(1)
-              i += 1
-            end
-          when Shin::AST::Map
-            ser!("Map destructuring isn't supported yet.", name)
-          when Shin::AST::Symbol
-            # all good
-            decl = VariableDeclaration.new
-            decl.declarations << VariableDeclarator.new(make_ident(name.value), translate_expr(val))
-            anon.body.body << decl
+          lhs, rhs = binding
+          if destructuring_needed?(lhs)
+            destructure(block, lhs, rhs)
           else
-            ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{name.class}", name)
+            vdfe(block, lhs.value, rhs)
           end
         end
 
-        translate_body_into_block(exprs, anon.body)
+        translate_body_into_block(exprs, block)
         return call
       end or ser!("Invalid let form", list)
     end
