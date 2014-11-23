@@ -27,6 +27,13 @@ RSpec.describe "Language", "destructuring" do
                (print (= r1 r2)))
              }).to have_output("true")
     end
+
+    it "works when nested" do
+      expect(%Q{
+      (let [[[a b] c [[d] [e [f]]]]  [[1 2] 3 [[4] [5 [6]]]]]
+        (print a b c d e f))
+             }).to have_output("1 2 3 4 5 6")
+    end
   end
 end
 

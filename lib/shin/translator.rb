@@ -19,6 +19,7 @@ module Shin
       @options = {:file => mod.file}
 
       @quoting = false
+      @seed = 4141
     end
 
     def translate
@@ -154,10 +155,14 @@ module Shin
     def destructure(block, lhs, rhs)
       case lhs
       when Shin::AST::Vector
-        t = lhs.token
-        i = 0
         done = false
         list = lhs.inner
+        rhs_memo = fresh("rhsmemo")
+        vdfe(block, rhs_memo, rhs)
+        rhs_sym = Shin::AST::Symbol.new(lhs.token, rhs_sym)
+        rhs_id = make_ident(rhs_memo)
+
+        i = 0
         until list.empty?
           k = list.first
           ser!("Unexpected argument", k) if done
@@ -166,12 +171,18 @@ module Shin
             done = true
             list = list.drop(1)
             if rest = list.first
-              part = CallExpression.new(make_ident('nthnext'), [translate_expr(rhs), make_literal(i)])
+              part = CallExpression.new(make_ident('nthnext'), [rhs_id, make_literal(i)])
               vdfe(block, rest.value, part)
             end
           else
-            part = CallExpression.new(make_ident('nth'), [translate_expr(rhs), make_literal(i)])
-            vdfe(block, k.value, part) 
+            part = CallExpression.new(make_ident('nth'), [rhs_id, make_literal(i)])
+            if k.sym?
+              vdfe(block, k.value, part) 
+            else
+              part_memo = fresh("partmemo")
+              vdfe(block, part_memo, part)
+              destructure(block, k, Shin::AST::Symbol.new(k.token, part_memo))
+            end
           end
 
           list = list.drop(1)
@@ -434,6 +445,10 @@ module Shin
       snippet = snippet(@input, start, length)
 
       raise "#{msg} at #{file}:#{line}:#{column}\n\n#{snippet}\n\n"
+    end
+
+    def fresh(prefix)
+      "#{prefix}#{@seed += 1}"
     end
   end
 end
