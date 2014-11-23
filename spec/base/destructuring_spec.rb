@@ -1,6 +1,6 @@
 
 RSpec.describe "Language", "destructuring" do
-  describe "on vectors/lists" do
+  describe "on vectors" do
     it "captures all elements at once" do
       expect(%Q{
              (let [r1     [1 2 3]
@@ -33,6 +33,16 @@ RSpec.describe "Language", "destructuring" do
       (let [[[a b] c [[d] [e [f]]]]  [[1 2] 3 [[4] [5 [6]]]]]
         (print a b c d e f))
              }).to have_output("1 2 3 4 5 6")
+    end
+  end
+
+  describe "on maps" do
+    it "captures individual elements" do
+      expect(%Q{
+             (let [m                {:a 1 :b 2 :c 3}
+                   {a :a b :b c :c} m]
+               (print a b c))
+             }).to have_output("1 2 3")
     end
   end
 end

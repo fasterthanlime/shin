@@ -164,10 +164,10 @@ module Shin
 
         i = 0
         until list.empty?
-          k = list.first
-          ser!("Unexpected argument", k) if done
+          name = list.first
+          ser!("Unexpected argument", name) if done
 
-          if k.sym?('&')
+          if name.sym?('&')
             done = true
             list = list.drop(1)
             if rest = list.first
@@ -176,12 +176,12 @@ module Shin
             end
           else
             part = CallExpression.new(make_ident('nth'), [rhs_id, make_literal(i)])
-            if k.sym?
-              vdfe(block, k.value, part) 
+            if name.sym?
+              vdfe(block, name.value, part) 
             else
               part_memo = fresh("partmemo")
               vdfe(block, part_memo, part)
-              destructure(block, k, Shin::AST::Symbol.new(k.token, part_memo))
+              destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
             end
           end
 
@@ -189,7 +189,24 @@ module Shin
           i += 1
         end
       when Shin::AST::Map
-        ser!("Map destructuring isn't supported yet.", lhs)
+        rhs_memo = fresh("rhsmemo")
+        vdfe(block, rhs_memo, rhs)
+        rhs_sym = Shin::AST::Symbol.new(lhs.token, rhs_sym)
+        rhs_id = make_ident(rhs_memo)
+
+        lhs.inner.each_slice(2) do |pair|
+          name, map_key = pair
+          ser!("Expected keyword in map destructuring", map_key) unless map_key.kw?
+
+          part = CallExpression.new(make_ident('get'), [rhs_id, translate_expr(map_key)])
+          if name.sym?
+            vdfe(block, name.value, part)
+          else
+            part_memo = fresh("partmemo")
+            vdfe(block, part_memo, part)
+            destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
+          end
+        end
       when Shin::AST::Symbol
         vdfe(block, lhs.value, rhs)
       else
