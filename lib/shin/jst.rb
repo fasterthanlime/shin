@@ -56,11 +56,11 @@ module Shin
         @type = "Function"
         @id = id
         @params = []
-      end
-
-      def to_hash
-        super.merge(:id => id, :params => params, :body => body,
-                   :rest => nil, :defaults => [], :generator => false, :expression => false)
+        @body = nil
+        @rest = nil
+        @defaults = []
+        @generator = false
+        @expression = false
       end
     end
 

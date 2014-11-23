@@ -42,9 +42,7 @@ module Shin
     end
 
     def spec_loaded?(spec)
-      loaded = @context.eval("$kir.modules[#{escape(spec.name)}] != null")
-      debug "spec '#{spec.name}' loaded? #{loaded}."
-      loaded
+      @context.eval("$kir.modules[#{escape(spec.name)}] != null")
     end
 
     def fresh_seed
@@ -57,8 +55,6 @@ module Shin
       else
         parse_spec(spec_input)
       end
-
-      debug "Loading #{spec.name}"
 
       if spec.text?
         text_content = File.read(resource_path(spec.name))
@@ -89,7 +85,7 @@ module Shin
       }
 
       if inline
-        debug "Loading inline:\n\n#{spec_input}\n\n"
+        debug "Loading #{spec.name} inline:\n\n#{spec_input}\n\n"
         @context.eval(spec_input, spec.name)
       else
         done = false
@@ -100,11 +96,13 @@ module Shin
           when nil
             next
           when Pathname
-            debug "Loading from pathname #{name} -> #{res}"
+            debug "Loading #{name} from pathname -> #{res}"
             @context.load(res.to_s)
             done = true
           else
-            debug "Evaling from memory #{name}:\n\n#{res}"
+            unless name.start_with?("shin.core")
+              debug "Loading #{name} from memory:\n\n#{res}"
+            end
             @context.eval(res, spec.name)
             done = true
           end
@@ -143,10 +141,8 @@ module Shin
           js << "$kir.modules[#{escape(spec.name)}].exports, "
         elsif dep_spec.name == 'require'
           # workaround for hamt
-          debug "#{spec.name} => require hack"
           js << "null, "
         else
-          debug "#{spec.name} => #{dep_spec.name}"
           unless spec_loaded?(dep_spec)
             load(dep_spec.input)
           end
@@ -165,7 +161,6 @@ module Shin
       end
 
       # actually call the factory!
-      debug "Calling the factory of #{spec.name}"
       @context.eval js.join("\n")
 
     end

@@ -118,9 +118,9 @@ module Shin
               ser!("Macro in a non-macro module", node) unless @mod.macro?
               body << translate_defn(node.inner.drop 1)
             when first.sym?("defprotocol")
-              ser!("defprotocol: stub", first)
+              body << translate_defprotocol(node.inner.drop 1)
             when first.sym?("deftype")
-              ser!("deftype: stub", first)
+              body << translate_deftype(node.inner.drop 1)
             else
               expr = translate_expr(node) or ser!("Couldn't parse expr", node)
               body << ExpressionStatement.new(expr)
@@ -311,6 +311,84 @@ module Shin
         translate_body_into_block(exprs, block)
         return call
       end or ser!("Invalid let form", list)
+    end
+
+    DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
+
+    def translate_defprotocol(list)
+      matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
+        decl = VariableDeclaration.new
+        dtor = VariableDeclarator.new(make_ident(name.value))
+
+        t = name.token
+        proto_map = Shin::AST::Map.new(t)
+        proto_map.inner << Shin::AST::Keyword.new(t, "sigs")
+        sigs_map = Shin::AST::Map.new(t)
+        sigs.each do |sig|
+          sigs_map.inner << Shin::AST::Keyword.new(t, sig.inner.first.value)
+          sigs_map.inner << Shin::AST::SyntaxQuote.new(t, sig)
+        end
+        proto_map.inner << sigs_map
+        dtor.init = translate_expr(proto_map)
+
+        ex = make_ident("exports/#{name}")
+        dtor.init = AssignmentExpression.new(ex, dtor.init)
+        decl.declarations << dtor
+
+        return decl
+      end or ser!("Invalid defprotocol form", list)
+    end
+
+    DEFTYPE_PATTERN         = ":sym :str? :expr*".freeze
+
+    def translate_deftype(list)
+      matches?(list, DEFTYPE_PATTERN) do |name, doc, body|
+        decl = VariableDeclaration.new
+        dtor = VariableDeclarator.new(make_ident(name.value))
+
+        wrapper = FunctionExpression.new
+        block = wrapper.body = BlockStatement.new
+        dtor.init = CallExpression.new(wrapper)
+
+        # TODO: members / params
+        # constructor
+        ctor = FunctionExpression.new
+        ctor.body = BlockStatement.new
+        vdfe(block, name.value, ctor)
+
+        prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
+        protocols_mexpr = MemberExpression.new(prototype_mexpr, make_ident("_protocols"), false)
+        empty_arr = ArrayExpression.new
+        block.body << ExpressionStatement.new(AssignmentExpression.new(protocols_mexpr, empty_arr))
+
+        body.each do |limb|
+          case
+          when limb.list?
+            id = limb.inner.first
+            fn = translate_fn(limb.inner.drop 1)
+            slot = MemberExpression.new(prototype_mexpr, make_ident(id.value), false)
+            ass = AssignmentExpression.new(slot, fn)
+            block.body << ExpressionStatement.new(ass)
+          when limb.sym?
+            # Ehhhh ignore for now.
+            push = MemberExpression.new(protocols_mexpr, make_ident('push'), false)
+            call = CallExpression.new(push)
+            call.arguments << make_ident(limb.value)
+            block.body << ExpressionStatement.new(call)
+          else
+            ser!("Unrecognized thing in deftype", limb)
+          end
+        end
+
+        # return our new type.
+        block.body << ReturnStatement.new(make_ident(name.value))
+
+        ex = make_ident("exports/#{name}")
+        dtor.init = AssignmentExpression.new(ex, dtor.init)
+        decl.declarations << dtor
+
+        return decl
+      end or ser!("Invalid deftype form", list)
     end
 
     DEF_PATTERN             = ":sym :expr*".freeze
