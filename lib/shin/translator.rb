@@ -214,14 +214,29 @@ module Shin
       end
     end
 
-    def destructure_map(block, inner, rhs)
+    def destructure_map(block, inner, rhs, alt_map = {})
       rhs_memo = fresh("rhsmemo")
       vdfe(block, rhs_memo, rhs)
       rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
       rhs_id = make_ident(rhs_memo)
 
-      shortcut_directives = %w(keys strs syms)
+      # filter out 'or', store in alt_map
+      pairs = []
       inner.each_slice(2) do |pair|
+        k, v = pair
+        if k.kw?('or')
+          ser!("Expected map after :or", v) unless v.map?
+          v.inner.each_slice(2) do |alt|
+            kk, vv = alt
+            alt_map[kk.value] = vv
+          end
+        else
+          pairs << pair
+        end
+      end
+
+      shortcut_directives = %w(keys strs syms)
+      pairs.each do |pair|
         name, map_key = pair
 
         if name.kw?
@@ -231,7 +246,7 @@ module Shin
 
             binds = []
             map_key.inner.each do |sym|
-              ser!("Expected symbol in :#{directive} vetor (in map destructuring)") unless sym.sym?
+              ser!("Expected symbol in :#{directive} vector (in map destructuring)") unless sym.sym?
               binds << sym
               binds << case directive
                   when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
@@ -242,7 +257,7 @@ module Shin
                   else raise "Unknown directive #{directive}"
                   end
             end
-            destructure_map(block, binds, rhs)
+            destructure_map(block, binds, rhs, alt_map)
           elsif 'as' === name.value
             vdfe(block, map_key.value, rhs_sym)
           else
@@ -251,6 +266,9 @@ module Shin
         else
           part = CallExpression.new(make_ident('get'), [rhs_id, translate_expr(map_key)])
           if name.sym?
+            if alt = alt_map[name.value]
+              part.arguments << translate_expr(alt)
+            end
             vdfe(block, name.value, part)
           else
             part_memo = fresh("partmemo")

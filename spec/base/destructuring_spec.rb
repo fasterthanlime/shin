@@ -84,6 +84,13 @@ RSpec.describe "Language", "destructuring" do
                (print a b c))
              }).to have_output("1 2 3")
     end
+
+    it "works with :or directive" do
+      expect(%Q{
+             (let [{a :a :or {a 1 b 2} b :b c :c}   {:a 1 :c 3}]
+               (print a b c))
+             }).to have_output("1 2 3")
+    end
   end
 
   # describe "stress test" do
