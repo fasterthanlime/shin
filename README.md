@@ -333,8 +333,14 @@ on the mutator's side.
 
 ## Destructuring
 
-I wrote this README instead of implementing it, but track it at
-[Issue #14](https://github.com/memoways/shin/issues/14).
+Full Clojure destructuring is supported, with vectors and maps, in let forms,
+function definitions and macro definitions, nested as deep as you want.
+
+It's one of the reason Clojure is so cool, read about it:
+
+  - [On clojure.org](http://clojure.org/special_forms#Special%20Forms--Binding%20Forms%20(Destructuring))
+  - [On clojuredocs.org](http://clojuredocs.org/concepts/destructuring)
+  - [On Jay Field's blog](http://blog.jayfields.com/2010/07/clojure-destructuring.html)
 
 ## Data structures
 
