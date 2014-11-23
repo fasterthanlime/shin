@@ -525,8 +525,14 @@ module Shin
 
           return CallExpression.new(anon)
         else
-          # function call
-          call = CallExpression.new(translate_expr(first))
+          # function call or instanciation
+          call = if first.sym? && first.value.end_with?('.')
+                   type_name = first.value[0..-2]
+                   NewExpression.new(make_ident(type_name))
+                 else
+                   CallExpression.new(translate_expr(first))
+                 end
+          
           list.drop(1).each do |arg|
             call.arguments << translate_expr(arg)
           end
