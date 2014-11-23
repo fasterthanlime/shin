@@ -138,8 +138,10 @@ module Shin
 
     protected
 
+    EXPORT_PATTERN = ":sym :sym?".freeze
+
     def translate_export(list)
-      matches?(list, ":sym :sym?") do |name, aka|
+      matches?(list, EXPORT_PATTERN) do |name, aka|
         aka ||= name
         mexp = MemberExpression.new(make_ident('exports'), make_ident(aka.value), false)
         return AssignmentExpression.new(mexp, make_ident(name.value))
@@ -288,8 +290,10 @@ module Shin
       end
     end
 
+    LET_PATTERN = "[] :expr*".freeze
+
     def translate_let(list)
-      matches?(list, "[] :expr*") do |bindings, exprs|
+      matches?(list, LET_PATTERN) do |bindings, exprs|
         anon = FunctionExpression.new
         block = anon.body = BlockStatement.new
         call = CallExpression.new(anon)
@@ -309,16 +313,20 @@ module Shin
       end or ser!("Invalid let form", list)
     end
 
+    DEF_PATTERN             = ":sym :expr*".freeze
+    DEF_WITH_DOC_PATTERN    = ":str :expr".freeze
+    DEF_WITHOUT_DOC_PATTERN = ":expr".freeze
+
     def translate_def(list)
-      matches?(list, ":sym :expr*") do |name, rest|
+      matches?(list, DEF_PATTERN) do |name, rest|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
 
         case
-        when matches?(rest, ":str :expr")
+        when matches?(rest, DEF_WITH_DOC_PATTERN)
           doc, expr = rest
           dtor.init = translate_expr(expr)
-        when matches?(rest, ":expr")
+        when matches?(rest, DEF_WITHOUT_DOC_PATTERN)
           expr = rest.first
           dtor.init = translate_expr(expr)
         else
@@ -332,8 +340,10 @@ module Shin
       end or ser!("Invalid def form", list)
     end
 
+    DEFN_PATTERN = ":sym :str? [:expr*] :expr*".freeze
+
     def translate_defn(list)
-      matches?(list, ":sym :str? [:expr*] :expr*") do |name, doc, args, body|
+      matches?(list, DEFN_PATTERN) do |name, doc, args, body|
         f = translate_fn_inner(args, body, :name => name.value)
 
         decl = VariableDeclaration.new
@@ -394,8 +404,10 @@ module Shin
       end
     end
 
+    FN_PATTERN = "[:expr*] :expr*".freeze
+
     def translate_fn(list)
-      matches?(list, "[:expr*] :expr*") do |args, body|
+      matches?(list, FN_PATTERN) do |args, body|
         return translate_fn_inner(args, body)
       end or ser!("Invalid fn form", list)
     end

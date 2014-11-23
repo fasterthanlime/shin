@@ -11,6 +11,7 @@ module Shin
       attr_reader :column
 
       def initialize(line, column)
+        @type = "Position"
         @line = line
         @column = column
       end
@@ -22,6 +23,7 @@ module Shin
       attr_reader :end
 
       def initialize(source, _start, _end)
+        @type = "SourceLocation"
         @source = source
         @start = _start
         @end = _end
@@ -30,18 +32,13 @@ module Shin
 
     class Node
       attr_accessor :loc
-
-      def to_hash
-        res = {:type => self.class.name.split('::').last}
-        res[:loc] = loc if loc
-        res
-      end
     end
 
     class Program < Node
       attr_reader :body
 
       def initialize
+        @type = "Program"
         @body = []
       end
 
@@ -56,6 +53,7 @@ module Shin
       attr_accessor :body
 
       def initialize(id = nil)
+        @type = "Function"
         @id = id
         @params = []
       end
@@ -68,10 +66,20 @@ module Shin
 
     class FunctionDeclaration < Node
       include Function
+
+      def initialize(*args)
+        super(*args)
+        @type = "FunctionDeclaration"
+      end
     end
 
     class FunctionExpression < Node
       include Function
+
+      def initialize(*args)
+        super(*args)
+        @type = "FunctionExpression"
+      end
     end
 
     class AssignmentExpression < Node
@@ -80,13 +88,10 @@ module Shin
       attr_reader :operator
 
       def initialize(left, right, operator = '=')
+        @type = "AssignmentExpression"
         @left = left
         @right = right
         @operator = operator
-      end
-
-      def to_hash
-        super.merge(:left => left, :right => right, :operator => operator)
       end
     end
 
@@ -94,11 +99,8 @@ module Shin
       attr_reader :body
 
       def initialize
+        @type = "BlockStatement"
         @body = []
-      end
-
-      def to_hash
-        super.merge(:body => body)
       end
     end
 
@@ -106,11 +108,8 @@ module Shin
       attr_reader :name
 
       def initialize(name)
+        @type = "Identifier"
         @name = name
-      end
-
-      def to_hash
-        super.merge(:name => name)
       end
     end
 
@@ -118,11 +117,8 @@ module Shin
       attr_reader :argument
 
       def initialize(argument)
+        @type = "ReturnStatement"
         @argument = argument
-      end
-
-      def to_hash
-        super.merge(:argument => argument)
       end
     end
 
@@ -130,11 +126,8 @@ module Shin
       attr_reader :expression
 
       def initialize(expression)
+        @type = "ExpressionStatement"
         @expression = expression
-      end
-
-      def to_hash
-        super.merge(:expression => expression)
       end
     end
 
@@ -143,16 +136,17 @@ module Shin
       attr_reader :arguments
 
       def initialize(callee, arguments = [])
+        @type = "CallExpression"
         @callee = callee
         @arguments = arguments
-      end
-
-      def to_hash
-        super.merge(:callee => callee, :arguments => arguments)
       end
     end
 
     class NewExpression < CallExpression
+      def initialize(callee, arguments = [])
+        super(callee, arguments)
+        @type = "NewExpression"
+      end
     end
 
     class MemberExpression < Node
@@ -161,13 +155,10 @@ module Shin
       attr_reader :computed
 
       def initialize(object, property, computed)
+        @type = "MemberExpression"
         @object = object
         @property = property
         @computed = computed
-      end
-
-      def to_hash
-        super.merge(:object => object, :property => property, :computed => computed)
       end
     end
 
@@ -176,27 +167,25 @@ module Shin
       attr_reader :raw
 
       def initialize(value, raw = nil)
+        @type = "Literal"
         @value = value
         @raw = raw
-      end
-
-      def to_hash
-        super.merge(:value => value, :raw => raw)
       end
     end
 
     class ThisExpression < Node
+
+      def initialize
+        @type = "ThisExpression"
+      end
     end
 
     class ArrayExpression < Node
       attr_reader :elements
 
       def initialize(elements = [])
+        @type = "ArrayExpression"
         @elements = elements
-      end
-
-      def to_hash
-        super.merge(:elements => elements)
       end
     end
 
@@ -204,11 +193,8 @@ module Shin
       attr_reader :properties
 
       def initialize(properties = [])
+        @type = "ObjectExpression"
         @properties = properties
-      end
-
-      def to_hash
-        super.merge(:properties => properties)
       end
     end
 
@@ -217,12 +203,9 @@ module Shin
       attr_reader :value
 
       def initialize(key, value)
+        @type = "Property"
         @key = key
         @value = value
-      end
-
-      def to_hash
-        super.merge(:key => key, :value => value)
       end
     end
 
@@ -232,11 +215,8 @@ module Shin
       attr_accessor :alternate
 
       def initialize(test)
+        @type = "IfStatement"
         @test = test
-      end
-
-      def to_hash
-        super.merge(:test => test, :consequent => consequent, :alternate => alternate)
       end
     end
 
@@ -245,12 +225,9 @@ module Shin
       attr_accessor :kind
 
       def initialize(kind = 'var')
+        @type = "VariableDeclaration"
         @declarations = []
         @kind = kind
-      end
-
-      def to_hash
-        super.merge(:declarations => declarations, :kind => kind)
       end
     end
 
@@ -259,12 +236,9 @@ module Shin
       attr_accessor :init
 
       def initialize(id, init = nil)
+        @type = "VariableDeclarator"
         @id = id
         @init = init
-      end
-
-      def to_hash
-        super.merge(:id => id, :init => init)
       end
     end
   end

@@ -19,8 +19,10 @@ module Shin
         "kw"   => Keyword,
       }
 
+      @@ast_cache = {}
+
       def matches?(ast, pattern, &block)
-        specs = Shin::Parser.parse(pattern)
+        specs = lazy_parse(pattern)
 
         if block && specs.length != block.arity
           raise PatternError.new("Wrong arity for matches?, got #{block.arity}, expected #{specs.length}")
@@ -105,6 +107,10 @@ module Shin
 
         block.call(*matches) if block
         true
+      end
+
+      def lazy_parse(pattern)
+        @@ast_cache[pattern] ||= Shin::Parser.parse(pattern)
       end
     end
   end

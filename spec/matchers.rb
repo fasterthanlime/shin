@@ -31,6 +31,7 @@ RSpec::Matchers.define :have_output do |expected_output|
   code = nil
 
   match do |actual|
+
     source = nil
     macros = nil
     case actual

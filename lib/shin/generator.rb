@@ -13,9 +13,19 @@ module Shin
     end
 
     def generate
-      jst_json = Oj.dump(@mod.jst, :mode => :compat, :indent => 2)
+      # `:object` is the fastest mode for Oj
+      # we assign `@type` in every JST node's constructor
+      # Oj will generate an extra ':^o' entry but it's still faster
+      # than using compat mode + `to_hash` implementations.
+      jst_json = Oj.dump(@mod.jst, :mode => :object)
+      if DEBUG
+        puts "JST json for #{@mod.slug}:\n\n#{jst_json}" if DEBUG
+      end
+
+      # fastest way to pass a big string to V8
       context.set("jst_json", jst_json)
-      debug "JST json for #{@mod.slug}:\n\n#{jst_json}"
+
+      # it's faster to call JSON.parse from JS than to eval the JSON
       @mod.code = context.eval("escodegen.generate(JSON.parse(jst_json))")
     end
 
@@ -25,12 +35,6 @@ module Shin
         @@context.load("escodegen")
       end
       @@context
-    end
-
-    private
-
-    def debug(*args)
-      puts(*args) if DEBUG
     end
   end
 end
