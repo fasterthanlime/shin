@@ -147,17 +147,40 @@ module Shin
           name, val = binding
 
           case name
-          when Shin::AST::Sequence
-            ser!("Destructuring isn't supported yet.", name)
+          when Shin::AST::Vector
+            t = name.token
+            i = 0
+            list = name.inner
+            until list.empty?
+              k = list.first
+              if k.sym?('&')
+                list = list.drop(1)
+                if rest = list.first
+                  part = CallExpression.new(make_ident('nthnext'), [translate_expr(val), make_literal(i)])
+                  decl = VariableDeclaration.new
+                  decl.declarations << VariableDeclarator.new(make_ident(rest.value), part)
+                  anon.body.body << decl
+                end
+              else
+                part = CallExpression.new(make_ident('nth'), [translate_expr(val), make_literal(i)])
+                decl = VariableDeclaration.new
+                decl.declarations << VariableDeclarator.new(make_ident(k.value), part)
+                anon.body.body << decl
+              end
+
+              list = list.drop(1)
+              i += 1
+            end
+          when Shin::AST::Map
+            ser!("Map destructuring isn't supported yet.", name)
           when Shin::AST::Symbol
             # all good
+            decl = VariableDeclaration.new
+            decl.declarations << VariableDeclarator.new(make_ident(name.value), translate_expr(val))
+            anon.body.body << decl
           else
             ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{name.class}", name)
           end
-
-          decl = VariableDeclaration.new
-          decl.declarations << VariableDeclarator.new(make_ident(name.value), translate_expr(val))
-          anon.body.body << decl;
         end
 
         translate_body_into_block(exprs, anon.body)
