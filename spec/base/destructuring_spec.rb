@@ -28,6 +28,13 @@ RSpec.describe "Language", "destructuring" do
              }).to have_output("true")
     end
 
+    it "works with :as directive" do
+      expect(%Q{
+             (let [[a b c :as v]      [1 2 3]]
+               (print (= [a b c] v)))
+             }).to have_output("true")
+    end
+
     it "works when nested" do
       expect(%Q{
       (let [[[a b] c [[d] [e [f]]]]  [[1 2] 3 [[4] [5 [6]]]]]

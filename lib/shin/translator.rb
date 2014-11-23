@@ -155,18 +155,41 @@ module Shin
     def destructure(block, lhs, rhs)
       case lhs
       when Shin::AST::Vector
-        done = false
-        list = lhs.inner
-        rhs_memo = fresh("rhsmemo")
-        vdfe(block, rhs_memo, rhs)
-        rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_sym)
-        rhs_id = make_ident(rhs_memo)
+        destructure_vector(block, lhs.inner, rhs)
+      when Shin::AST::Map
+        destructure_map(block, lhs.inner, rhs)
+      when Shin::AST::Symbol
+        vdfe(block, lhs.value, rhs)
+      else
+        ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
+      end
+    end
 
-        i = 0
-        until list.empty?
-          name = list.first
+    def destructure_vector(block, inner, rhs)
+      done = false
+      list = inner
+      rhs_memo = fresh("rhsmemo")
+      vdfe(block, rhs_memo, rhs)
+      rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
+      rhs_id = make_ident(rhs_memo)
+
+      i = 0
+      until list.empty?
+        name = list.first
+
+        if name.kw?
+          directive = name.value
+          case directive
+          when 'as'
+            list = list.drop(1)
+            as_sym = list.first
+            ser!("Expected symbol in :as directive, got #{as_sym.class}") unless as_sym.sym?
+            vdfe(block, as_sym.value, rhs_sym)
+          else
+            ser!("Unknown directive in vector destructuring: :#{directive}", name)
+          end
+        else
           ser!("Unexpected argument", name) if done
-
           if name.sym?('&')
             done = true
             list = list.drop(1)
@@ -184,16 +207,10 @@ module Shin
               destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
             end
           end
-
-          list = list.drop(1)
-          i += 1
         end
-      when Shin::AST::Map
-        destructure_map(block, lhs.inner, rhs)
-      when Shin::AST::Symbol
-        vdfe(block, lhs.value, rhs)
-      else
-        ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
+
+        list = list.drop(1)
+        i += 1
       end
     end
 
@@ -210,7 +227,7 @@ module Shin
         if name.kw?
           if shortcut_directives.include?(name.value)
             directive = name.value
-            ser!("Expected vector after :#{directive} in map destructuring, got #{map_key.class.to_s}", map_key) unless map_key.vector?
+            ser!("Expected vector after :#{directive} in map destructuring, got #{map_key.class}", map_key) unless map_key.vector?
 
             binds = []
             map_key.inner.each do |sym|
