@@ -48,26 +48,45 @@ RSpec.describe "Language", "destructuring" do
     it "works with :keys directive" do
       expect(%Q{
              (let [m                {:a 1 :b 2 :c 3 :d 4}
-                   {:keys [a b c]} m]
-               (print a b c))
-             }).to have_output("1 2 3")
+                   {d :d :keys [a b c]} m]
+               (print a b c d))
+             }).to have_output("1 2 3 4")
     end
 
     it "works with :strs directive" do
       expect(%Q{
              (let [m                {"a" 1 "b" 2 "c" 3 "d" 4}
-                   {:strs [a b c]} m]
-               (print a b c))
-             }).to have_output("1 2 3")
+                   {d "d" :strs [a b c]} m]
+               (print a b c d))
+             }).to have_output("1 2 3 4")
     end
 
     it "works with :syms directive" do
       expect(%Q{
              (let [m                {'a 1 'b 2 'c 3 'd 4}
-                   {:syms [a b c]} m]
+                   {d 'd :syms [a b c]} m]
+               (print a b c d))
+             }).to have_output("1 2 3 4")
+    end
+
+    it "works with :as directive" do
+      expect(%Q{
+             (let [m                      {:a 1 :b 2 :c 3 :d 4}
+                   {:as m2 d :d}          m
+                   {a :a b :b c :c}       m2]
                (print a b c))
              }).to have_output("1 2 3")
     end
   end
+
+  # describe "stress test" do
+  #   it "works with an example from clojure.org" do
+  #     expect(%Q{
+  #            (let [{j :j, k :k, i :i, [r s & t :as v] :ivec, :or {i 12 j 13}}
+  #                  {:j 15 :k 16 :ivec [22 23 24 25]}]
+  #                    [i j k r s t v])
+  #            }).to have_output("[12 15 16 22 23 (24 25) [22 23 24 25]]")
+  #   end
+  # end
 end
 

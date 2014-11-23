@@ -189,40 +189,49 @@ module Shin
           i += 1
         end
       when Shin::AST::Map
-        rhs_memo = fresh("rhsmemo")
-        vdfe(block, rhs_memo, rhs)
-        rhs_sym = Shin::AST::Symbol.new(lhs.token, rhs_sym)
-        rhs_id = make_ident(rhs_memo)
+        destructure_map(block, lhs.inner, rhs)
+      when Shin::AST::Symbol
+        vdfe(block, lhs.value, rhs)
+      else
+        ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
+      end
+    end
 
-        list = lhs.inner
-        shortcut_directives = %w(keys strs syms)
+    def destructure_map(block, inner, rhs)
+      rhs_memo = fresh("rhsmemo")
+      vdfe(block, rhs_memo, rhs)
+      rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
+      rhs_id = make_ident(rhs_memo)
 
-        if list.first && list.first.kw? && shortcut_directives.include?(list.first.value)
-          directive = list.first.value
+      shortcut_directives = %w(keys strs syms)
+      inner.each_slice(2) do |pair|
+        name, map_key = pair
 
-          ser!("Missing key vector after :#{directive} in map destructuring", list) unless list.size >= 2
-          keys_vec = list[1]
-          ser!("Expected vector after :#{directive} in map destructuring, got #{keys_vec.class.to_s}", keys_vec) unless keys_vec.vector?
-          rest = list.drop(2)
+        if name.kw?
+          if shortcut_directives.include?(name.value)
+            directive = name.value
+            ser!("Expected vector after :#{directive} in map destructuring, got #{map_key.class.to_s}", map_key) unless map_key.vector?
 
-          binds = []
-          keys_vec.inner.each do |sym|
-            binds << sym
-            binds << case directive
-            when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
-            when 'strs' then Shin::AST::String.new(sym.token, sym.value)
-            when 'syms'
-              s = Shin::AST::Symbol.new(sym.token, sym.value)
-              Shin::AST::Quote.new(sym.token, s)
-            else raise "Unknown directive #{directive}"
+            binds = []
+            map_key.inner.each do |sym|
+              ser!("Expected symbol in :#{directive} vetor (in map destructuring)") unless sym.sym?
+              binds << sym
+              binds << case directive
+                  when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
+                  when 'strs' then Shin::AST::String.new(sym.token, sym.value)
+                  when 'syms'
+                    s = Shin::AST::Symbol.new(sym.token, sym.value)
+                    Shin::AST::Quote.new(sym.token, s)
+                  else raise "Unknown directive #{directive}"
+                  end
             end
+            destructure_map(block, binds, rhs)
+          elsif 'as' === name.value
+            vdfe(block, map_key.value, rhs_sym)
+          else
+            ser!("Unknown directive in map destructuring - :#{name.value}", name)
           end
-          list = binds + rest
-        end
-
-        list.each_slice(2) do |pair|
-          name, map_key = pair
-
+        else
           part = CallExpression.new(make_ident('get'), [rhs_id, translate_expr(map_key)])
           if name.sym?
             vdfe(block, name.value, part)
@@ -232,10 +241,6 @@ module Shin
             destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
           end
         end
-      when Shin::AST::Symbol
-        vdfe(block, lhs.value, rhs)
-      else
-        ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
       end
     end
 
