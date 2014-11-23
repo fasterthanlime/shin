@@ -105,6 +105,20 @@ RSpec.describe "Language", "destructuring" do
              ((fn [{:or {b 2 c 4} a :a :keys [b c]}] (print a b c)) {:a 1 :c 3})
              }).to have_output("1 2 3")
     end
+
+    it "works with defn too" do
+      expect(%Q{
+             (defn foobar [[a b] c [[d] e [f]]] (print a b c d e f))
+             (foobar [1 2] 3 [[4] 5 [6]])
+             }).to have_output("1 2 3 4 5 6")
+    end
+
+    it "works with defmacro too" do
+      expect(
+        :macros => %Q{(defmacro foobar [[a b] c [[d] e [f]]] `(print ~a ~b ~c ~d ~e ~f))},
+        :source => %Q{(foobar [1 2] 3 [[4] 5 [6]])}
+      ).to have_output("1 2 3 4 5 6")
+    end
   end
 
   describe "stress test" do

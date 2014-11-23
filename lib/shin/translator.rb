@@ -326,13 +326,7 @@ module Shin
     def translate_defn(list)
       # FIXME: express in terms of 'fn'
       matches?(list, ":sym :str? [:expr*] :expr*") do |name, doc, args, body|
-        f = FunctionExpression.new(make_ident(name.value))
-        args.inner.each do |arg|
-          f.params << make_ident(arg.value)
-        end
-
-        f.body = block = BlockStatement.new
-        translate_body_into_block(body, block)
+        f = translate_fn_inner(args, body, :name => name.value)
 
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
@@ -346,27 +340,31 @@ module Shin
 
     def translate_fn(list)
       matches?(list, "[:expr*] :expr*") do |args, body|
-        expr = FunctionExpression.new
-        expr.body = BlockStatement.new
-
-        if args.inner.any? { |x| destructuring_needed?(x) }
-          t = args.token
-          lhs = Shin::AST::Vector.new(t, args.inner)
-          apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
-          vector    = Shin::AST::Symbol.new(t, 'vector')
-          _nil      = Shin::AST::Nil.new(t)
-          arguments = Shin::AST::Symbol.new(t, 'arguments')
-          rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
-          destructure(expr.body, lhs, rhs)
-        else
-          args.inner.each do |arg|
-            expr.params << make_ident(arg.value)
-          end
-        end
-
-        translate_body_into_block(list.drop(1), expr.body)
-        return expr
+        return translate_fn_inner(args, body)
       end or ser!("Invalid fn form", list)
+    end
+
+    def translate_fn_inner(args, body, name: nil)
+      expr = FunctionExpression.new(name ? make_ident(name) : nil)
+      expr.body = BlockStatement.new
+
+      if args.inner.any? { |x| destructuring_needed?(x) }
+        t = args.token
+        lhs = Shin::AST::Vector.new(t, args.inner)
+        apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
+        vector    = Shin::AST::Symbol.new(t, 'vector')
+        _nil      = Shin::AST::Nil.new(t)
+        arguments = Shin::AST::Symbol.new(t, 'arguments')
+        rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
+        destructure(expr.body, lhs, rhs)
+      else
+        args.inner.each do |arg|
+          expr.params << make_ident(arg.value)
+        end
+      end
+
+      translate_body_into_block(body, expr.body)
+      return expr
     end
 
     def translate_body_into_block(body, block)
