@@ -16,5 +16,18 @@ RSpec.describe "Language", "defprotocol and deftype" do
              (-shout c))
            }).to have_output("Woof! Meow!")
   end
+
+  it "defines a simple type with fields and plays with it" do
+    expect(%Q{
+           (defprotocol INoisyAnimal
+             (-shout [animal]))
+           (deftype Dog [name]
+            INoisyAnimal
+             (-shout [dog]
+               (let [name  (str "Sir " name)]
+                 (print (str name ": Woof!")))))
+           (-shout (Dog. "Fido"))
+           }).to have_output("Sir Fido: Woof!")
+  end
 end
 

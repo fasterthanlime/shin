@@ -48,7 +48,7 @@ module Shin
     end
 
     module Function
-      attr_reader :id
+      attr_accessor :id
       attr_reader :params
       attr_accessor :body
 

@@ -79,9 +79,9 @@ RSpec.describe "Language", "basic macros" do
       },
       :macros => %Q{
         (defmacro my-repeat [count body]
-          (let [inner (fn [count body]
+          (let [inner (fn rec [count body]
                          (if (> count 0)
-                             (cons body (inner (- count 1) body))
+                             (cons body (rec (- count 1) body))
                              '()))]
             `(do ~@(inner count body))))
       }

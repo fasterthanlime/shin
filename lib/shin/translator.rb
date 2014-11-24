@@ -296,13 +296,14 @@ module Shin
 
     # declare or assign, depending on mode
     def decline(block, scope, lhs, rhs, mode)
+      rhs = translate_expr(rhs) if Shin::AST::Node === rhs
+
       case mode
       when :declare
         tmp = fresh("#{lhs.value}")
         scope[lhs.value] = tmp
         vdfe(block, tmp, rhs)
       when :assign
-        rhs = translate_expr(rhs) if Shin::AST::Node === rhs
         ass = AssignmentExpression.new(make_ident(lhs.value), rhs)
         block.body << ExpressionStatement.new(ass)
       else raise "Invalid mode: #{mode}"
@@ -448,10 +449,10 @@ module Shin
       end or ser!("Invalid defprotocol form", list)
     end
 
-    DEFTYPE_PATTERN         = ":sym :str? :expr*".freeze
+    DEFTYPE_PATTERN         = ":sym :str? :vec? :expr*".freeze
 
     def translate_deftype(list)
-      matches?(list, DEFTYPE_PATTERN) do |name, doc, body|
+      matches?(list, DEFTYPE_PATTERN) do |name, doc, fields, body|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
 
@@ -460,9 +461,16 @@ module Shin
         dtor.init = CallExpression.new(wrapper)
 
         # TODO: members / params
-        # constructor
         ctor = FunctionExpression.new
         ctor.body = BlockStatement.new
+        fields.inner.each do |field|
+          fname = field.value
+          ctor.params << make_ident(fname)
+          slot = make_ident("this/#{fname}")
+          ass = AssignmentExpression.new(slot, make_ident(fname))
+          ctor.body.body << ExpressionStatement.new(ass)
+        end if fields
+
         vdfe(block, name.value, ctor)
 
         prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
@@ -474,7 +482,24 @@ module Shin
           case
           when limb.list?
             id = limb.inner.first
-            fn = translate_fn(limb.inner.drop 1)
+            fn = nil
+
+            type_scope = Scope.new
+
+            @context.with_scope(type_scope) do
+              self_name = fresh("self")
+              fields.inner.each do |field|
+                type_scope[field.value] = "#{self_name}/#{field.value}"
+              end if fields
+
+              fn = translate_fn(limb.inner.drop 1)
+
+              self_decl = VariableDeclaration.new
+              self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
+              self_decl.declarations << self_dtor
+              fn.body.body.unshift(self_decl)
+            end
+
             slot = MemberExpression.new(prototype_mexpr, make_ident(id.value), false)
             ass = AssignmentExpression.new(slot, fn)
             block.body << ExpressionStatement.new(ass)
@@ -591,11 +616,22 @@ module Shin
       end
     end
 
-    FN_PATTERN = "[:expr*] :expr*".freeze
+    FN_PATTERN = ":sym? [:expr*] :expr*".freeze
 
     def translate_fn(list)
-      matches?(list, FN_PATTERN) do |args, body|
-        return translate_fn_inner(args, body)
+      matches?(list, FN_PATTERN) do |name, args, body|
+        fn = nil
+        if name
+          fscope = Scope.new
+          fscope[name.value] = name.value
+          @context.with_scope(fscope) do
+            fn = translate_fn_inner(args, body)
+          end
+          fn.id = make_ident(name.value)
+        else
+          fn = translate_fn_inner(args, body)
+        end
+        return fn
       end or ser!("Invalid fn form", list)
     end
 
@@ -800,7 +836,7 @@ module Shin
     end
 
     def make_ident(id)
-      matches = /^([^\/]+)\/(.*)?$/.match(id)
+      matches = /^([^\/]+)[\/](.*)?$/.match(id)
       if matches
         ns, name = matches.to_a.drop(1)
         MemberExpression.new(make_ident(ns), make_ident(name), false)
@@ -808,7 +844,13 @@ module Shin
         aka = @context.lookup(id)
         if aka
           debug "Resolved #{id} => #{aka}"
-          Identifier.new(mangle(aka))
+          matches = /^([^\/]+)\/(.*)?$/.match(aka)
+          if matches
+            obj, prop = matches.to_a.drop(1)
+            MemberExpression.new(make_ident(obj), Identifier.new(mangle(prop)), false)
+          else
+            Identifier.new(mangle(aka))
+          end
         else
           Identifier.new(mangle(id))
         end

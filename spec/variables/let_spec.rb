@@ -39,14 +39,11 @@ RSpec.describe "Language", "let" do
            }).to have_output("Boromir")
   end
 
-  it "self-referential let" do
+  it "nested lets" do
     expect(%Q{
-           (let [inner (fn [x]
-                         (if (< x 10)
-                           (inner (inc x))
-                           x))]
-             (print (inner 0)))
-           }).to have_output("10")
+           (let [{a :m b :m c :m d :m} {:m "Meeeep"}]
+             (let [a 1] (let [b 2] (let [c 3] (let [d 4] (print a b c d))))))
+           }).to have_output("1 2 3 4")
   end
 
   it "lets and accesses multiple variables" do
@@ -61,6 +58,18 @@ RSpec.describe "Language", "let" do
   it "raises on invalid let forms" do
     expect { expect(%Q{(let)}).to have_output("") }.to raise_error(Shin::SyntaxError)
     expect { expect(%Q{(let [a 2 woops])}).to have_output("") }.to raise_error(Shin::SyntaxError)
+  end
+
+  it "raises on self-referential let" do
+    expect do
+      expect(%Q{
+            (let [inner (fn [x]
+                          (if (< x 10)
+                            (inner (inc x))
+                            x))]
+              (print (inner 0)))
+            }).to have_output("10")
+    end.to raise_error(V8::Error)
   end
 end
 
