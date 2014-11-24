@@ -201,13 +201,13 @@ module Shin
 
     class MethodCall < ObjectAccess
       def to_s
-        ".#{sym.value})"
+        ".#{sym.value}"
       end
     end
 
     class FieldAccess < ObjectAccess
       def to_s
-        ".-#{sym.value})"
+        ".-#{sym.value}"
       end
     end
 

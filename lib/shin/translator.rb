@@ -609,6 +609,10 @@ module Shin
         end
 
         case
+        when Shin::AST::FieldAccess === first
+          property = make_ident(list[0].sym.value)
+          object = translate_expr(list[1])
+          return MemberExpression.new(object, property, false)
         when Shin::AST::MethodCall === first
           property = make_ident(list[0].sym.value)
           object = translate_expr(list[1])
