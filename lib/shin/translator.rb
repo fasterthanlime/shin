@@ -2,10 +2,13 @@
 require 'shin/jst'
 require 'shin/ast'
 require 'shin/utils'
+require 'hamster/deque'
 
 module Shin
   # Converts Shin AST to JST
   class Translator
+    DEBUG = ENV['TRANSLATOR_DEBUG']
+
     include Shin::Utils::LineColumn
     include Shin::Utils::Snippet
     include Shin::Utils::Matcher
@@ -17,9 +20,10 @@ module Shin
       @mod = mod
       @input = mod.source.dup
       @options = {:file => mod.file}
+      @context = Context.new
 
       @quoting = false
-      @seed = 4141
+      @seed = 0
     end
 
     def translate
@@ -163,20 +167,20 @@ module Shin
       block.body << decl
     end
 
-    def destructure(block, lhs, rhs)
+    def destructure(block, scope, lhs, rhs, mode: :declare)
       case lhs
       when Shin::AST::Vector
-        destructure_vector(block, lhs.inner, rhs)
+        destructure_vector(block, scope, lhs.inner, rhs, mode)
       when Shin::AST::Map
-        destructure_map(block, lhs.inner, rhs)
+        destructure_map(block, scope, lhs.inner, rhs, mode)
       when Shin::AST::Symbol
-        vdfe(block, lhs.value, rhs)
+        decline(block, scope, lhs, rhs, mode)
       else
         ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
       end
     end
 
-    def destructure_vector(block, inner, rhs)
+    def destructure_vector(block, scope, inner, rhs, mode)
       done = false
       list = inner
       rhs_memo = fresh("rhsmemo")
@@ -195,7 +199,7 @@ module Shin
             list = list.drop(1)
             as_sym = list.first
             ser!("Expected symbol in :as directive, got #{as_sym.class}") unless as_sym.sym?
-            vdfe(block, as_sym.value, rhs_sym)
+            decline(block, scope, as_sym, rhs_sym, mode)
           else
             ser!("Unknown directive in vector destructuring: :#{directive}", name)
           end
@@ -215,7 +219,7 @@ module Shin
             else
               part_memo = fresh("partmemo")
               vdfe(block, part_memo, part)
-              destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
+              destructure(block, scope, name, Shin::AST::Symbol.new(name.token, part_memo))
             end
           end
         end
@@ -225,7 +229,7 @@ module Shin
       end
     end
 
-    def destructure_map(block, inner, rhs, alt_map = {})
+    def destructure_map(block, scope, inner, rhs, mode, alt_map = {})
       rhs_memo = fresh("rhsmemo")
       vdfe(block, rhs_memo, rhs)
       rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
@@ -268,9 +272,9 @@ module Shin
               else raise Shin::SyntaxError, "Unknown directive #{directive}"
               end
             end
-            destructure_map(block, binds, rhs, alt_map)
+            destructure_map(block, scope, binds, rhs, mode, alt_map)
           elsif 'as' === name.value
-            vdfe(block, map_key.value, rhs_sym)
+            decline(block, scope, map_key, rhs_sym, mode)
           else
             ser!("Unknown directive in map destructuring - :#{name.value}", name)
           end
@@ -280,13 +284,28 @@ module Shin
             if alt = alt_map[name.value]
               part.arguments << translate_expr(alt)
             end
-            vdfe(block, name.value, part)
+            decline(block, scope, name, part, mode)
           else
             part_memo = fresh("partmemo")
             vdfe(block, part_memo, part)
-            destructure(block, name, Shin::AST::Symbol.new(name.token, part_memo))
+            destructure(block, scope, name, Shin::AST::Symbol.new(name.token, part_memo))
           end
         end
+      end
+    end
+
+    # declare or assign, depending on mode
+    def decline(block, scope, lhs, rhs, mode)
+      case mode
+      when :declare
+        tmp = fresh("#{lhs.value}")
+        scope[lhs.value] = tmp
+        vdfe(block, tmp, rhs)
+      when :assign
+        rhs = translate_expr(rhs) if Shin::AST::Node === rhs
+        ass = AssignmentExpression.new(make_ident(lhs.value), rhs)
+        block.body << ExpressionStatement.new(ass)
+      else raise "Invalid mode: #{mode}"
       end
     end
 
@@ -299,16 +318,16 @@ module Shin
         call = CallExpression.new(anon)
 
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
-        bindings.inner.each_slice(2) do |binding|
-          lhs, rhs = binding
-          if destructuring_needed?(lhs)
-            destructure(block, lhs, rhs)
-          else
-            vdfe(block, lhs.value, rhs)
-          end
-        end
+        scope = Scope.new
 
-        translate_body_into_block(exprs, block)
+        @context.with_scope(scope) do
+          bindings.inner.each_slice(2) do |binding|
+            lhs, rhs = binding
+            destructure(block, scope, lhs, rhs)
+          end
+
+          translate_body_into_block(exprs, block)
+        end
         return call
       end or ser!("Invalid let form", list)
     end
@@ -329,48 +348,51 @@ module Shin
         fn = FunctionExpression.new
         fn.body = BlockStatement.new
 
-        bindings.inner.each_slice(2) do |binding|
-          lhs, rhs = binding
-          destructure(fn.body, lhs, rhs)
+        scope = Scope.new
+
+        @context.with_scope(scope) do
+          bindings.inner.each_slice(2) do |binding|
+            lhs, rhs = binding
+            destructure(fn.body, scope, lhs, rhs)
+          end
+
+          recur_id = make_ident('recur')
+          vdfe(fn.body, 'recur', make_literal(nil))
+
+          capture = make_ident(fresh('loopret'))
+          vdfe(fn.body, capture.name, make_literal(nil));
+
+          loup = WhileStatement.new(make_literal(true))
+          fn.body.body << loup
+
+          fn.body.body << ReturnStatement.new(capture)
+
+          loup.body = BlockStatement.new
+          translate_body_into_block_captured(body, loup.body, capture)
+
+          if_recur = IfStatement.new(recur_id)
+          recur_block = if_recur.consequent = BlockStatement.new
+
+          recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
+
+          i = 0
+          bindings.inner.each_slice(2) do |binding|
+            lhs, _ = binding
+            t = lhs.token
+            rhs = Shin::AST::List.new(t)
+            rhs.inner << Shin::AST::Symbol.new(t, "aget")
+            rhs.inner << recur_ast_sym
+            rhs.inner << Shin::AST::Number.new(t, i)
+            destructure(recur_block, scope, lhs, rhs, :mode => :assign)
+            i += 1
+          end
+          null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
+          recur_block.body << ExpressionStatement.new(null_ass)
+          recur_block.body << ContinueStatement.new
+
+          loup.body.body << if_recur
+          loup.body.body << BreakStatement.new
         end
-
-        recur_id = make_ident('recur')
-        vdfe(fn.body, 'recur', make_literal(nil))
-
-        capture = make_ident(fresh('loopret'))
-        vdfe(fn.body, capture.name, make_literal(nil));
-
-        loup = WhileStatement.new(make_literal(true))
-        fn.body.body << loup
-
-        fn.body.body << ReturnStatement.new(capture)
-
-        loup.body = BlockStatement.new
-        translate_body_into_block_captured(body, loup.body, capture)
-
-        if_recur = IfStatement.new(recur_id)
-        recur_block = if_recur.consequent = BlockStatement.new
-
-
-        recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
-
-        i = 0
-        bindings.inner.each_slice(2) do |binding|
-          lhs, _ = binding
-          t = lhs.token
-          rhs = Shin::AST::List.new(t)
-          rhs.inner << Shin::AST::Symbol.new(t, "aget")
-          rhs.inner << recur_ast_sym
-          rhs.inner << Shin::AST::Number.new(t, i)
-          destructure(recur_block, lhs, rhs)
-          i += 1
-        end
-        null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
-        recur_block.body << ExpressionStatement.new(null_ass)
-        recur_block.body << ContinueStatement.new
-
-        loup.body.body << if_recur
-        loup.body.body << BreakStatement.new
 
         return CallExpression.new(fn)
       end or ser!("Invalid loop form", list)
@@ -581,22 +603,28 @@ module Shin
       expr = FunctionExpression.new(name ? make_ident(name) : nil)
       expr.body = BlockStatement.new
 
-      if args.inner.any? { |x| destructuring_needed?(x) }
-        t = args.token
-        lhs = Shin::AST::Vector.new(t, args.inner)
-        apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
-        vector    = Shin::AST::Symbol.new(t, 'vector')
-        _nil      = Shin::AST::Nil.new(t)
-        arguments = Shin::AST::Symbol.new(t, 'arguments')
-        rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
-        destructure(expr.body, lhs, rhs)
-      else
-        args.inner.each do |arg|
-          expr.params << make_ident(arg.value)
+      # FIXME: scope
+      scope = Scope.new
+
+      @context.with_scope(scope) do
+        if args.inner.any? { |x| destructuring_needed?(x) }
+          t = args.token
+          lhs = Shin::AST::Vector.new(t, args.inner)
+          apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
+          vector    = Shin::AST::Symbol.new(t, 'vector')
+          _nil      = Shin::AST::Nil.new(t)
+          arguments = Shin::AST::Symbol.new(t, 'arguments')
+          rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
+          destructure(expr.body, scope, lhs, rhs)
+        else
+          args.inner.each do |arg|
+            expr.params << make_ident(arg.value)
+          end
         end
+
+        translate_body_into_block(body, expr.body)
       end
 
-      translate_body_into_block(body, expr.body)
       return expr
     end
 
@@ -777,8 +805,18 @@ module Shin
         ns, name = matches.to_a.drop(1)
         MemberExpression.new(make_ident(ns), make_ident(name), false)
       else
-        Identifier.new(mangle(id))
+        aka = @context.lookup(id)
+        if aka
+          debug "Resolved #{id} => #{aka}"
+          Identifier.new(mangle(aka))
+        else
+          Identifier.new(mangle(id))
+        end
       end
+    end
+
+    def debug(*args)
+      puts("[TRANSLATOR] #{args.join(" ")}") if DEBUG
     end
 
     def file
@@ -801,6 +839,63 @@ module Shin
 
     def fresh(prefix)
       "$$__#{prefix}#{@seed += 1}"
+    end
+  end
+
+  class Context
+    def initialize
+      @envs = Hamster.deque
+    end
+
+    def with_scope(scope, &block)
+      old_envs = @envs
+      @envs = @envs.unshift(scope)
+      block.call
+      @envs = old_envs
+    end
+
+    def lookup(name)
+      c = @envs
+      until c.empty?
+        e = c.first
+        c = c.shift
+        res = e[name]
+        return res if res
+      end
+      nil
+    end
+
+    def to_s
+      s = ""
+      c = @envs
+      until c.empty?
+        e = c.first
+        c = c.pop
+        s = "#{s}/#{e}"
+      end
+      s
+    end
+  end
+
+  class Scope
+    def initialize
+      @defs = {}
+    end
+
+    def [](x)
+      @defs[x]
+    end
+
+    def []=(x, v)
+      @defs[x] = v
+    end
+
+    def to_s
+      s = ""
+      @defs.each do |k, v|
+        s += "(#{k} => #{v})"
+      end
+      s
     end
   end
 end

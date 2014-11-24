@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     shin (0.1.0)
+      hamster (~> 1.0.1.pre.rc3)
       oj (~> 2.11)
       slop (~> 3.6)
       therubyracer (~> 0.12)
@@ -9,8 +10,11 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
+    atomic (1.1.16)
     coderay (1.1.0)
     diff-lcs (1.2.5)
+    hamster (1.0.1.pre.rc3)
+      atomic (~> 1.1)
     libv8 (3.16.14.7)
     method_source (0.8.2)
     oj (2.11.1)

@@ -11,7 +11,7 @@ RSpec.describe "Language", "let" do
            }).to have_output("Pomplamoose")
   end
 
-  it "lets shadows but leaves outer intact" do
+  it "lets shadows but leaves outer intact (values)" do
     expect(%Q{
            (let [a "outer"]
              (print a)
@@ -21,12 +21,32 @@ RSpec.describe "Language", "let" do
            }).to have_output("outer inner outer")
   end
 
+  it "lets shadows but leaves outer intact (functions)" do
+    expect(%Q{
+           (let [a #(str "outer")]
+             (print (a))
+             (let [a #(str "inner")]
+               (print (a)))
+             (print (a)))
+           }).to have_output("outer inner outer")
+  end
+
   it "cascading let" do
     expect(%Q{
            (let [a "Boromir"
                  b a]
             (print b))
            }).to have_output("Boromir")
+  end
+
+  it "self-referential let" do
+    expect(%Q{
+           (let [inner (fn [x]
+                         (if (< x 10)
+                           (inner (inc x))
+                           x))]
+             (print (inner 0)))
+           }).to have_output("10")
   end
 
   it "lets and accesses multiple variables" do

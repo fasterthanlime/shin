@@ -21,6 +21,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "oj", "~> 2.11"
   spec.add_dependency "slop", "~> 3.6"
   spec.add_dependency "therubyracer", "~> 0.12"
+  spec.add_dependency "hamster", "~> 1.0.1.pre.rc3"
   spec.add_development_dependency "bundler", "~> 1.7"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "pry", "~> 0.10"
