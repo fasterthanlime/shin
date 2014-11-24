@@ -14,6 +14,18 @@ RSpec.describe "Language", "vector" do
     end
   end
 
+  it "has working get" do
+    [1, 2, 3].each do |i|
+      expect(%Q{ (print (get [1 2 3] #{i - 1})) }).to have_output("#{i}")
+    end
+  end
+
+  it "is callable" do
+    [1, 2, 3].each do |i|
+      expect(%Q{ (print ([1 2 3] #{i - 1})) }).to have_output("#{i}")
+    end
+  end
+
   it "has working conj" do
     expect(%Q{ (print (pr-str (conj [1 2 3] 4))) }).to have_output("[1 2 3 4]")
   end

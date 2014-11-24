@@ -807,7 +807,11 @@ module Shin
                    type_name = first.value[0..-2]
                    NewExpression.new(make_ident(type_name))
                  else
-                   CallExpression.new(translate_expr(first))
+                   ifn = translate_expr(first)
+                   mexp = MemberExpression.new(ifn, make_ident('call'), false)
+                   call = CallExpression.new(mexp)
+                   call.arguments << make_literal(nil)
+                   call
                  end
 
           list.drop(1).each do |arg|
