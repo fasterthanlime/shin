@@ -11,6 +11,16 @@ RSpec.describe "Language", "let" do
            }).to have_output("Pomplamoose")
   end
 
+  it "lets shadows but leaves outer intact" do
+    expect(%Q{
+           (let [a "outer"]
+             (print a)
+             (let [a "inner"]
+               (print a))
+             (print a))
+           }).to have_output("outer inner outer")
+  end
+
   it "cascading let" do
     expect(%Q{
            (let [a "Boromir"
@@ -29,8 +39,8 @@ RSpec.describe "Language", "let" do
   end
 
   it "raises on invalid let forms" do
-    expect { expect(%Q{(let)}).to have_output("") }.to raise_error
-    expect { expect(%Q{(let [a 2 woops])}).to have_output("") }.to raise_error
+    expect { expect(%Q{(let)}).to have_output("") }.to raise_error(Shin::SyntaxError)
+    expect { expect(%Q{(let [a 2 woops])}).to have_output("") }.to raise_error(Shin::SyntaxError)
   end
 end
 
