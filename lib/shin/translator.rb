@@ -314,25 +314,11 @@ module Shin
     end
 
     def translate_if(list)
-      anon = FunctionExpression.new
-      anon.body = BlockStatement.new
-      body = anon.body.body
-
       test, consequent, alternate = list
-      fi = IfStatement.new(translate_expr(test))
-
-      if consequent
-        fi.consequent  = BlockStatement.new
-        translate_body_into_block([consequent], fi.consequent)
-      end
-
-      if alternate
-        fi.alternate = BlockStatement.new
-        translate_body_into_block([alternate], fi.alternate)
-      end
-      body << fi
-
-      return CallExpression.new(anon)
+      cond = ConditionalExpression.new(translate_expr(test))
+      cond.consequent = consequent ? translate_expr(consequent) : make_literal(nil)
+      cond.alternate  = alternate  ? translate_expr(alternate)  : make_literal(nil)
+      return cond
     end
 
     LOOP_PATTERN            = "[:expr*] :expr*"

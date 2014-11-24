@@ -231,6 +231,19 @@ module Shin
       end
     end
 
+    class ConditionalExpression < Node
+      attr_reader :test
+      attr_accessor :consequent
+      attr_accessor :alternate
+
+      def initialize(test)
+        @type = "ConditionalExpression"
+        @test = test
+        @consequent = nil
+        @alternate = nil
+      end
+    end
+
     class IfStatement < Node
       attr_reader :test
       attr_accessor :consequent
@@ -239,6 +252,8 @@ module Shin
       def initialize(test)
         @type = "IfStatement"
         @test = test
+        @consequent = nil
+        @alternate = nil
       end
     end
 
