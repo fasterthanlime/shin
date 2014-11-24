@@ -434,11 +434,13 @@ module Shin
           arguments = make_ident('arguments')
           this_access = MemberExpression.new(arguments, make_literal(0), true)
 
-          selfcall = CallExpression.new(make_ident("--selfcall"));
           meth_acc = MemberExpression.new(this_access, name_ident, false)
-          selfcall.arguments << meth_acc
-          selfcall.arguments << make_ident('arguments')
-          fn.body.body << ReturnStatement.new(selfcall)
+          apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+          first_arg = MemberExpression.new(arguments, make_literal(0), true)
+          meth_call = CallExpression.new(apply_acc)
+          meth_call.arguments << first_arg
+          meth_call.arguments << make_ident('arguments')
+          fn.body.body << ReturnStatement.new(meth_call)
 
           ex = make_ident("exports/#{name}")
           dtor.init = AssignmentExpression.new(ex, dtor.init)
@@ -463,7 +465,10 @@ module Shin
         # TODO: members / params
         ctor = FunctionExpression.new
         ctor.body = BlockStatement.new
+
         fields.inner.each do |field|
+          next if field.meta?  # FIXME: woooooooooo #28
+
           fname = field.value
           ctor.params << make_ident(fname)
           slot = make_ident("this/#{fname}")
@@ -489,6 +494,7 @@ module Shin
             @context.with_scope(type_scope) do
               self_name = fresh("self")
               fields.inner.each do |field|
+                next if field.meta?  # FIXME: woooooooooo #28
                 type_scope[field.value] = "#{self_name}/#{field.value}"
               end if fields
 
@@ -780,6 +786,9 @@ module Shin
           object, property, val = list.drop(1)
           mexpr = MemberExpression.new(translate_expr(object), translate_expr(property), true)
           return AssignmentExpression.new(mexpr, translate_expr(val))
+        when first.sym?("set!")
+          property, val = list.drop(1)
+          return AssignmentExpression.new(translate_expr(property), translate_expr(val))
         when first.sym?("aget")
           object, property, val = list.drop(1)
           return MemberExpression.new(translate_expr(object), translate_expr(property), true)

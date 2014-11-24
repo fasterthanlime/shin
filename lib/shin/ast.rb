@@ -37,6 +37,10 @@ module Shin
       def initialize(token)
         @token = token
       end
+
+      def meta?(value = nil)
+        false
+      end
       
       def sym?(value = nil)
         false
@@ -219,6 +223,11 @@ module Shin
         @inner = inner
       end
 
+      def meta?(value = nil)
+        return true unless value
+        inner && inner.kw?(value)
+      end
+      
       def to_s
         "^#{inner}"
       end

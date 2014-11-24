@@ -23,11 +23,32 @@ RSpec.describe "Language", "defprotocol and deftype" do
              (-shout [animal]))
            (deftype Dog [name]
             INoisyAnimal
-             (-shout [dog]
-               (let [name  (str "Sir " name)]
-                 (print (str name ": Woof!")))))
+            (-shout [dog]
+              (let [name  (str "Sir " name)]
+                (print (str name ": Woof!")))))
            (-shout (Dog. "Fido"))
            }).to have_output("Sir Fido: Woof!")
+  end
+
+  it "defines a simple type with mutable fields" do
+    expect(%Q{
+           (defprotocol INoisyAnimal
+             (-shout [_]))
+           (defprotocol IRename
+             (-rename [_ name]))
+           (deftype Dog [^:mutable name]
+            IRename
+            (-rename [_ new-name]
+              (set! name new-name))
+            INoisyAnimal
+            (-shout [_]
+              (let [name  (str "Sir " name)]
+                (print (str name ": Woof!")))))
+           (let [d (Dog. "Fido")]
+             (-shout d)
+             (-rename d "Rufus")
+             (-shout d))
+           }).to have_output("Sir Fido: Woof! Sir Rufus: Woof!")
   end
 end
 
