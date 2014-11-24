@@ -118,7 +118,7 @@ module Shin
               ser!("Macro in a non-macro module", node) unless @mod.macro?
               body << translate_defn(node.inner.drop 1)
             when first.sym?("defprotocol")
-              body << translate_defprotocol(node.inner.drop 1)
+              translate_defprotocol(body, node.inner.drop(1))
             when first.sym?("deftype")
               body << translate_deftype(node.inner.drop 1)
             else
@@ -315,7 +315,7 @@ module Shin
 
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
 
-    def translate_defprotocol(list)
+    def translate_defprotocol(body, list)
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
@@ -335,7 +335,31 @@ module Shin
         dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
 
-        return decl
+        body << decl
+
+        sigs.each do |sig|
+          name = sig.inner.first
+          name_ident = make_ident(name.value)
+          decl = VariableDeclaration.new
+          dtor = VariableDeclarator.new(name_ident)
+
+          dtor.init = fn = FunctionExpression.new(fn)
+          fn.body = BlockStatement.new
+          arguments = make_ident('arguments')
+          this_access = MemberExpression.new(arguments, make_literal(0), true)
+
+          selfcall = CallExpression.new(make_ident("--selfcall"));
+          meth_acc = MemberExpression.new(this_access, name_ident, false)
+          selfcall.arguments << meth_acc
+          selfcall.arguments << make_ident('arguments')
+          fn.body.body << ReturnStatement.new(selfcall)
+
+          ex = make_ident("exports/#{name}")
+          dtor.init = AssignmentExpression.new(ex, dtor.init)
+          decl.declarations << dtor
+
+          body << decl
+        end
       end or ser!("Invalid defprotocol form", list)
     end
 

@@ -3,15 +3,15 @@ RSpec.describe "Language", "defprotocol and deftype" do
   it "defines a simple type and plays with it" do
     expect(%Q{
            (defprotocol INoisyAnimal
-             (shout [])
-             (whine []))
+             (-shout [animal])
+             (-whine [animal]))
            (deftype Dog
              INoisyAnimal
-             (shout [] (print "Woof!"))
-             (whine [] (print "Kai kai")))
+             (-shout [dog] (print "Woof!"))
+             (-whine [dog] (print "Kai kai")))
            (let [d (Dog.)]
-             (.shout d)
-             (.whine d))
+             (-shout d)
+             (-whine d))
            }).to have_output("Woof! Kai kai")
   end
 end
