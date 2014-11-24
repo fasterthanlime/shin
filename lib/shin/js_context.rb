@@ -100,7 +100,7 @@ module Shin
             @context.load(res.to_s)
             done = true
           else
-            unless name.start_with?("shin.core")
+            unless name.start_with?("shin.core") && ENV['JSCONTEXT_DEBUG'] != '2'
               debug "Loading #{name} from memory:\n\n#{res}"
             end
             @context.eval(res, spec.name)
