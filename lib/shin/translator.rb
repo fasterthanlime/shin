@@ -329,11 +329,13 @@ module Shin
         recur_id = make_ident('recur')
         vdfe(fn.body, 'recur', make_literal(nil))
 
+        capture = make_ident(fresh('loopret'))
+        vdfe(fn.body, capture.name, make_literal(nil));
+
         loup = WhileStatement.new(make_literal(true))
         fn.body.body << loup
 
-        capture = make_ident(fresh('loopret'))
-        vdfe(fn.body, capture.name, make_literal(nil));
+        fn.body.body << ReturnStatement.new(capture)
 
         loup.body = BlockStatement.new
         translate_body_into_block_captured(body, loup.body, capture)
