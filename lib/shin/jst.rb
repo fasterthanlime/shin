@@ -95,6 +95,18 @@ module Shin
       end
     end
 
+    class BreakStatement < Node
+      def initialize
+        @type = "BreakStatement"
+      end
+    end
+
+    class ContinueStatement < Node
+      def initialize
+        @type = "ContinueStatement"
+      end
+    end
+
     class BlockStatement < Node
       attr_reader :body
 
@@ -206,6 +218,16 @@ module Shin
         @type = "Property"
         @key = key
         @value = value
+      end
+    end
+
+    class WhileStatement < Node
+      attr_reader :test
+      attr_accessor :body
+
+      def initialize(test)
+        @type = "WhileStatement"
+        @test = test
       end
     end
 

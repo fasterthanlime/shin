@@ -313,6 +313,59 @@ module Shin
       end or ser!("Invalid let form", list)
     end
 
+    LOOP_PATTERN            = "[:expr*] :expr*"
+
+    def translate_loop(list)
+      t = list.first.token
+      matches?(list, LOOP_PATTERN) do |bindings, body|
+        fn = FunctionExpression.new
+        fn.body = BlockStatement.new
+
+        bindings.inner.each_slice(2) do |binding|
+          lhs, rhs = binding
+          destructure(fn.body, lhs, rhs)
+        end
+
+        recur_id = make_ident('recur')
+        vdfe(fn.body, 'recur', make_literal(nil))
+
+        loup = WhileStatement.new(make_literal(true))
+        fn.body.body << loup
+
+        capture = make_ident(fresh('loopret'))
+        vdfe(fn.body, capture.name, make_literal(nil));
+
+        loup.body = BlockStatement.new
+        translate_body_into_block_captured(body, loup.body, capture)
+
+        if_recur = IfStatement.new(recur_id)
+        recur_block = if_recur.consequent = BlockStatement.new
+
+
+        recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
+
+        i = 0
+        bindings.inner.each_slice(2) do |binding|
+          lhs, _ = binding
+          t = lhs.token
+          rhs = Shin::AST::List.new(t)
+          rhs.inner << Shin::AST::Symbol.new(t, "aget")
+          rhs.inner << recur_ast_sym
+          rhs.inner << Shin::AST::Number.new(t, i)
+          destructure(recur_block, lhs, rhs)
+          i += 1
+        end
+        null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
+        recur_block.body << ExpressionStatement.new(null_ass)
+        recur_block.body << ContinueStatement.new
+
+        loup.body.body << if_recur
+        loup.body.body << BreakStatement.new
+
+        return CallExpression.new(fn)
+      end or ser!("Invalid loop form", list)
+    end
+
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
 
     def translate_defprotocol(body, list)
@@ -546,6 +599,16 @@ module Shin
       end
     end
 
+    def translate_body_into_block_captured(body, block, ret_ident)
+      inner_count = body.length
+      body.each_with_index do |expr, i|
+        node = translate_expr(expr)
+        last = (inner_count - 1 == i)
+        node = AssignmentExpression.new(ret_ident, node) if last
+        block.body << ExpressionStatement.new(node)
+      end
+    end
+
     def translate_expr(expr)
       case expr
       when Shin::AST::Symbol
@@ -651,6 +714,15 @@ module Shin
           body << fi
 
           return CallExpression.new(anon)
+        when first.sym?("loop")
+          return translate_loop(list.drop(1))
+        when first.sym?("recur")
+          # FIXME check that it's in last position
+          recur_id = make_ident('recur')
+          els = list.drop(1).map { |el| translate_expr(el) }
+          values = ArrayExpression.new(els)
+          ass = AssignmentExpression.new(recur_id, values)
+          return ass
         else
           # function call or instanciation
           call = if first.sym? && first.value.end_with?('.')
