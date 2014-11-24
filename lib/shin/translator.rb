@@ -313,6 +313,28 @@ module Shin
       end or ser!("Invalid let form", list)
     end
 
+    def translate_if(list)
+      anon = FunctionExpression.new
+      anon.body = BlockStatement.new
+      body = anon.body.body
+
+      test, consequent, alternate = list
+      fi = IfStatement.new(translate_expr(test))
+
+      if consequent
+        fi.consequent  = BlockStatement.new
+        translate_body_into_block([consequent], fi.consequent)
+      end
+
+      if alternate
+        fi.alternate = BlockStatement.new
+        translate_body_into_block([alternate], fi.alternate)
+      end
+      body << fi
+
+      return CallExpression.new(anon)
+    end
+
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
@@ -703,19 +725,7 @@ module Shin
           translate_body_into_block(list.drop(1), anon.body)
           return CallExpression.new(anon)
         when first.sym?("if")
-          anon = FunctionExpression.new
-          anon.body = BlockStatement.new
-          body = anon.body.body
-
-          test, consequent, alternate = list.drop 1
-          fi = IfStatement.new(translate_expr(test))
-          fi.consequent  = BlockStatement.new
-          translate_body_into_block([consequent], fi.consequent) if consequent
-          fi.alternate = BlockStatement.new
-          translate_body_into_block([alternate], fi.alternate) if alternate
-          body << fi
-
-          return CallExpression.new(anon)
+          return translate_if(list.drop 1)
         when first.sym?("loop")
           return translate_loop(list.drop(1))
         when first.sym?("recur")
