@@ -38,6 +38,11 @@ module Shin
       debug "Mutating #{mod.slug}"
       mod.mutating = true
       mod.ast2 = mod.ast.map { |x| expand(x) }
+
+      # we've probably been generating ourselves while mutating, so null those
+      # so that the compiler doesn't over-cache things.
+      mod.jst = nil
+      mod.code = nil
     end
 
     protected
@@ -61,7 +66,7 @@ module Shin
 
             eval_mod = make_macro_module(invoc, info)
             expanded_ast = eval_macro_module(eval_mod)
-            return expanded_ast
+            return expand(expanded_ast)
           end
         end
       end

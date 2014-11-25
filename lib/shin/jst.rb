@@ -34,6 +34,9 @@ module Shin
       attr_accessor :loc
     end
 
+    class Statement < Node
+    end
+
     class Program < Node
       attr_reader :body
 
@@ -95,19 +98,19 @@ module Shin
       end
     end
 
-    class BreakStatement < Node
+    class BreakStatement < Statement
       def initialize
         @type = "BreakStatement"
       end
     end
 
-    class ContinueStatement < Node
+    class ContinueStatement < Statement
       def initialize
         @type = "ContinueStatement"
       end
     end
 
-    class BlockStatement < Node
+    class BlockStatement < Statement
       attr_reader :body
 
       def initialize
@@ -125,7 +128,7 @@ module Shin
       end
     end
 
-    class ReturnStatement < Node
+    class ReturnStatement < Statement
       attr_reader :argument
 
       def initialize(argument)
@@ -134,7 +137,7 @@ module Shin
       end
     end
 
-    class ExpressionStatement < Node
+    class ExpressionStatement < Statement
       attr_reader :expression
 
       def initialize(expression)
@@ -221,7 +224,7 @@ module Shin
       end
     end
 
-    class WhileStatement < Node
+    class WhileStatement < Statement
       attr_reader :test
       attr_accessor :body
 
@@ -244,7 +247,7 @@ module Shin
       end
     end
 
-    class IfStatement < Node
+    class IfStatement < Statement
       attr_reader :test
       attr_accessor :consequent
       attr_accessor :alternate
@@ -276,6 +279,28 @@ module Shin
         @type = "VariableDeclarator"
         @id = id
         @init = init
+      end
+    end
+
+    class BinaryExpression < Node
+      attr_reader :operator
+      attr_reader :left
+      attr_reader :right
+
+      def initialize(operator, left, right)
+        @type = "BinaryExpression"
+        @operator = operator
+        @left = left
+        @right = right
+      end
+    end
+
+    class ThrowStatement < Statement
+      attr_reader :argument
+
+      def initialize(argument)
+        @type = "ThrowStatement"
+        @argument = argument
       end
     end
   end

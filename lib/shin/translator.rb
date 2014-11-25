@@ -675,7 +675,11 @@ module Shin
       body.each_with_index do |expr, i|
         node = translate_expr(expr)
         last = (inner_count - 1 == i)
-        block.body << (last ? ReturnStatement : ExpressionStatement).new(node)
+
+        unless Statement === node
+          node = (last ? ReturnStatement : ExpressionStatement).new(node)
+        end
+        block.body << node
       end
     end
 
@@ -753,7 +757,7 @@ module Shin
 
         case
         when Shin::AST::FieldAccess === first
-          property = make_ident(list[0].sym.value)
+          property = Identifier.new(list[0].sym.value)
           object = translate_expr(list[1])
           return MemberExpression.new(object, property, false)
         when Shin::AST::MethodCall === first
@@ -769,8 +773,6 @@ module Shin
           property = make_ident(list[0].sym.value)
           object = translate_expr(list[1])
           return MemberExpression.new(object, property, false)
-        when first.sym?("export")
-          return translate_export(list.drop(1))
         when first.sym?("let")
           return translate_let(list.drop(1))
         when first.sym?("fn")
@@ -801,6 +803,14 @@ module Shin
           values = ArrayExpression.new(els)
           ass = AssignmentExpression.new(recur_id, values)
           return ass
+        when first.sym?("instance?")
+          r, l = list.drop(1)
+          return BinaryExpression.new('instanceof', translate_expr(l), translate_expr(r))
+        when first.sym?("throw")
+          arg = list[1]
+          return ThrowStatement.new(translate_expr(arg))
+        when first.sym?("export")
+          return translate_export(list.drop(1))
         else
           # function call or instanciation
           call = if first.sym? && first.value.end_with?('.')
@@ -838,6 +848,16 @@ module Shin
         return call_expr
       when Shin::AST::Closure
         translate_closure(expr)
+      when Shin::AST::MethodCall
+        unless @quoting
+          ser!("Invalid use of method-access as an expression outside quoting", expr)
+        end
+        CallExpression.new(make_ident("--method-call"), [translate_expr(expr.sym)])
+      when Shin::AST::FieldAccess
+        unless @quoting
+          ser!("Invalid use of field-access as an expression outside quoting", expr)
+        end
+        CallExpression.new(make_ident("--field-access"), [translate_expr(expr.sym)])
       else
         ser!("Unknown expr form #{expr}", expr.token)
         nil

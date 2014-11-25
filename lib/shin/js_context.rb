@@ -1,6 +1,8 @@
 
 require 'therubyracer'
 require 'oj'
+require 'pathname'
+require 'fileutils'
 
 module Shin
   class JsContext
@@ -100,9 +102,15 @@ module Shin
             @context.load(res.to_s)
             done = true
           else
-            unless name.start_with?("shin.core") && ENV['JSCONTEXT_DEBUG'] != '2'
-              debug "Loading #{name} from memory:\n\n#{res}"
+            debug "Loading #{name} from memory"
+            if hardcore_debug?
+              path = ".hardcore-debug/#{spec.name}.js"
+              FileUtils.mkdir_p(File.dirname(path))
+              File.open(path, 'w') { |f| f.write(res) }
+            else
+              debug "(use JSCONTEXT_DEBUG=2 to dump in .hardcore-debug/)"
             end
+
             @context.eval(res, spec.name)
             done = true
           end
@@ -192,6 +200,10 @@ module Shin
 
     def debug(*args)
       puts("[JS_CONTEXT] #{args.join(" ")}") if DEBUG
+    end
+
+    def hardcore_debug?
+      ENV['JSCONTEXT_DEBUG'] == '2'
     end
 
   end
