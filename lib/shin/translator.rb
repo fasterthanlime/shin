@@ -2,7 +2,7 @@
 require 'shin/jst'
 require 'shin/ast'
 require 'shin/utils'
-require 'hamster/deque'
+require 'shin/jst_builder'
 
 module Shin
   # Converts Shin AST to JST
@@ -20,7 +20,7 @@ module Shin
       @mod = mod
       @input = mod.source.dup
       @options = {:file => mod.file}
-      @context = Context.new
+      @builder = JstBuilder.new
 
       @quoting = false
       @seed = 0
@@ -321,7 +321,7 @@ module Shin
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
         scope = Scope.new
 
-        @context.with_scope(scope) do
+        @builder.with_scope(scope) do
           bindings.inner.each_slice(2) do |binding|
             lhs, rhs = binding
             destructure(block, scope, lhs, rhs)
@@ -351,7 +351,7 @@ module Shin
 
         scope = Scope.new
 
-        @context.with_scope(scope) do
+        @builder.with_scope(scope) do
           bindings.inner.each_slice(2) do |binding|
             lhs, rhs = binding
             destructure(fn.body, scope, lhs, rhs)
@@ -491,7 +491,7 @@ module Shin
 
             type_scope = Scope.new
 
-            @context.with_scope(type_scope) do
+            @builder.with_scope(type_scope) do
               self_name = fresh("self")
               fields.inner.each do |field|
                 next if field.meta?  # FIXME: woooooooooo #28
@@ -630,7 +630,7 @@ module Shin
         if name
           fscope = Scope.new
           fscope[name.value] = name.value
-          @context.with_scope(fscope) do
+          @builder.with_scope(fscope) do
             fn = translate_fn_inner(args, body)
           end
           fn.id = make_ident(name.value)
@@ -648,7 +648,7 @@ module Shin
       # FIXME: scope
       scope = Scope.new
 
-      @context.with_scope(scope) do
+      @builder.with_scope(scope) do
         if args.inner.any? { |x| destructuring_needed?(x) }
           t = args.token
           lhs = Shin::AST::Vector.new(t, args.inner)
@@ -874,7 +874,7 @@ module Shin
         ns, name = matches.to_a.drop(1)
         MemberExpression.new(make_ident(ns), make_ident(name), false)
       else
-        aka = @context.lookup(id)
+        aka = @builder.lookup(id)
         if aka
           debug "Resolved #{id} => #{aka}"
           matches = /^([^\/]+)\/(.*)?$/.match(aka)
@@ -914,63 +914,6 @@ module Shin
 
     def fresh(prefix)
       "$$__#{prefix}#{@seed += 1}"
-    end
-  end
-
-  class Context
-    def initialize
-      @envs = Hamster.deque
-    end
-
-    def with_scope(scope, &block)
-      old_envs = @envs
-      @envs = @envs.unshift(scope)
-      block.call
-      @envs = old_envs
-    end
-
-    def lookup(name)
-      c = @envs
-      until c.empty?
-        e = c.first
-        c = c.shift
-        res = e[name]
-        return res if res
-      end
-      nil
-    end
-
-    def to_s
-      s = ""
-      c = @envs
-      until c.empty?
-        e = c.first
-        c = c.pop
-        s = "#{s}/#{e}"
-      end
-      s
-    end
-  end
-
-  class Scope
-    def initialize
-      @defs = {}
-    end
-
-    def [](x)
-      @defs[x]
-    end
-
-    def []=(x, v)
-      @defs[x] = v
-    end
-
-    def to_s
-      s = ""
-      @defs.each do |k, v|
-        s += "(#{k} => #{v})"
-      end
-      s
     end
   end
 end

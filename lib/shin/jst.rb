@@ -32,6 +32,10 @@ module Shin
 
     class Node
       attr_accessor :loc
+
+      def to_s
+        Oj.dump(self, :mode => :object, :indent => 2)
+      end
     end
 
     class Statement < Node
@@ -47,6 +51,10 @@ module Shin
 
       def to_hash
         super.merge(:body => body)
+      end
+
+      def << (arg)
+        @body << arg
       end
     end
 
@@ -64,6 +72,10 @@ module Shin
         @defaults = []
         @generator = false
         @expression = false
+      end
+
+      def << (arg)
+        @body << arg
       end
     end
 
@@ -116,6 +128,10 @@ module Shin
       def initialize
         @type = "BlockStatement"
         @body = []
+      end
+
+      def << (arg)
+        @body << arg
       end
     end
 
