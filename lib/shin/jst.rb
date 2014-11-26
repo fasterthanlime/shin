@@ -328,6 +328,17 @@ module Shin
       end
     end
 
+    class UnaryExpression < Node
+      attr_reader :operator
+      attr_reader :argument
+
+      def initialize(operator, argument)
+        @type = "UnaryExpression"
+        @operator = operator
+        @argument = argument
+      end
+    end
+
     class ThrowStatement < Statement
       attr_reader :argument
 

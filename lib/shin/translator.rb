@@ -142,14 +142,6 @@ module Shin
 
     EXPORT_PATTERN = ":sym :sym?".freeze
 
-    def translate_export(list)
-      matches?(list, EXPORT_PATTERN) do |name, aka|
-        aka ||= name
-        mexp = MemberExpression.new(make_ident('exports'), make_ident(aka.value), false)
-        @builder << AssignmentExpression.new(mexp, make_ident(name.value))
-      end or ser!("Invalid export form")
-    end
-
     def destructuring_needed?(lhs)
       !lhs.sym? || lhs.sym?('&')
     end
@@ -910,96 +902,100 @@ module Shin
         return
       end
 
-      # special forms
-      case
-      when first.sym?("let")
-        translate_let(list.drop(1))
-      when first.sym?("fn")
-        translate_fn(list.drop(1))
-      when first.sym?("do")
-        translate_do(list.drop(1))
-      when first.sym?("if")
-        translate_if(list.drop(1))
-      when first.sym?("aset")
-        object, property, val = list.drop(1)
-        mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
-        @builder << AssignmentExpression.new(mexpr, as_expr(val))
-        nil
-      when first.sym?("set!")
-        property, val = list.drop(1)
-        @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
-        nil
-      when first.sym?("aget")
-        object, property, val = list.drop(1)
-        @builder << MemberExpression.new(as_expr(object), as_expr(property), true)
-        nil
-      when first.sym?("loop")
-        translate_loop(list.drop(1))
-      when first.sym?("recur")
-        # FIXME check that it's in last position
-        recur_id = make_ident('recur')
+      if first.sym?
+        handled = true
 
-        values = @builder.into(ArrayExpression.new) do
-          treach(list.drop(1))
-        end
+        rest = list.drop(1)
+        name = first.value
 
-        @builder << AssignmentExpression.new(recur_id, values)
-        nil
-      when first.sym?("instance?")
-        r, l = list.drop(1)
-        @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
-        nil
-      when first.sym?("throw")
-        arg = list[1]
-        @builder << ThrowStatement.new(as_expr(arg))
-        nil
-      when first.sym?("export")
-        translate_export(list.drop(1))
-      else
-        handled = false
-
+        # JS interop
         case
-        when first.sym?
-          name = first.value
-          case
-          when name.start_with?('.-')
-            # field access
-            property = Identifier.new(name[2..-1])
-            object = as_expr(list[1])
-            @builder << MemberExpression.new(object, property, false)
-            handled = true
-          when name.start_with?('.')
-            # method call
-            property = Identifier.new(name[1..-1])
-            object = as_expr(list[1])
-            mexp = MemberExpression.new(object, property, false)
+        when name.start_with?('.-')
+          # field access
+          property = Identifier.new(name[2..-1])
+          object = as_expr(list[1])
+          @builder << MemberExpression.new(object, property, false)
+        when name.start_with?('.')
+          # method call
+          property = Identifier.new(name[1..-1])
+          object = as_expr(list[1])
+          mexp = MemberExpression.new(object, property, false)
 
-            @builder.into!(CallExpression.new(mexp)) do
-              treach(list.drop(2))
-            end
-            handled = true
-          when name.end_with?('.')
-            # instanciation
-            type_name = name[0..-2]
-            inst = NewExpression.new(make_ident(type_name))
-            @builder.into!(inst) do
-              treach(list.drop(1))
-            end
-            handled = true
-          end
-        end
-
-        unless handled
-          # function call
-          ifn = as_expr(first)
-          mexp = MemberExpression.new(ifn, make_ident('call'), false)
           @builder.into!(CallExpression.new(mexp)) do
-            @builder << make_literal(nil)
+            treach(list.drop(2))
+          end
+        when name.end_with?('.')
+          # instanciation
+          type_name = name[0..-2]
+          inst = NewExpression.new(make_ident(type_name))
+          @builder.into!(inst) do
             treach(list.drop(1))
           end
+        else
+          handled = false
         end
-        nil
+
+        return if handled
+        handled = true
+
+        # special forms
+        case name
+        when "let"
+          translate_let(rest)
+        when "fn"
+          translate_fn(rest)
+        when "do"
+          translate_do(rest)
+        when "if"
+          translate_if(rest)
+        when "loop"
+          translate_loop(rest)
+        when "recur"
+          # FIXME check that it's in last position
+          recur_id = make_ident('recur')
+
+          values = @builder.into(ArrayExpression.new) do
+            treach(list.drop(1))
+          end
+          @builder << AssignmentExpression.new(recur_id, values)
+        when "set!"
+          property, val = rest
+          @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
+        when "aset"
+          object, property, val = rest
+          mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
+          @builder << AssignmentExpression.new(mexpr, as_expr(val))
+        when "aget"
+          object, property, val = rest
+          @builder << MemberExpression.new(as_expr(object), as_expr(property), true)
+        when "instance?"
+          r, l = rest
+          @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
+        when "throw"
+          arg = rest.first
+          @builder << ThrowStatement.new(as_expr(arg))
+        when "*js-uop"
+          op, arg = rest
+          @builder << UnaryExpression.new(op.value, as_expr(arg))
+        when "*js-bop"
+          op, l, r = rest
+          @builder << BinaryExpression.new(op.value, as_expr(l), as_expr(r))
+        else
+          handled = false
+        end
+
+        return if handled
       end
+
+      # if we reached here, it's not a special form,
+      # just a regular function call
+      ifn = as_expr(first)
+      mexp = MemberExpression.new(ifn, make_ident('call'), false)
+      @builder.into!(CallExpression.new(mexp)) do
+        @builder << make_literal(nil)
+        treach(list.drop(1))
+      end
+      nil
     end
 
     ##################
