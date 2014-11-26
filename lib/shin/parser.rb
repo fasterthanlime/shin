@@ -120,8 +120,7 @@ module Shin
     end
 
     def read_expr
-      read_object_access ||
-        read_quote ||
+      read_quote ||
         read_syntax_quote ||
         read_unquote ||
         read_symbol_like ||
@@ -173,32 +172,6 @@ module Shin
       end
 
       String.new(t.extend!(pos), s)
-    end
-
-    def read_object_access
-      skip_ws
-      t = token
-      type = :call
-
-      return nil unless peek_char.chr == '.'
-      skip_char
-
-      if peek_char.chr == '-'
-        type = :access
-        skip_char
-      end
-
-      id = read_symbol
-      ser!("Expected symbol after method call operator") unless id
-
-      case type
-      when :access
-        FieldAccess.new(t.extend!(pos), id)
-      when :call
-        MethodCall.new(t.extend!(pos), id)
-      else
-        ser!("Invalid object access type: #{type}")
-      end
     end
 
     def read_symbol_like
@@ -408,7 +381,7 @@ module Shin
     end
 
     # Post-parsing logic (auto-gensym, etc.)
-    
+
     def post_parse(node, trail = [])
       case node
       when Sequence

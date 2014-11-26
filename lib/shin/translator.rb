@@ -654,7 +654,7 @@ module Shin
         if args.inner.any? { |x| destructuring_needed?(x) }
           t = args.token
           lhs = Shin::AST::Vector.new(t, args.inner)
-          apply     = Shin::AST::MethodCall.new(t, Shin::AST::Symbol.new(t, 'apply'))
+          apply     = Shin::AST::Symbol.new(t, '.apply')
           vector    = Shin::AST::Symbol.new(t, 'vector')
           _nil      = Shin::AST::Nil.new(t)
           arguments = Shin::AST::Symbol.new(t, 'arguments')
@@ -842,18 +842,6 @@ module Shin
                  nil
                when Shin::AST::Closure
                  translate_closure(expr)
-               when Shin::AST::MethodCall
-                 unless @quoting
-                   ser!("Invalid use of method-access as an expression outside quoting", expr)
-                 end
-                 @builder << CallExpression.new(make_ident("--method-call"), [as_expr(expr.sym)])
-                 nil
-               when Shin::AST::FieldAccess
-                 unless @quoting
-                   ser!("Invalid use of field-access as an expression outside quoting", expr)
-                 end
-                 @builder << CallExpression.new(make_ident("--field-access"), [as_expr(expr.sym)])
-                 nil
                else
                  ser!("Unknown expr form #{expr}", expr.token)
                end
@@ -870,26 +858,8 @@ module Shin
         return
       end
 
+      # special forms
       case
-      when Shin::AST::FieldAccess === first
-        property = Identifier.new(list[0].sym.value)
-        object = as_expr(list[1])
-        @builder << MemberExpression.new(object, property, false)
-        nil
-      when Shin::AST::MethodCall === first
-        property = make_ident(list[0].sym.value)
-        object = as_expr(list[1])
-        mexp = MemberExpression.new(object, property, false)
-
-        @builder.into!(CallExpression.new(mexp)) do
-          treach(list.drop(2))
-        end
-        nil
-      when Shin::AST::FieldAccess === first
-        property = make_ident(list[0].sym.value)
-        object = translate_expr(list[1])
-        @builder << MemberExpression.new(object, property, false)
-        nil
       when first.sym?("let")
         translate_let(list.drop(1))
       when first.sym?("fn")
@@ -937,21 +907,47 @@ module Shin
       when first.sym?("export")
         translate_export(list.drop(1))
       else
-        call = if first.sym? && first.value.end_with?('.')
-                 # instanciation
-                 type_name = first.value[0..-2]
-                 NewExpression.new(make_ident(type_name))
-               else
-                 # function call
-                 ifn = as_expr(first)
-                 mexp = MemberExpression.new(ifn, make_ident('call'), false)
-                 call = CallExpression.new(mexp)
-                 call.arguments << make_literal(nil)
-                 call
-               end
+        handled = false
 
-        @builder.into!(call) do
-          treach(list.drop(1))
+        case
+        when first.sym?
+          name = first.value
+          case
+          when name.start_with?('.-')
+            # field access
+            property = Identifier.new(name[2..-1])
+            object = as_expr(list[1])
+            @builder << MemberExpression.new(object, property, false)
+            handled = true
+          when name.start_with?('.')
+            # method call
+            property = Identifier.new(name[1..-1])
+            object = as_expr(list[1])
+            mexp = MemberExpression.new(object, property, false)
+
+            @builder.into!(CallExpression.new(mexp)) do
+              treach(list.drop(2))
+            end
+            handled = true
+          when name.end_with?('.')
+            # instanciation
+            type_name = name[0..-2]
+            inst = NewExpression.new(make_ident(type_name))
+            @builder.into!(inst) do
+              treach(list.drop(1))
+            end
+            handled = true
+          end
+        end
+
+        unless handled
+          # function call
+          ifn = as_expr(first)
+          mexp = MemberExpression.new(ifn, make_ident('call'), false)
+          @builder.into!(CallExpression.new(mexp)) do
+            @builder << make_literal(nil)
+            treach(list.drop(1))
+          end
         end
         nil
       end

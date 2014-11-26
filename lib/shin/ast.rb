@@ -194,27 +194,6 @@ module Shin
       end
     end
 
-    class ObjectAccess < Node
-      attr_accessor :sym
-
-      def initialize(token, sym)
-        super(token)
-        @sym = sym
-      end
-    end
-
-    class MethodCall < ObjectAccess
-      def to_s
-        ".#{sym.value}"
-      end
-    end
-
-    class FieldAccess < ObjectAccess
-      def to_s
-        ".-#{sym.value}"
-      end
-    end
-
     class MetaData < Node
       attr_reader :inner
 
