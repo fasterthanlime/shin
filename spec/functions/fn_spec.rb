@@ -67,5 +67,15 @@ RSpec.describe "Language", "fn" do
       end.to raise_error(V8::Error)
     end
   end
+
+  describe "recursive functions" do
+    it "works" do
+      expect(%Q{
+             ((fn [x]
+                (print x)
+                (if (< x 5) (recur (inc x)))) 1)
+             }).to have_output("1 2 3 4 5")
+    end
+  end
 end
 

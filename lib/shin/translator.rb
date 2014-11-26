@@ -394,62 +394,66 @@ module Shin
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
-      t = list.first.token
       matches?(list, LOOP_PATTERN) do |bindings, body|
-        fn = FunctionExpression.new
-
-        scope = Scope.new
-
-        @builder.with_scope(scope) do
-          @builder.into(fn.body, :statement) do
-
-            bindings.inner.each_slice(2) do |binding|
-              lhs, rhs = binding
-              destructure(lhs, rhs)
-            end
-
-            recur_id = make_ident('recur')
-            @builder << make_decl('recur', make_literal(nil))
-
-            capture = make_ident(fresh('loopret'))
-            @builder << make_decl(capture, make_literal(nil))
-
-            loup = WhileStatement.new(make_literal(true))
-            fn.body << loup
-            fn.body << ReturnStatement.new(capture)
-
-            trbody_captured(body, loup.body, capture)
-
-            if_recur = IfStatement.new(recur_id)
-            recur_block = if_recur.consequent
-
-            @builder.into(recur_block, :statement) do
-              recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
-
-              i = 0
-              bindings.inner.each_slice(2) do |binding|
-                lhs, _ = binding
-                t = lhs.token
-                rhs = Shin::AST::List.new(t)
-                rhs.inner << Shin::AST::Symbol.new(t, "aget")
-                rhs.inner << recur_ast_sym
-                rhs.inner << Shin::AST::Number.new(t, i)
-                destructure(lhs, rhs, :mode => :assign)
-                i += 1
-              end
-              null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
-              @builder << null_ass
-              @builder << ContinueStatement.new
-            end
-
-            loup.body << if_recur
-            loup.body << BreakStatement.new
-          end
-        end
-
-        @builder << CallExpression.new(fn)
+        translate_loop_inner(bindings.inner, body)
       end or ser!("Invalid loop form", list)
       nil
+    end
+
+    def translate_loop_inner(bindings, body)
+      t = body.first.token
+      fn = FunctionExpression.new
+      scope = Scope.new
+
+      @builder.with_scope(scope) do
+        @builder.into(fn.body, :statement) do
+
+          bindings.each_slice(2) do |binding|
+            lhs, rhs = binding
+            destructure(lhs, rhs)
+          end
+
+          recur_id = make_ident('recur')
+          @builder << make_decl('recur', make_literal(nil))
+
+          capture = make_ident(fresh('loopret'))
+          @builder << make_decl(capture, make_literal(nil))
+
+          loup = WhileStatement.new(make_literal(true))
+          fn.body << loup
+          fn.body << ReturnStatement.new(capture)
+
+          trbody_captured(body, loup.body, capture)
+
+          if_recur = IfStatement.new(recur_id)
+          recur_block = if_recur.consequent
+
+          @builder.into(recur_block, :statement) do
+            recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
+
+            i = 0
+            bindings.each_slice(2) do |binding|
+              lhs, _ = binding
+              t = lhs.token
+              rhs = Shin::AST::List.new(t)
+              rhs.inner << Shin::AST::Symbol.new(t, "aget")
+              rhs.inner << recur_ast_sym
+              rhs.inner << Shin::AST::Number.new(t, i)
+              destructure(lhs, rhs, :mode => :assign)
+              i += 1
+            end
+            null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
+            @builder << null_ass
+            @builder << ContinueStatement.new
+          end
+
+          loup.body << if_recur
+          loup.body << BreakStatement.new
+
+        end
+      end
+
+      @builder << CallExpression.new(fn)
     end
 
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
@@ -718,7 +722,25 @@ module Shin
           end
         end
 
-        trbody(body, fn.body)
+        recursive = body.any? { |x| contains_recur?(x) }
+        if recursive
+          t = body.first.token
+          bindings = []
+          scope = Scope.new
+
+          args.inner.each do |arg|
+            sym = Shin::AST::Symbol.new(t, arg.value)
+            bindings += [sym, sym]
+          end
+
+          @builder.with_scope(scope) do
+            @builder.into(fn.body, :return) do
+              translate_loop_inner(bindings, body)
+            end
+          end
+        else
+          trbody(body, fn.body)
+        end
       end
 
       return fn
@@ -1103,6 +1125,30 @@ module Shin
       when :assign
         @builder << AssignmentExpression.new(make_ident(lhs.value), rhs)
       else raise "Invalid mode: #{mode}"
+      end
+    end
+
+    # Exploratory helpers
+
+    def contains_recur?(ast)
+      case ast
+      when Shin::AST::List
+        first = ast.inner.first
+        if first.sym?
+          case first.value
+          when "recur"
+            return true
+          when "fn", "loop"
+            # new top-recursion points, those recur's don't concern us.
+            return false
+          end
+        end
+
+        ast.inner.any? { |x| contains_recur?(x) }
+      when Shin::AST::Sequence
+        ast.inner.any? { |x| contains_recur?(x) }
+      else
+        false
       end
     end
 
