@@ -402,12 +402,21 @@ module Shin
 
     def translate_loop_inner(bindings, body)
       t = body.first.token
-      fn = FunctionExpression.new
       scope = Scope.new
 
-      @builder.with_scope(scope) do
-        @builder.into(fn.body, :statement) do
+      mode = @builder.mode
+      dest = @builder.dest
+      support = case @builder.mode
+                when :expression
+                  FunctionExpression.new
+                when :statement, :return, :assign
+                  BlockStatement.new
+                else
+                  raise "loop in unknown builder mode: #{@builder.mode}"
+                end
 
+      @builder.with_scope(scope) do
+        @builder.into(support, :statement) do
           bindings.each_slice(2) do |binding|
             lhs, rhs = binding
             destructure(lhs, rhs)
@@ -420,10 +429,21 @@ module Shin
           @builder << make_decl(capture, make_literal(nil))
 
           loup = WhileStatement.new(make_literal(true))
-          fn.body << loup
-          fn.body << ReturnStatement.new(capture)
+          support << loup
 
-          trbody_captured(body, loup.body, capture)
+          case mode
+          when :expression
+            trbody_captured(body, loup.body, capture)
+            support << ReturnStatement.new(capture)
+          when :statement
+            @builder.into(loup.body, :statement) do
+              treach(body)
+            end
+          when :return
+            trbody(body, loup.body)
+          else
+            raise "loop in unsupported builder mode: #{mode}"
+          end
 
           if_recur = IfStatement.new(recur_id)
           recur_block = if_recur.consequent
@@ -449,11 +469,17 @@ module Shin
 
           loup.body << if_recur
           loup.body << BreakStatement.new
-
         end
       end
 
-      @builder << CallExpression.new(fn)
+      case @builder.mode
+      when :expression
+        @builder << CallExpression.new(support)
+      when :statement, :return, :assign
+        @builder << support
+      else
+        raise "loop in unknown builder mode: #{@builder.mode}"
+      end
     end
 
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
@@ -1068,7 +1094,9 @@ module Shin
           values = @builder.into(ArrayExpression.new) do
             treach(list.drop(1))
           end
-          @builder << AssignmentExpression.new(recur_id, values)
+          @builder.into(@builder.recipient, :statement) do
+            @builder << AssignmentExpression.new(recur_id, values)
+          end
         when "set!"
           property, val = rest
           @builder << AssignmentExpression.new(as_expr(property), as_expr(val))

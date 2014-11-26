@@ -131,7 +131,7 @@ module Shin
       end
 
       def << (arg)
-        raise "Expected statement, got #{arg}" unless Statement === arg
+        raise "[blockstatement] Expected statement, got #{arg}" unless Statement === arg
         @body << arg
       end
     end

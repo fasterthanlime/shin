@@ -124,7 +124,7 @@ module Shin
       case mode
       when :expression
         if Statement === candidate
-          raise "Expected expression, got statement:\n\n #{candidate}"
+          raise "[expr mode] Expected expression, got statement:\n\n #{candidate}"
         end
         into << candidate
       when :statement
