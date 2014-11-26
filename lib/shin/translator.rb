@@ -293,22 +293,47 @@ module Shin
 
     def translate_let(list)
       matches?(list, LET_PATTERN) do |bindings, body|
-        anon = FunctionExpression.new
-        call = CallExpression.new(anon)
+        unless bindings.inner.length.even?
+          ser!("Invalid let form: odd number of binding forms", list)
+        end
 
-        ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
         scope = Scope.new
+        vase = case @builder.mode
+               when :expression
+                 fn = FunctionExpression.new
+                 @builder << CallExpression.new(fn)
+                 fn
+               when :statement, :return
+                 block = BlockStatement.new
+                 @builder << block
+                 block
+               end
 
         @builder.with_scope(scope) do
-          @builder.into(anon.body, :statement) do
+          @builder.into(vase, :statement) do
             bindings.inner.each_slice(2) do |binding|
               lhs, rhs = binding
               destructure(lhs, rhs)
             end
           end
-          trbody(body, anon)
+
+          case @builder.mode
+          when :expression
+            # return, we made a return-friendly vase (anon fn)
+            trbody(body, vase)
+          when :statement
+            # only statements, don't care about return value
+            @builder.into(vase, :statement) do
+              treach(body)
+            end
+          when :return
+            # return at the end, we're in a return-friendly vase
+            trbody(body, vase)
+          else
+            raise "let in unknown builder mode: #{@builder.mode}"
+          end
         end
-        @builder << call
+
       end or ser!("Invalid let form", list)
       nil
     end
@@ -975,7 +1000,7 @@ module Shin
       else
         aka = @builder.lookup(id)
         if aka
-          debug "Resolved #{id} => #{aka}"
+          # debug "Resolved #{id} => #{aka}"
           matches = /^([^\/]+)\/(.*)?$/.match(aka)
           if matches
             obj, prop = matches.to_a.drop(1)

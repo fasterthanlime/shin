@@ -54,6 +54,16 @@ module Shin
       end
     end
 
+    def mode
+      raise "Trying to get mode in no-vase builder" if @vases.empty?
+      @vases.first.mode
+    end
+
+    def recipient
+      raise "Trying to get recipient in no-vase builder" if @vases.empty?
+      @vases.first.into
+    end
+
     def declare(name, aka)
       raise "Trying to declare #{name} into no-scope builder" if @scopes.empty?
       @scopes.first[name] = aka
@@ -121,11 +131,8 @@ module Shin
         into << stat
       when :return
         stat = case candidate
-               when ReturnStatement
+               when Statement
                  candidate
-               when ThrowStatement
-                 into << candidate
-                 ReturnStatement.new(Literal.new(nil))
                else
                  ReturnStatement.new(candidate)
                end

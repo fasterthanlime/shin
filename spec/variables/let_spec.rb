@@ -11,6 +11,24 @@ RSpec.describe "Language", "let" do
            }).to have_output("Pomplamoose")
   end
 
+  it "let as an expression" do
+    expect(%Q{
+           (print (let [band "Pomplamoose"] band))
+           }).to have_output("Pomplamoose")
+  end
+
+  it "let in return position" do
+    expect(%Q{
+           ((fn []
+              (let [a 1]
+                (let [b 2]
+                  (let [c 3]
+                    (print a)
+                    (print b)
+                    (print c))))))
+           }).to have_output("1 2 3")
+  end
+
   it "lets shadows but leaves outer intact (values)" do
     expect(%Q{
            (let [a "outer"]
