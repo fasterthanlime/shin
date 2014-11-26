@@ -66,7 +66,7 @@ module Shin
       shim_call.arguments << factory
       program.body << ExpressionStatement.new(shim_call)
 
-      body = factory.body.body
+      body = factory.body
 
       unless @mod.macro?
         shin_init = MemberExpression.new(make_ident('shin'), make_ident('init'), false)
@@ -108,32 +108,34 @@ module Shin
         end
       end
 
-      ast.each do |node|
-        case node
-        when Shin::AST::List
-          first = node.inner.first
-          if first
-            case
-            when first.sym?("def")
-              body << translate_def(node.inner.drop 1)
-            when first.sym?("defn")
-              body << translate_defn(node.inner.drop 1)
-            when first.sym?("defmacro")
-              ser!("Macro in a non-macro module", node) unless @mod.macro?
-              body << translate_defn(node.inner.drop 1)
-            when first.sym?("defprotocol")
-              translate_defprotocol(body, node.inner.drop(1))
-            when first.sym?("deftype")
-              body << translate_deftype(node.inner.drop 1)
+      @builder.with_vase(:into => body, :mode => :statement) do
+        ast.each do |node|
+          case node
+          when Shin::AST::List
+            first = node.inner.first
+            if first
+              case
+              when first.sym?("def")
+                translate_def(node.inner.drop 1)
+              when first.sym?("defn")
+                translate_defn(node.inner.drop 1)
+              when first.sym?("defmacro")
+                ser!("Macro in a non-macro module", node) unless @mod.macro?
+                translate_defn(node.inner.drop 1)
+              when first.sym?("defprotocol")
+                translate_defprotocol(node.inner.drop(1))
+              when first.sym?("deftype")
+                translate_deftype(node.inner.drop 1)
+              else
+                expr = translate_expr(node) or ser!("Couldn't parse expr", node)
+                body << ExpressionStatement.new(expr)
+              end
             else
               expr = translate_expr(node) or ser!("Couldn't parse expr", node)
               body << ExpressionStatement.new(expr)
             end
           else
-            expr = translate_expr(node) or ser!("Couldn't parse expr", node)
-            body << ExpressionStatement.new(expr)
           end
-        else
         end
       end
 
@@ -401,7 +403,7 @@ module Shin
 
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
 
-    def translate_defprotocol(body, list)
+    def translate_defprotocol(list)
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
         decl = VariableDeclaration.new
         dtor = VariableDeclarator.new(make_ident(name.value))
@@ -421,7 +423,7 @@ module Shin
         dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
 
-        body << decl
+        @builder << decl
 
         sigs.each do |sig|
           name = sig.inner.first
@@ -440,13 +442,13 @@ module Shin
           meth_call = CallExpression.new(apply_acc)
           meth_call.arguments << first_arg
           meth_call.arguments << make_ident('arguments')
-          fn.body.body << ReturnStatement.new(meth_call)
+          fn.body << ReturnStatement.new(meth_call)
 
           ex = make_ident("exports/#{name}")
           dtor.init = AssignmentExpression.new(ex, dtor.init)
           decl.declarations << dtor
 
-          body << decl
+          @builder << decl
         end
       end or ser!("Invalid defprotocol form", list)
     end
@@ -527,7 +529,7 @@ module Shin
         dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
 
-        return decl
+        @builder << decl
       end or ser!("Invalid deftype form", list)
     end
 
@@ -554,7 +556,7 @@ module Shin
         ex = make_ident("exports/#{name}")
         dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
-        return decl
+        @builder << decl
       end or ser!("Invalid def form", list)
     end
 
@@ -569,8 +571,7 @@ module Shin
         ex = make_ident("exports/#{name}")
         dtor.init = AssignmentExpression.new(ex, f)
         decl.declarations << dtor
-
-        return decl
+        @builder << decl
       end or ser!("Invalid defn form", list)
     end
 

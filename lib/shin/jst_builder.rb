@@ -97,7 +97,7 @@ module Shin
       when :statement
         stat = case candidate
                when Statement
-                 # all good
+                 candidate
                else
                  ExpressionStatement.new(candidate)
                end
@@ -105,12 +105,16 @@ module Shin
       when :return
         stat = case candidate
                when ReturnStatement
-                 # all good
+                 candidate
                else
                  ReturnStatement.new(candidate)
                end
         into.body << stat
       end
+    end
+
+    def to_s
+      "<){ #{@mode} -> #{@into} }(>"
     end
   end
 

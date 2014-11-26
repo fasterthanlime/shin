@@ -34,7 +34,7 @@ module Shin
       attr_accessor :loc
 
       def to_s
-        Oj.dump(self, :mode => :object, :indent => 2)
+        "[JST::#{@type}]"
       end
     end
 
@@ -276,7 +276,7 @@ module Shin
       end
     end
 
-    class VariableDeclaration < Node
+    class VariableDeclaration < Statement
       attr_reader :declarations
       attr_accessor :kind
 
