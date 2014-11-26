@@ -265,6 +265,10 @@ module Shin
         @test = test
         @body = BlockStatement.new
       end
+
+      def << (stat)
+        @body << stat
+      end
     end
 
     class ConditionalExpression < Node
@@ -289,7 +293,7 @@ module Shin
         @type = "IfStatement"
         @test = test
         @consequent = BlockStatement.new
-        @alternate = BlockStatement.new
+        @alternate = nil
       end
     end
 

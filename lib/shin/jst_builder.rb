@@ -9,8 +9,20 @@ module Shin
     include Shin::Utils::Hamster
 
     def initialize
-      @scopes = Hamster.deque
-      @vases = Hamster.deque
+      @scopes  = Hamster.deque
+      @vases   = Hamster.deque
+      @anchors = Hamster.deque
+    end
+
+    def with_anchor(anchor, &block)
+      old_anchors = @anchors
+
+      begin
+        @anchors = @anchors.unshift(anchor)
+        block.call
+      ensure
+        @anchors = old_anchors
+      end
     end
 
     def with_scope(scope, &block)
@@ -52,6 +64,11 @@ module Shin
       ensure
         @vases = old_vases
       end
+    end
+
+    def anchor
+      raise "Trying to get anchor in anchorless builder" if @anchors.empty?
+      @anchors.first
     end
 
     def mode
@@ -183,6 +200,17 @@ module Shin
     def to_s
       inner = @defs.map { |k, v| "#{k} => #{v}" }.join(", ")
       "(#{inner})"
+    end
+  end
+
+  # Recursion point
+  class Anchor
+    attr_reader :bindings
+    attr_reader :sentinel
+
+    def initialize(bindings, sentinel)
+      @bindings = bindings
+      @sentinel = sentinel
     end
   end
 end

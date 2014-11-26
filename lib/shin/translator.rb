@@ -405,7 +405,6 @@ module Shin
       scope = Scope.new
 
       mode = @builder.mode
-      dest = @builder.dest
       support = case @builder.mode
                 when :expression
                   FunctionExpression.new
@@ -417,58 +416,37 @@ module Shin
 
       @builder.with_scope(scope) do
         @builder.into(support, :statement) do
+          lhs_bindings = []
+
           bindings.each_slice(2) do |binding|
             lhs, rhs = binding
+            lhs_bindings << lhs
             destructure(lhs, rhs)
           end
 
-          recur_id = make_ident('recur')
-          @builder << make_decl('recur', make_literal(nil))
+          recur_id = Identifier.new(fresh('recur_sentinel'))
+          @builder << make_decl(recur_id, make_literal(true))
 
-          capture = make_ident(fresh('loopret'))
-          @builder << make_decl(capture, make_literal(nil))
-
-          loup = WhileStatement.new(make_literal(true))
+          loup = WhileStatement.new(recur_id)
           support << loup
+          reset = AssignmentExpression.new(recur_id, make_literal(false))
+          loup << ExpressionStatement.new(reset)
 
-          case mode
-          when :expression
-            trbody_captured(body, loup.body, capture)
-            support << ReturnStatement.new(capture)
-          when :statement
-            @builder.into(loup.body, :statement) do
-              treach(body)
+          anchor = Anchor.new(lhs_bindings, recur_id)
+          @builder.with_anchor(anchor) do
+            case mode
+            when :expression
+              trbody(body, loup.body)
+            when :statement
+              @builder.into(loup.body, :statement) do
+                treach(body)
+              end
+            when :return
+              trbody(body, loup.body)
+            else
+              raise "loop in unsupported builder mode: #{mode}"
             end
-          when :return
-            trbody(body, loup.body)
-          else
-            raise "loop in unsupported builder mode: #{mode}"
           end
-
-          if_recur = IfStatement.new(recur_id)
-          recur_block = if_recur.consequent
-
-          @builder.into(recur_block, :statement) do
-            recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
-
-            i = 0
-            bindings.each_slice(2) do |binding|
-              lhs, _ = binding
-              t = lhs.token
-              rhs = Shin::AST::List.new(t)
-              rhs.inner << Shin::AST::Symbol.new(t, "aget")
-              rhs.inner << recur_ast_sym
-              rhs.inner << Shin::AST::Number.new(t, i)
-              destructure(lhs, rhs, :mode => :assign)
-              i += 1
-            end
-            null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
-            @builder << null_ass
-            @builder << ContinueStatement.new
-          end
-
-          loup.body << if_recur
-          loup.body << BreakStatement.new
         end
       end
 
@@ -901,16 +879,6 @@ module Shin
       end
     end
 
-#     def translate_body_into_block_captured(body, block, ret_ident)
-#       inner_count = body.length
-#       body.each_with_index do |expr, i|
-#         node = translate_expr(expr)
-#         last = (inner_count - 1 == i)
-#         node = AssignmentExpression.new(ret_ident, node) if last
-#         block.body << ExpressionStatement.new(node)
-#       end
-#     end
-
     def translate_expr(expr, shove: false)
       raise "Shoulda shoved." unless shove
 
@@ -1088,14 +1056,30 @@ module Shin
         when "loop"
           translate_loop(rest)
         when "recur"
-          # FIXME check that it's in last position
-          recur_id = make_ident('recur')
+          anchor = @builder.anchor
+          ser!("Recur with no anchor!", expr) unless anchor
 
-          values = @builder.into(ArrayExpression.new) do
-            treach(list.drop(1))
-          end
-          @builder.into(@builder.recipient, :statement) do
-            @builder << AssignmentExpression.new(recur_id, values)
+          values = list.drop(1)
+          block = BlockStatement.new
+          @builder << block
+
+          @builder.into(block, :statement) do
+            t = expr.token
+            tmps = []
+            anchor.bindings.each_with_index do |lhs, i|
+              rhs = values[i]
+              ser!("Missing value in recur", values) unless rhs
+              tmp = Shin::AST::Symbol.new(t, fresh("G__"))
+              destructure(tmp, rhs)
+              tmps << tmp
+            end
+
+            anchor.bindings.each_with_index do |lhs, i|
+              tmp = tmps[i]
+              destructure(lhs, tmp, :mode => :assign)
+            end
+            ass = AssignmentExpression.new(anchor.sentinel, make_literal(true))
+            @builder << ass
           end
         when "set!"
           property, val = rest
