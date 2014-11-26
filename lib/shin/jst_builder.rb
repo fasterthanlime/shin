@@ -24,6 +24,15 @@ module Shin
       end
     end
 
+    def into(recipient, mode = :expression, dest: nil, &block)
+      with_vase(:into => recipient, :mode => mode, :dest => dest, &block)
+      recipient
+    end
+
+    def into!(recipient, mode = :expression, dest: nil, &block)
+      self << into(recipient, mode, :dest => dest, &block)
+    end
+
     REQUIRED_VASE_ARGS = %i(into mode)
 
     def with_vase(opts, &block)
@@ -34,7 +43,7 @@ module Shin
                opts
              else
                raise unless REQUIRED_VASE_ARGS.all? { |x| opts.has_key?(x) }
-               Vase.new(opts[:into], opts[:mode])
+               Vase.new(opts[:into], opts[:mode], :dest => opts[:dest])
              end
 
       begin
@@ -43,6 +52,11 @@ module Shin
       ensure
         @vases = old_vases
       end
+    end
+
+    def declare(name, aka)
+      raise "Trying to declare #{name} into no-scope builder" if @scopes.empty?
+      @scopes.first[name] = aka
     end
 
     def lookup(name)
@@ -77,14 +91,17 @@ module Shin
     attr_reader :into
     attr_reader :mode
 
-    VALID_MODES = %i(expression statement return)
+    VALID_MODES = %i(expression statement return assign)
 
-    def initialize(into, mode)
+    def initialize(into, mode, dest: nil)
       raise unless VALID_MODES.include?(mode)
 
       raise "Invalid recipient in vase, should respond to :<<" unless into.respond_to?(:<<)
       @into = into
       @mode = mode
+
+      raise "Need dest for 'assign' mode" if (mode == :assign && dest.nil?)
+      @dest = dest
     end
 
     def << (candidate)
@@ -101,16 +118,30 @@ module Shin
                else
                  ExpressionStatement.new(candidate)
                end
-        into.body << stat
+        into << stat
       when :return
         stat = case candidate
                when ReturnStatement
                  candidate
+               when ThrowStatement
+                 into << candidate
+                 ReturnStatement.new(Literal.new(nil))
                else
                  ReturnStatement.new(candidate)
                end
-        into.body << stat
+        into << stat
+      when :assign
+        if Statement === candidate
+          raise "Expected expression, got statement:\n\n #{candidate}"
+        end
+        ass = AssignmentExpression.new(@dest, candidate)
+        into << ExpressionStatement.new(ass)
       end
+    end
+
+    def bind_sym(name, aka)
+      raise "Can't bind_sym in no-scope context" if @scopes.empty?
+      @scopes.first[name] = aka
     end
 
     def to_s
@@ -130,6 +161,7 @@ module Shin
     end
 
     def []=(x, v)
+      raise "Overwriting #{x} in scope #{self}" if @defs.has_key?(x)
       @defs[x] = v
     end
 

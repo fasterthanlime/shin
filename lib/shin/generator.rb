@@ -19,7 +19,7 @@ module Shin
       # than using compat mode + `to_hash` implementations.
       jst_json = Oj.dump(@mod.jst, :mode => :object)
       if DEBUG
-        puts "JST json for #{@mod.slug}:\n\n#{jst_json}" if DEBUG
+        puts "JST json for #{@mod.slug}:\n\n#{Oj.dump(@mod.jst, :mode => :object, :indent => 2)}"
       end
 
       # fastest way to pass a big string to V8

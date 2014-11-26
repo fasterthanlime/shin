@@ -67,7 +67,7 @@ module Shin
         @type = "Function"
         @id = id
         @params = []
-        @body = nil
+        @body = BlockStatement.new
         @rest = nil
         @defaults = []
         @generator = false
@@ -148,6 +148,7 @@ module Shin
       attr_reader :argument
 
       def initialize(argument)
+        raise "Can't initialize ReturnStatement with null" if argument.nil?
         @type = "ReturnStatement"
         @argument = argument
       end
@@ -167,9 +168,14 @@ module Shin
       attr_reader :arguments
 
       def initialize(callee, arguments = [])
+        raise "CallExpression requires an array of arguments or nil" unless Array === arguments
         @type = "CallExpression"
         @callee = callee
         @arguments = arguments
+      end
+
+      def << (arg)
+        @arguments << arg
       end
     end
 
@@ -218,14 +224,9 @@ module Shin
         @type = "ArrayExpression"
         @elements = elements
       end
-    end
 
-    class ObjectExpression < Node
-      attr_reader :properties
-
-      def initialize(properties = [])
-        @type = "ObjectExpression"
-        @properties = properties
+      def << (arg)
+        @elements << arg
       end
     end
 
@@ -240,6 +241,20 @@ module Shin
       end
     end
 
+    class ObjectExpression < Node
+      attr_reader :properties
+
+      def initialize(properties = [])
+        @type = "ObjectExpression"
+        @properties = properties
+      end
+
+      def << (arg)
+        raise "Object expression expected property, got #{arg.inspect}" unless Property === arg
+        @elements << arg
+      end
+    end
+
     class WhileStatement < Statement
       attr_reader :test
       attr_accessor :body
@@ -247,6 +262,7 @@ module Shin
       def initialize(test)
         @type = "WhileStatement"
         @test = test
+        @body = BlockStatement.new
       end
     end
 
@@ -271,8 +287,8 @@ module Shin
       def initialize(test)
         @type = "IfStatement"
         @test = test
-        @consequent = nil
-        @alternate = nil
+        @consequent = BlockStatement.new
+        @alternate = BlockStatement.new
       end
     end
 

@@ -39,7 +39,6 @@ module Shin
       load_shim = FunctionExpression.new
       load_shim.params << make_ident('root');
       load_shim.params << make_ident('factory')
-      load_shim.body = BlockStatement.new
       define_call = CallExpression.new(make_ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
@@ -52,14 +51,13 @@ module Shin
         MemberExpression.new(make_ident('factory'), make_ident('bind'), false),
         [make_ident('this')])
       define_call.arguments << bound_factory
-      load_shim.body.body << ExpressionStatement.new(define_call)
+      load_shim.body << ExpressionStatement.new(define_call)
 
       factory = FunctionExpression.new
       requires.each do |req|
         next if req.macro? && !@mod.macro?
         factory.params << make_ident(req.as_sym)
       end
-      factory.body = BlockStatement.new
 
       shim_call = CallExpression.new(load_shim)
       shim_call.arguments << ThisExpression.new
@@ -108,7 +106,7 @@ module Shin
         end
       end
 
-      @builder.with_vase(:into => body, :mode => :statement) do
+      @builder.into(body, :statement) do
         ast.each do |node|
           case node
           when Shin::AST::List
@@ -127,12 +125,10 @@ module Shin
               when first.sym?("deftype")
                 translate_deftype(node.inner.drop 1)
               else
-                expr = translate_expr(node) or ser!("Couldn't parse expr", node)
-                body << ExpressionStatement.new(expr)
+                translate_expr(node, shove: true)
               end
             else
-              expr = translate_expr(node) or ser!("Couldn't parse expr", node)
-              body << ExpressionStatement.new(expr)
+              translate_expr(node, shove: true)
             end
           else
           end
@@ -150,7 +146,7 @@ module Shin
       matches?(list, EXPORT_PATTERN) do |name, aka|
         aka ||= name
         mexp = MemberExpression.new(make_ident('exports'), make_ident(aka.value), false)
-        return AssignmentExpression.new(mexp, make_ident(name.value))
+        @builder << AssignmentExpression.new(mexp, make_ident(name.value))
       end or ser!("Invalid export form")
     end
 
@@ -158,35 +154,32 @@ module Shin
       !lhs.sym? || lhs.sym?('&')
     end
 
-    # 'VDFE' = Variable-Decl from Expr - just an old acronym
-    # from the ooc days...
-    def vdfe(block, name, expr)
-      expr = translate_expr(expr) if Shin::AST::Node === expr
-
-      decl = VariableDeclaration.new
-      dtor = VariableDeclarator.new(make_ident(name), expr)
-      decl.declarations << dtor
-      block.body << decl
+    def as_expr(expr)
+      arr = []
+      @builder.into(arr, :expression) do
+        translate_expr(expr, :shove => true)
+      end
+      arr[0]
     end
 
-    def destructure(block, scope, lhs, rhs, mode: :declare)
+    def destructure(lhs, rhs, mode: :declare)
       case lhs
       when Shin::AST::Vector
-        destructure_vector(block, scope, lhs.inner, rhs, mode)
+        destructure_vector(lhs.inner, rhs, mode)
       when Shin::AST::Map
-        destructure_map(block, scope, lhs.inner, rhs, mode)
+        destructure_map(lhs.inner, rhs, mode)
       when Shin::AST::Symbol
-        decline(block, scope, lhs, rhs, mode)
+        decline(lhs, rhs, mode)
       else
         ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
       end
     end
 
-    def destructure_vector(block, scope, inner, rhs, mode)
+    def destructure_vector(inner, rhs, mode)
       done = false
       list = inner
       rhs_memo = fresh("rhsmemo")
-      vdfe(block, rhs_memo, rhs)
+      @builder << make_decl(rhs_memo, rhs)
       rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
       rhs_id = make_ident(rhs_memo)
 
@@ -201,7 +194,7 @@ module Shin
             list = list.drop(1)
             as_sym = list.first
             ser!("Expected symbol in :as directive, got #{as_sym.class}") unless as_sym.sym?
-            decline(block, scope, as_sym, rhs_sym, mode)
+            decline(as_sym, rhs_sym, mode)
           else
             ser!("Unknown directive in vector destructuring: :#{directive}", name)
           end
@@ -212,16 +205,16 @@ module Shin
             list = list.drop(1)
             if rest = list.first
               part = CallExpression.new(make_ident('nthnext'), [rhs_id, make_literal(i)])
-              vdfe(block, rest.value, part)
+              @builder << make_decl(rest.value, part)
             end
           else
             part = CallExpression.new(make_ident('nth'), [rhs_id, make_literal(i)])
             if name.sym?
-              vdfe(block, name.value, part) 
+              @builder << make_decl(name.value, part)
             else
               part_memo = fresh("partmemo")
-              vdfe(block, part_memo, part)
-              destructure(block, scope, name, Shin::AST::Symbol.new(name.token, part_memo))
+              @builder << make_decl(part_memo, part)
+              destructure(name, Shin::AST::Symbol.new(name.token, part_memo))
             end
           end
         end
@@ -231,9 +224,9 @@ module Shin
       end
     end
 
-    def destructure_map(block, scope, inner, rhs, mode, alt_map = {})
+    def destructure_map(inner, rhs, mode, alt_map = {})
       rhs_memo = fresh("rhsmemo")
-      vdfe(block, rhs_memo, rhs)
+      @builder << make_decl(rhs_memo, rhs)
       rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
       rhs_id = make_ident(rhs_memo)
 
@@ -274,73 +267,59 @@ module Shin
               else raise Shin::SyntaxError, "Unknown directive #{directive}"
               end
             end
-            destructure_map(block, scope, binds, rhs, mode, alt_map)
+            destructure_map(binds, rhs, mode, alt_map)
           elsif 'as' === name.value
-            decline(block, scope, map_key, rhs_sym, mode)
+            decline(map_key, rhs_sym, mode)
           else
             ser!("Unknown directive in map destructuring - :#{name.value}", name)
           end
         else
-          part = CallExpression.new(make_ident('get'), [rhs_id, translate_expr(map_key)])
+          part = CallExpression.new(make_ident('get'), [rhs_id, as_expr(map_key)])
           if name.sym?
             if alt = alt_map[name.value]
-              part.arguments << translate_expr(alt)
+              part.arguments << as_expr(alt)
             end
-            decline(block, scope, name, part, mode)
+            decline(name, part, mode)
           else
             part_memo = fresh("partmemo")
-            vdfe(block, part_memo, part)
-            destructure(block, scope, name, Shin::AST::Symbol.new(name.token, part_memo))
+            @builder << make_decl(part_memo, part)
+            destructure(name, Shin::AST::Symbol.new(name.token, part_memo))
           end
         end
-      end
-    end
-
-    # declare or assign, depending on mode
-    def decline(block, scope, lhs, rhs, mode)
-      rhs = translate_expr(rhs) if Shin::AST::Node === rhs
-
-      case mode
-      when :declare
-        tmp = fresh("#{lhs.value}")
-        scope[lhs.value] = tmp
-        vdfe(block, tmp, rhs)
-      when :assign
-        ass = AssignmentExpression.new(make_ident(lhs.value), rhs)
-        block.body << ExpressionStatement.new(ass)
-      else raise "Invalid mode: #{mode}"
       end
     end
 
     LET_PATTERN = "[] :expr*".freeze
 
     def translate_let(list)
-      matches?(list, LET_PATTERN) do |bindings, exprs|
+      matches?(list, LET_PATTERN) do |bindings, body|
         anon = FunctionExpression.new
-        block = anon.body = BlockStatement.new
         call = CallExpression.new(anon)
 
         ser!("Invalid let form: odd number of binding forms", list) unless bindings.inner.length.even?
         scope = Scope.new
 
         @builder.with_scope(scope) do
-          bindings.inner.each_slice(2) do |binding|
-            lhs, rhs = binding
-            destructure(block, scope, lhs, rhs)
+          @builder.into(anon.body, :statement) do
+            bindings.inner.each_slice(2) do |binding|
+              lhs, rhs = binding
+              destructure(lhs, rhs)
+            end
           end
-
-          translate_body_into_block(exprs, block)
+          trbody(body, anon)
         end
-        return call
+        @builder << call
       end or ser!("Invalid let form", list)
+      nil
     end
 
     def translate_if(list)
       test, consequent, alternate = list
-      cond = ConditionalExpression.new(translate_expr(test))
-      cond.consequent = consequent ? translate_expr(consequent) : make_literal(nil)
-      cond.alternate  = alternate  ? translate_expr(alternate)  : make_literal(nil)
-      return cond
+      cond = ConditionalExpression.new(as_expr(test))
+      cond.consequent = consequent ? as_expr(consequent) : make_literal(nil)
+      cond.alternate  = alternate  ? as_expr(alternate)  : make_literal(nil)
+      @builder << cond
+      nil
     end
 
     LOOP_PATTERN            = "[:expr*] :expr*"
@@ -349,56 +328,59 @@ module Shin
       t = list.first.token
       matches?(list, LOOP_PATTERN) do |bindings, body|
         fn = FunctionExpression.new
-        fn.body = BlockStatement.new
 
         scope = Scope.new
 
         @builder.with_scope(scope) do
-          bindings.inner.each_slice(2) do |binding|
-            lhs, rhs = binding
-            destructure(fn.body, scope, lhs, rhs)
+          @builder.into(fn.body, :statement) do
+
+            bindings.inner.each_slice(2) do |binding|
+              lhs, rhs = binding
+              destructure(lhs, rhs)
+            end
+
+            recur_id = make_ident('recur')
+            @builder << make_decl('recur', make_literal(nil))
+
+            capture = make_ident(fresh('loopret'))
+            @builder << make_decl(capture, make_literal(nil))
+
+            loup = WhileStatement.new(make_literal(true))
+            fn.body << loup
+            fn.body << ReturnStatement.new(capture)
+
+            trbody_captured(body, loup.body, capture)
+
+            if_recur = IfStatement.new(recur_id)
+            recur_block = if_recur.consequent
+
+            @builder.into(recur_block, :statement) do
+              recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
+
+              i = 0
+              bindings.inner.each_slice(2) do |binding|
+                lhs, _ = binding
+                t = lhs.token
+                rhs = Shin::AST::List.new(t)
+                rhs.inner << Shin::AST::Symbol.new(t, "aget")
+                rhs.inner << recur_ast_sym
+                rhs.inner << Shin::AST::Number.new(t, i)
+                destructure(lhs, rhs, :mode => :assign)
+                i += 1
+              end
+              null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
+              @builder << null_ass
+              @builder << ContinueStatement.new
+            end
+
+            loup.body << if_recur
+            loup.body << BreakStatement.new
           end
-
-          recur_id = make_ident('recur')
-          vdfe(fn.body, 'recur', make_literal(nil))
-
-          capture = make_ident(fresh('loopret'))
-          vdfe(fn.body, capture.name, make_literal(nil));
-
-          loup = WhileStatement.new(make_literal(true))
-          fn.body.body << loup
-
-          fn.body.body << ReturnStatement.new(capture)
-
-          loup.body = BlockStatement.new
-          translate_body_into_block_captured(body, loup.body, capture)
-
-          if_recur = IfStatement.new(recur_id)
-          recur_block = if_recur.consequent = BlockStatement.new
-
-          recur_ast_sym = Shin::AST::Symbol.new(t, "recur")
-
-          i = 0
-          bindings.inner.each_slice(2) do |binding|
-            lhs, _ = binding
-            t = lhs.token
-            rhs = Shin::AST::List.new(t)
-            rhs.inner << Shin::AST::Symbol.new(t, "aget")
-            rhs.inner << recur_ast_sym
-            rhs.inner << Shin::AST::Number.new(t, i)
-            destructure(recur_block, scope, lhs, rhs, :mode => :assign)
-            i += 1
-          end
-          null_ass = AssignmentExpression.new(recur_id, make_literal(nil))
-          recur_block.body << ExpressionStatement.new(null_ass)
-          recur_block.body << ContinueStatement.new
-
-          loup.body.body << if_recur
-          loup.body.body << BreakStatement.new
         end
 
-        return CallExpression.new(fn)
+        @builder << CallExpression.new(fn)
       end or ser!("Invalid loop form", list)
+      nil
     end
 
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
@@ -417,7 +399,7 @@ module Shin
           sigs_map.inner << Shin::AST::SyntaxQuote.new(t, sig)
         end
         proto_map.inner << sigs_map
-        dtor.init = translate_expr(proto_map)
+        dtor.init = as_expr(proto_map)
 
         ex = make_ident("exports/#{name}")
         dtor.init = AssignmentExpression.new(ex, dtor.init)
@@ -432,7 +414,6 @@ module Shin
           dtor = VariableDeclarator.new(name_ident)
 
           dtor.init = fn = FunctionExpression.new(fn)
-          fn.body = BlockStatement.new
           arguments = make_ident('arguments')
           this_access = MemberExpression.new(arguments, make_literal(0), true)
 
@@ -461,12 +442,11 @@ module Shin
         dtor = VariableDeclarator.new(make_ident(name.value))
 
         wrapper = FunctionExpression.new
-        block = wrapper.body = BlockStatement.new
+        block = wrapper.body
         dtor.init = CallExpression.new(wrapper)
 
         # TODO: members / params
         ctor = FunctionExpression.new
-        ctor.body = BlockStatement.new
 
         fields.inner.each do |field|
           next if field.meta?  # FIXME: woooooooooo #28
@@ -475,10 +455,10 @@ module Shin
           ctor.params << make_ident(fname)
           slot = make_ident("this/#{fname}")
           ass = AssignmentExpression.new(slot, make_ident(fname))
-          ctor.body.body << ExpressionStatement.new(ass)
+          ctor.body << ExpressionStatement.new(ass)
         end if fields
 
-        vdfe(block, name.value, ctor)
+        @builder << make_decl(name.value, ctor)
 
         prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
         protocols_mexpr = MemberExpression.new(prototype_mexpr, make_ident("_protocols"), false)
@@ -500,12 +480,17 @@ module Shin
                 type_scope[field.value] = "#{self_name}/#{field.value}"
               end if fields
 
-              fn = translate_fn(limb.inner.drop 1)
+              # FIXME: That's uh, not good. Feex it!
+              fn = nil
+              matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
+                fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+              end or ser!("Invalid fn form", list)
 
               self_decl = VariableDeclaration.new
               self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
               self_decl.declarations << self_dtor
               fn.body.body.unshift(self_decl)
+              @builder << fn
             end
 
             slot = MemberExpression.new(prototype_mexpr, make_ident(id.value), false)
@@ -548,7 +533,7 @@ module Shin
           dtor.init = translate_expr(expr)
         when matches?(rest, DEF_WITHOUT_DOC_PATTERN)
           expr = rest.first
-          dtor.init = translate_expr(expr)
+          dtor.init = as_expr(expr)
         else
           ser!("Invalid def form", list)
         end
@@ -585,7 +570,8 @@ module Shin
         name = arg_map[index] || fresh("aarg#{index}-")
         Shin::AST::Symbol.new(t, name)
       end
-      translate_fn_inner(Shin::AST::Vector.new(t, args), [body])
+      @builder << translate_fn_inner(Shin::AST::Vector.new(t, args), [body])
+      nil
     end
 
     def desugar_closure_inner(node, arg_map)
@@ -627,27 +613,17 @@ module Shin
 
     def translate_fn(list)
       matches?(list, FN_PATTERN) do |name, args, body|
-        fn = nil
-        if name
-          fscope = Scope.new
-          fscope[name.value] = name.value
-          @builder.with_scope(fscope) do
-            fn = translate_fn_inner(args, body)
-          end
-          fn.id = make_ident(name.value)
-        else
-          fn = translate_fn_inner(args, body)
-        end
-        return fn
+        fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+        @builder << fn
       end or ser!("Invalid fn form", list)
+      nil
     end
 
     def translate_fn_inner(args, body, name: nil)
-      expr = FunctionExpression.new(name ? make_ident(name) : nil)
-      expr.body = BlockStatement.new
+      fn = FunctionExpression.new(name ? make_ident(name) : nil)
 
-      # FIXME: scope
       scope = Scope.new
+      scope[name] = name if name
 
       @builder.with_scope(scope) do
         if args.inner.any? { |x| destructuring_needed?(x) }
@@ -658,211 +634,333 @@ module Shin
           _nil      = Shin::AST::Nil.new(t)
           arguments = Shin::AST::Symbol.new(t, 'arguments')
           rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
-          destructure(expr.body, scope, lhs, rhs)
+
+          @builder.into(fn.body, :statement) do
+            destructure(lhs, rhs)
+          end
         else
           args.inner.each do |arg|
-            expr.params << make_ident(arg.value)
+           fn.params << make_ident(arg.value)
           end
         end
 
-        translate_body_into_block(body, expr.body)
+        trbody(body, fn.body)
       end
 
-      return expr
+      return fn
     end
 
-    def translate_body_into_block(body, block)
-      inner_count = body.length
-      body.each_with_index do |expr, i|
-        node = translate_expr(expr)
-        last = (inner_count - 1 == i)
+    #########################
+    # Weapons of mass translation
+    #########################
 
-        unless Statement === node
-          node = (last ? ReturnStatement : ExpressionStatement).new(node)
-        end
-        block.body << node
-      end
+    def tr(expr)
+      # TODO: fold into translate_expr itself
+      translate_expr(expr, :shove => true)
     end
 
-    def translate_body_into_block_captured(body, block, ret_ident)
-      inner_count = body.length
-      body.each_with_index do |expr, i|
-        node = translate_expr(expr)
-        last = (inner_count - 1 == i)
-        node = AssignmentExpression.new(ret_ident, node) if last
-        block.body << ExpressionStatement.new(node)
+    def treach(list)
+      list.each do |el|
+        translate_expr(el, :shove => true)
       end
     end
 
-    def translate_expr(expr)
-      case expr
-      when Shin::AST::Symbol
-        if @quoting
-          return CallExpression.new(make_ident("symbol"), [make_literal(expr.value)])
-        end
-
-        return make_ident(expr.value)
-      when Shin::AST::RegExp
-        return NewExpression.new(make_ident("RegExp"), [make_literal(expr.value)])
-      when Shin::AST::Literal
-        return make_literal(expr.value)
-      when Shin::AST::Deref
-        t = expr.token
-        return translate_expr(Shin::AST::List.new(t, [Shin::AST::Symbol.new(t, "deref"), expr.inner]))
-      when Shin::AST::Quote, Shin::AST::SyntaxQuote
-        # TODO: find a less terrible solution.
-        @quoting = true
-        expr = translate_expr(expr.inner)
-        @quoting = false
-        return expr
-      when Shin::AST::Vector
-        first = expr.inner.first
-        if first && first.sym?('$')
-          els = expr.inner.drop(1).map { |el| translate_expr(el) }
-          return ArrayExpression.new(els)
-        else
-          els = expr.inner.map { |el| translate_expr(el) }
-          return CallExpression.new(make_ident("vector"), els)
-        end
-      when Shin::AST::Set
-        arr = ArrayExpression.new(expr.inner.map { |el| translate_expr(el) })
-        return CallExpression.new(make_ident("set"), [arr])
-      when Shin::AST::Map
-        first = expr.inner.first
-        if first && first.sym?('$')
-          list = expr.inner.drop(1)
-          props = []
-          list.each_slice(2) do |pair|
-            key, val = pair
-            props << Property.new(translate_expr(key), translate_expr(val))
+    def trbody(body, block)
+      last_index = body.length - 1
+      
+      @builder.into(block, :statement) do
+        body.each_with_index do |expr, i|
+          if last_index == i
+            @builder.into(block, :return) { tr(expr) }
+          else
+            tr(expr)
           end
-          return ObjectExpression.new(props)
-        else
-          ser!("Map literal requires even number of forms", expr) unless expr.inner.count.even?
-          els = expr.inner.map { |el| translate_expr(el) }
-          return CallExpression.new(make_ident("hash-map"), els)
         end
-      when Shin::AST::Keyword
-        return CallExpression.new(make_ident("keyword"), [make_literal(expr.value)])
-      when Shin::AST::List
-        if @quoting
-          els = expr.inner.map { |el| translate_expr(el) }
-          return CallExpression.new(make_ident("list"), els)
-        end
+      end
+    end
 
-        list = expr.inner
-        first = list.first
-        unless first
-          return CallExpression.new(make_ident("list"))
-        end
-
-        case
-        when Shin::AST::FieldAccess === first
-          property = Identifier.new(list[0].sym.value)
-          object = translate_expr(list[1])
-          return MemberExpression.new(object, property, false)
-        when Shin::AST::MethodCall === first
-          property = make_ident(list[0].sym.value)
-          object = translate_expr(list[1])
-          mexp = MemberExpression.new(object, property, false)
-          call = CallExpression.new(mexp)
-          list.drop(2).each do |arg|
-            call.arguments << translate_expr(arg)
+    def trbody_captured(body, block, dest)
+      last_index = body.length - 1
+      
+      @builder.into(block, :statement) do
+        body.each_with_index do |expr, i|
+          if last_index == i
+            @builder.into(block, :assign, :dest => dest) do
+              tr(expr)
+            end
+          else
+            tr(expr)
           end
-          return call
-        when Shin::AST::FieldAccess === first
-          property = make_ident(list[0].sym.value)
-          object = translate_expr(list[1])
-          return MemberExpression.new(object, property, false)
-        when first.sym?("let")
-          return translate_let(list.drop(1))
-        when first.sym?("fn")
-          return translate_fn(list.drop(1))
-        when first.sym?("do")
-          anon = FunctionExpression.new
-          anon.body = BlockStatement.new
-          translate_body_into_block(list.drop(1), anon.body)
-          return CallExpression.new(anon)
-        when first.sym?("if")
-          return translate_if(list.drop 1)
-        when first.sym?("aset")
-          object, property, val = list.drop(1)
-          mexpr = MemberExpression.new(translate_expr(object), translate_expr(property), true)
-          return AssignmentExpression.new(mexpr, translate_expr(val))
-        when first.sym?("set!")
-          property, val = list.drop(1)
-          return AssignmentExpression.new(translate_expr(property), translate_expr(val))
-        when first.sym?("aget")
-          object, property, val = list.drop(1)
-          return MemberExpression.new(translate_expr(object), translate_expr(property), true)
-        when first.sym?("loop")
-          return translate_loop(list.drop(1))
-        when first.sym?("recur")
-          # FIXME check that it's in last position
-          recur_id = make_ident('recur')
-          els = list.drop(1).map { |el| translate_expr(el) }
-          values = ArrayExpression.new(els)
-          ass = AssignmentExpression.new(recur_id, values)
-          return ass
-        when first.sym?("instance?")
-          r, l = list.drop(1)
-          return BinaryExpression.new('instanceof', translate_expr(l), translate_expr(r))
-        when first.sym?("throw")
-          arg = list[1]
-          return ThrowStatement.new(translate_expr(arg))
-        when first.sym?("export")
-          return translate_export(list.drop(1))
-        else
-          # function call or instanciation
-          call = if first.sym? && first.value.end_with?('.')
-                   type_name = first.value[0..-2]
-                   NewExpression.new(make_ident(type_name))
+        end
+      end
+    end
+
+#     def translate_body_into_block_captured(body, block, ret_ident)
+#       inner_count = body.length
+#       body.each_with_index do |expr, i|
+#         node = translate_expr(expr)
+#         last = (inner_count - 1 == i)
+#         node = AssignmentExpression.new(ret_ident, node) if last
+#         block.body << ExpressionStatement.new(node)
+#       end
+#     end
+
+    def translate_expr(expr, shove: false)
+      raise "Shoulda shoved." unless shove
+
+      result = case expr
+               when Shin::AST::Symbol
+                 if @quoting
+                   lit = make_literal(expr.value)
+                   @builder << CallExpression.new(make_ident("symbol"), [lit])
                  else
-                   ifn = translate_expr(first)
-                   mexp = MemberExpression.new(ifn, make_ident('call'), false)
-                   call = CallExpression.new(mexp)
-                   call.arguments << make_literal(nil)
-                   call
+                   @builder << make_ident(expr.value)
+                 end
+                 nil
+               when Shin::AST::RegExp
+                 lit = make_literal(expr.value)
+                 @builder << NewExpression.new(make_ident("RegExp"), [lit])
+                 nil
+               when Shin::AST::Literal
+                 @builder << make_literal(expr.value)
+                 nil
+               when Shin::AST::Deref
+                 t = expr.token
+                 els = [Shin::AST::Symbol.new(t, "deref"), expr.inner]
+                 translate_expr(Shin::AST::List.new(t, els), :shove => true)
+                 nil
+               when Shin::AST::Quote, Shin::AST::SyntaxQuote
+                 # TODO: find a less terrible solution.
+                 begin
+                  @quoting = true
+                  translate_expr(expr.inner, :shove => true)
+                 ensure
+                  @quoting = false
+                 end
+                 nil
+               when Shin::AST::Vector
+                 first = expr.inner.first
+                 if first && first.sym?('$')
+                   @builder.into!(ArrayExpression.new) do
+                     treach(expr.inner.drop(1))
+                   end
+                 else
+                   @builder.into!(CallExpression.new(make_ident('vector'))) do
+                     treach(expr.inner)
+                   end
+                 end
+                 nil
+               when Shin::AST::Set
+                 els = @builder.into(ArrayExpression.new) do
+                   treach(expr.inner)
+                 end
+                 @builder << CallExpression.new(make_ident('set'), [els])
+                 nil
+               when Shin::AST::Map
+                 first = expr.inner.first
+                 if first && first.sym?('$')
+                   list = expr.inner.drop(1)
+                   props = []
+                   list.each_slice(2) do |pair|
+                     key, val = pair
+                     props << Property.new(as_expr(key), as_expr(val))
+                   end
+                   @builder << ObjectExpression.new(props)
+                 else
+                   unless expr.inner.count.even?
+                     ser!("Map literal requires even number of forms", expr)
+                   end
+                   @builder.into!(CallExpression.new(make_ident('hash-map'))) do
+                     treach(expr.inner)
+                   end
+                 end
+                 nil
+               when Shin::AST::Keyword
+                 lit = make_literal(expr.value)
+                 @builder << CallExpression.new(make_ident('keyword'), [lit])
+                 nil
+               when Shin::AST::List
+                 if @quoting
+                   call = CallExpression.new(make_ident("list"))
+                   @builder.into(call, :expression) do
+                     expr.inner.each do |el|
+                       translate_expr(el, :shove => true)
+                     end
+                   end
+                   @builder << call
+                   nil
+                 else
+                   translate_listform(expr)
+                 end
+               when Shin::AST::Unquote
+                 ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
+                 call = CallExpression.new(make_ident('--unquote'))
+
+                 @builder.into(call, :expression) do
+                  spliced = false
+                  inner = expr.inner
+                  if Shin::AST::Deref === inner
+                    spliced = true
+                    inner = inner.inner
+                  end
+
+                  begin
+                    @quoting = false
+                    translate_expr(inner, :shove => true)
+                  ensure
+                    @quoting = true
+                  end
+                  @builder << Literal.new(spliced)
                  end
 
-          list.drop(1).each do |arg|
-            call.arguments << translate_expr(arg)
-          end
-          return call
-        end
-      when Shin::AST::Unquote
-        call_expr = CallExpression.new(make_ident('--unquote'))
-        ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
+                 @builder << call
+                 nil
+               when Shin::AST::Closure
+                 translate_closure(expr)
+               when Shin::AST::MethodCall
+                 unless @quoting
+                   ser!("Invalid use of method-access as an expression outside quoting", expr)
+                 end
+                 @builder << CallExpression.new(make_ident("--method-call"), [as_expr(expr.sym)])
+                 nil
+               when Shin::AST::FieldAccess
+                 unless @quoting
+                   ser!("Invalid use of field-access as an expression outside quoting", expr)
+                 end
+                 @builder << CallExpression.new(make_ident("--field-access"), [as_expr(expr.sym)])
+                 nil
+               else
+                 ser!("Unknown expr form #{expr}", expr.token)
+               end
 
-        spliced = false
-        inner = expr.inner
-        if Shin::AST::Deref === inner
-          spliced = true
-          inner = inner.inner
+      raise "non-nil translate_expr result: #{result} for #{expr}" unless result.nil?
+    end
+
+    def translate_listform(expr)
+      list = expr.inner
+      first = list.first
+
+      unless first
+        @builder << CallExpression.new(make_ident("list"))
+        return
+      end
+
+      case
+      when Shin::AST::FieldAccess === first
+        property = Identifier.new(list[0].sym.value)
+        object = as_expr(list[1])
+        @builder << MemberExpression.new(object, property, false)
+        nil
+      when Shin::AST::MethodCall === first
+        property = make_ident(list[0].sym.value)
+        object = as_expr(list[1])
+        mexp = MemberExpression.new(object, property, false)
+
+        @builder.into!(CallExpression.new(mexp)) do
+          treach(list.drop(2))
+        end
+        nil
+      when Shin::AST::FieldAccess === first
+        property = make_ident(list[0].sym.value)
+        object = translate_expr(list[1])
+        @builder << MemberExpression.new(object, property, false)
+        nil
+      when first.sym?("let")
+        translate_let(list.drop(1))
+      when first.sym?("fn")
+        translate_fn(list.drop(1))
+      when first.sym?("do")
+        anon = FunctionExpression.new
+        trbody(list.drop(1), anon.body)
+        @builder << CallExpression.new(anon)
+        nil
+      when first.sym?("if")
+        translate_if(list.drop 1)
+      when first.sym?("aset")
+        object, property, val = list.drop(1)
+        mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
+        @builder << AssignmentExpression.new(mexpr, as_expr(val))
+        nil
+      when first.sym?("set!")
+        property, val = list.drop(1)
+        @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
+        nil
+      when first.sym?("aget")
+        object, property, val = list.drop(1)
+        @builder << MemberExpression.new(as_expr(object), as_expr(property), true)
+        nil
+      when first.sym?("loop")
+        translate_loop(list.drop(1))
+      when first.sym?("recur")
+        # FIXME check that it's in last position
+        recur_id = make_ident('recur')
+
+        values = @builder.into(ArrayExpression.new) do
+          treach(list.drop(1))
         end
 
-        @quoting = false
-        call_expr.arguments << translate_expr(inner)
-        @quoting = true
-
-        call_expr.arguments << Literal.new(spliced)
-        return call_expr
-      when Shin::AST::Closure
-        translate_closure(expr)
-      when Shin::AST::MethodCall
-        unless @quoting
-          ser!("Invalid use of method-access as an expression outside quoting", expr)
-        end
-        CallExpression.new(make_ident("--method-call"), [translate_expr(expr.sym)])
-      when Shin::AST::FieldAccess
-        unless @quoting
-          ser!("Invalid use of field-access as an expression outside quoting", expr)
-        end
-        CallExpression.new(make_ident("--field-access"), [translate_expr(expr.sym)])
+        @builder << AssignmentExpression.new(recur_id, values)
+        nil
+      when first.sym?("instance?")
+        r, l = list.drop(1)
+        @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
+        nil
+      when first.sym?("throw")
+        arg = list[1]
+        @builder << ThrowStatement.new(as_expr(arg))
+        nil
+      when first.sym?("export")
+        translate_export(list.drop(1))
       else
-        ser!("Unknown expr form #{expr}", expr.token)
+        call = if first.sym? && first.value.end_with?('.')
+                 # instanciation
+                 type_name = first.value[0..-2]
+                 NewExpression.new(make_ident(type_name))
+               else
+                 # function call
+                 ifn = as_expr(first)
+                 mexp = MemberExpression.new(ifn, make_ident('call'), false)
+                 call = CallExpression.new(mexp)
+                 call.arguments << make_literal(nil)
+                 call
+               end
+
+        @builder.into!(call) do
+          treach(list.drop(1))
+        end
         nil
       end
+    end
+
+    ##################
+    # Variable declaration helpers
+    ##################
+
+    # declare or assign, depending on mode
+    def decline(lhs, rhs, mode)
+      rhs = as_expr(rhs) if Shin::AST::Node === rhs
+
+      case mode
+      when :declare
+        tmp = fresh("#{lhs.value}")
+        @builder.declare(lhs.value, tmp)
+        @builder << make_decl(tmp, rhs)
+      when :assign
+        @builder << AssignmentExpression.new(make_ident(lhs.value), rhs)
+      else raise "Invalid mode: #{mode}"
+      end
+    end
+
+    # JST helpers
+
+    def make_decl(name, expr)
+      expr = as_expr(expr)    if     Shin::AST::Node       === expr
+      name = make_ident(name) unless Shin::JST::Identifier === name
+
+      decl = VariableDeclaration.new
+      dtor = VariableDeclarator.new(name, expr)
+      decl.declarations << dtor
+      decl
     end
 
     def make_literal(id)
