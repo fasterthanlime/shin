@@ -10,7 +10,7 @@ module Shin
 
     def initialize
       @scopes = Hamster.deque
-      @trail = Hamster.deque
+      @vases = Hamster.deque
     end
 
     def with_scope(scope, &block)
@@ -27,7 +27,7 @@ module Shin
     REQUIRED_VASE_ARGS = %i(into mode)
 
     def with_vase(opts, &block)
-      old_trail = @trail
+      old_vases = @vases
 
       vase = case opts
              when Vase
@@ -38,10 +38,10 @@ module Shin
              end
 
       begin
-        @trail = @trail.unshift(vase)
+        @vases = @vases.unshift(vase)
         block.call
       ensure
-        @trail = old_trail
+        @vases = old_vases
       end
     end
 
@@ -54,8 +54,8 @@ module Shin
     end
 
     def << (candidate)
-      raise "Trying to << into empty-trail builder" if @trail.empty?
-      @trail.first << candidate
+      raise "Trying to << into no-vase builder" if @vases.empty?
+      @vases.first << candidate
     end
 
     def to_s
