@@ -148,21 +148,12 @@ module Shin
     end
 
     def eval_macro_module(eval_mod)
-      js = Shin::JsContext.new
+      js = js_context
+
       result = nil
       js.context['yield'] = lambda do |_, ast_back|
         result = ast_back
       end
-
-      js.context['fresh_sym'] = lambda do |_|
-        return Mutator.fresh_sym
-      end
-
-      js.context['debug'] = lambda do |_, *args|
-        debug "[from JS] #{args.join(" ")}"
-      end
-
-      js.providers << @compiler
       js.load(eval_mod.code, :inline => true)
 
       res_parser = Shin::Parser.new(result.to_s)
@@ -173,6 +164,22 @@ module Shin
       debug "Dequoted AST:\n\n#{dequoted_ast}\n\n"
 
       dequoted_ast
+    end
+
+    def js_context
+      unless @js_context
+        js = @js_context = Shin::JsContext.new
+        js.context['fresh_sym'] = lambda do |_|
+          return Mutator.fresh_sym
+        end
+
+        js.context['debug'] = lambda do |_, *args|
+          debug "[from JS] #{args.join(" ")}"
+        end
+
+        js.providers << @compiler
+      end
+      @js_context
     end
 
     def dequote(node)
