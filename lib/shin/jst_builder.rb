@@ -59,6 +59,11 @@ module Shin
       @vases.first.mode
     end
 
+    def dest
+      raise "Trying to get dest in no-vase builder" if @vases.empty?
+      @vases.first.dest
+    end
+
     def recipient
       raise "Trying to get recipient in no-vase builder" if @vases.empty?
       @vases.first.into
@@ -100,6 +105,7 @@ module Shin
 
     attr_reader :into
     attr_reader :mode
+    attr_reader :dest
 
     VALID_MODES = %i(expression statement return assign)
 
@@ -139,7 +145,9 @@ module Shin
         into << stat
       when :assign
         if Statement === candidate
-          raise "Expected expression, got statement:\n\n #{candidate}"
+          # probably good.
+          into << candidate
+          return
         end
         ass = AssignmentExpression.new(@dest, candidate)
         into << ExpressionStatement.new(ass)

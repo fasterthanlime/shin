@@ -162,6 +162,14 @@ module Shin
       arr[0]
     end
 
+    def as_specified(expr, mode, dest: nil)
+      arr = []
+      @builder.into(arr, mode, :dest => dest) do
+        translate_expr(expr, :shove => true)
+      end
+      arr[0]
+    end
+
     def destructure(lhs, rhs, mode: :declare)
       case lhs
       when Shin::AST::Vector
@@ -340,10 +348,21 @@ module Shin
 
     def translate_if(list)
       test, consequent, alternate = list
-      cond = ConditionalExpression.new(as_expr(test))
-      cond.consequent = consequent ? as_expr(consequent) : make_literal(nil)
-      cond.alternate  = alternate  ? as_expr(alternate)  : make_literal(nil)
-      @builder << cond
+
+      case @builder.mode
+      when :expression
+        cond = ConditionalExpression.new(as_expr(test))
+        cond.consequent = consequent ? as_expr(consequent) : make_literal(nil)
+        cond.alternate  = alternate  ? as_expr(alternate)  : make_literal(nil)
+        @builder << cond
+      when :statement, :return, :assign
+        ifs = IfStatement.new(as_expr(test))
+        ifs.consequent = as_specified(consequent, @builder.mode, :dest => @builder.dest) if consequent
+        ifs.alternate  = as_specified(alternate,  @builder.mode, :dest => @builder.dest) if alternate
+        @builder << ifs
+      else
+        raise "if in unknown builder mode: #{@builder.mode}"
+      end
       nil
     end
 
