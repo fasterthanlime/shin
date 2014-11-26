@@ -295,6 +295,33 @@ module Shin
 
     LET_PATTERN = "[] :expr*".freeze
 
+    def translate_comp(op, rest)
+      terms = []
+
+      list = rest.map { |x| as_expr(x) }
+
+      while list.size >= 2
+        l, r = list
+        list = list.drop(1)
+        terms << BinaryExpression.new(op.value, l, r)
+      end
+      ser!("Invalid comparison, needs at least two operands", op) if terms.empty?
+
+      if terms.length == 1
+        @builder << terms.first
+      else
+        res = terms.first
+        terms = terms.drop(1)
+        until terms.empty?
+          term = terms.first
+          res = BinaryExpression.new('&&', res, term)
+          terms = terms.drop(1)
+        end
+        @builder << res
+      end
+      nil
+    end
+
     def translate_let(list)
       matches?(list, LET_PATTERN) do |bindings, body|
         unless bindings.inner.length.even?
@@ -1045,6 +1072,8 @@ module Shin
 
         # special forms
         case name
+        when "<", ">", "<=", ">="
+          translate_comp(first, rest)
         when "let"
           translate_let(rest)
         when "fn"
