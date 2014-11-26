@@ -81,10 +81,19 @@ For example, literals are transformed to calls to `vector`, `list`, `hash-map`,
 `symbol`, `keyword`, etc. Function definitions are transformed into JavaScript
 functions, auto-returning the last value.
 
-`if` forms, `let` forms are implemented using closures, to establish a new
-scope in the produced JavaScript code - ideally there'd be no need for that,
-and perhaps targetting ES5/ES6 would let us have a cleaner solution (or just
-having a more intelligent compiler). For now, though, it works well enough.
+`if`, `let`, and `do` forms emit relatively naive but efficient code where possible.
+
+For `if`, when the value is thrown away (`statement` mode), JavaScript's
+`if/else` will be used. Otherwise, the ternary operator (`cond ? iftrue : iffalse`)
+will be used.
+
+`let` establishes a new scope, and renames bound symbols inside
+of it, uses of which are then resolved to aliases, much like [Traceur][] does
+with ES6's `let`.
+
+`do` can be compiled either to a simple block, or to a closure, if the result
+is used as an expression (it doesn't make a closure if it's just in return position,
+in that case, return propagation is used).
 
 `def`s are local variable declarations + stored into the module's `exports`
 object (see `Modules` section).
@@ -500,4 +509,5 @@ Hamt+ is also MIT-licensed, see its own repo: [hamt+][].
 
 [RequireJS]: http://requirejs.org/
 [Almond]: https://github.com/jrburke/almond
+[Traceur]: https://github.com/google/traceur-compiler
 

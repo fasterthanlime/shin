@@ -170,6 +170,10 @@ module Shin
       arr[0]
     end
 
+    def as_parent(expr)
+      as_specified(expr, @builder.mode, :dest => @builder.dest)
+    end
+
     def destructure(lhs, rhs, mode: :declare)
       case lhs
       when Shin::AST::Vector
@@ -311,10 +315,12 @@ module Shin
                  fn = FunctionExpression.new
                  @builder << CallExpression.new(fn)
                  fn
-               when :statement, :return
+               when :statement, :return, :assign
                  block = BlockStatement.new
                  @builder << block
                  block
+               else
+                 raise "let in unknown builder mode: #{@builder.mode}"
                end
 
         @builder.with_scope(scope) do
@@ -337,12 +343,39 @@ module Shin
           when :return
             # return at the end, we're in a return-friendly vase
             trbody(body, vase)
+          when :assign
+            # assign at the end, we're in a vase that expects an assign
+            trbody_captured(body, vase, @builder.dest)
           else
             raise "let in unknown builder mode: #{@builder.mode}"
           end
         end
 
       end or ser!("Invalid let form", list)
+      nil
+    end
+
+    def translate_do(list)
+      case @builder.mode
+      when :expression
+        anon = FunctionExpression.new
+        trbody(list, anon.body)
+        @builder << CallExpression.new(anon)
+      when :statement
+        @builder.into!(BlockStatement.new, :statement) do
+          treach(list)
+        end
+      when :return
+        block = BlockStatement.new
+        trbody(list, block)
+        @builder << block
+      when :assign
+        block = BlockStatement.new
+        trbody_captured(list, block, @builder.dest)
+        @builder << block
+      else
+        raise "do in unknown builder mode: #{@builder.mode}"
+      end
       nil
     end
 
@@ -357,8 +390,8 @@ module Shin
         @builder << cond
       when :statement, :return, :assign
         ifs = IfStatement.new(as_expr(test))
-        ifs.consequent = as_specified(consequent, @builder.mode, :dest => @builder.dest) if consequent
-        ifs.alternate  = as_specified(alternate,  @builder.mode, :dest => @builder.dest) if alternate
+        ifs.consequent = as_parent(consequent) if consequent
+        ifs.alternate  = as_parent(alternate)  if alternate
         @builder << ifs
       else
         raise "if in unknown builder mode: #{@builder.mode}"
@@ -884,12 +917,9 @@ module Shin
       when first.sym?("fn")
         translate_fn(list.drop(1))
       when first.sym?("do")
-        anon = FunctionExpression.new
-        trbody(list.drop(1), anon.body)
-        @builder << CallExpression.new(anon)
-        nil
+        translate_do(list.drop(1))
       when first.sym?("if")
-        translate_if(list.drop 1)
+        translate_if(list.drop(1))
       when first.sym?("aset")
         object, property, val = list.drop(1)
         mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
