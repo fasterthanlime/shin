@@ -33,5 +33,39 @@ RSpec.describe "Language", "fn" do
             0))
            }).to have_output("10")
   end
+
+  describe "multiple arity" do
+    it "calls the correct arity" do
+      expect(%Q{
+            (defn f
+              ([x]          "1")
+              ([x y]        "2")
+              ([x y & more] "variadic"))
+            (print (f nil))
+            (print (f nil nil))
+            (print (f nil nil nil))
+            }).to have_output("1 2 variadic")
+    end
+
+    it "errs on fixed arity > variadic arity" do
+      expect do
+        expect(%Q{
+              (defn f
+                ([x y z]          "1")
+                ([& more] "variadic"))
+              }).to have_output("")
+      end.to raise_error(Shin::SyntaxError)
+    end
+
+    it "errs on wrong arity call" do
+      expect do
+        expect(%Q{
+              (defn f
+                ([x y z] "1"))
+              (f nil)
+              }).to have_output("")
+      end.to raise_error(V8::Error)
+    end
+  end
 end
 

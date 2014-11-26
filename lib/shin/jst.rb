@@ -293,6 +293,39 @@ module Shin
       end
     end
 
+    class SwitchCase < Node
+      attr_reader :test
+      attr_reader :consequent
+
+      def initialize(test)
+        @type = "SwitchCase"
+        @test = test
+        @consequent = []
+      end
+
+      def << (arg)
+        raise "Expected Statement" unless Statement === arg
+        @consequent << arg
+      end
+    end
+
+    class SwitchStatement < Statement
+      attr_reader :discriminant
+      attr_reader :cases
+
+      def initialize(discriminant, cases = [])
+        @type = "SwitchStatement"
+        @discriminant = discriminant
+        @cases = []
+        cases.each { |x| self << x } unless cases.empty?
+      end
+
+      def << (_case)
+        raise "Expected case, got #{_case}" unless SwitchCase === _case
+        @cases << _case
+      end
+    end
+
     class VariableDeclaration < Statement
       attr_reader :declarations
       attr_accessor :kind

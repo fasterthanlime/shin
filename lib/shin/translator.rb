@@ -614,19 +614,24 @@ module Shin
       end or ser!("Invalid def form", list)
     end
 
-    DEFN_PATTERN = ":sym :str? [:expr*] :expr*".freeze
+    DEFN_PATTERN       = ":sym :str? [:expr*] :expr*".freeze
+    DEFN_MULTI_PATTERN = ":sym :str? :list+".freeze
 
     def translate_defn(list)
-      matches?(list, DEFN_PATTERN) do |name, doc, args, body|
-        f = translate_fn_inner(args, body, :name => name.value)
+      f = nil
+      _name = nil
 
-        decl = VariableDeclaration.new
-        dtor = VariableDeclarator.new(make_ident(name.value))
-        ex = make_ident("exports/#{name}")
-        dtor.init = AssignmentExpression.new(ex, f)
-        decl.declarations << dtor
-        @builder << decl
+      matches?(list, DEFN_PATTERN) do |name, doc, args, body|
+        _name = name
+        f = translate_fn_inner(args, body, :name => name.value)
+      end or matches?(list, DEFN_MULTI_PATTERN) do |name, doc, variants|
+        _name = name
+        f = translate_fn_inner_multi(variants, :name => name.value)
       end or ser!("Invalid defn form", list)
+
+      export = make_ident("exports/#{_name}")
+      ass = AssignmentExpression.new(export, f)
+      @builder << make_decl(make_ident(_name.value), ass)
     end
 
     def translate_closure(closure)
@@ -714,6 +719,90 @@ module Shin
         end
 
         trbody(body, fn.body)
+      end
+
+      return fn
+    end
+
+    def translate_fn_inner_multi(variants, name: nil)
+      fn = FunctionExpression.new(name ? make_ident(name) : nil)
+      arity_cache = {}
+      variadic_arity = -1
+
+      max_arity = 0
+      name_candidate = nil
+
+      @builder.into(fn, :statement) do
+        variants.each do |variant|
+          matches?(variant.inner, FN_PATTERN) do |_, args, body|
+            ifn = translate_fn_inner(args, body)
+
+            arity = if args.inner.any? { |x| x.sym?('&') }
+                      variadic_arity = args.inner.take_while { |x| !x.sym?('&') }.count
+                      -1
+                    else
+                      args.inner.length
+                    end
+
+            if arity > max_arity
+              name_candidate = args.inner
+            end
+            tmp = fresh(name ? name : "anon")
+            ser!("Can't redefine arity #{arity}", variant) if arity_cache.has_key?(arity)
+            arity_cache[arity] = tmp
+            decl = make_decl(tmp, ifn)
+            @builder << decl
+          end or ser!("Invalid function variant", variant)
+        end
+
+        numargs = MemberExpression.new(make_ident('arguments'), make_ident('length'), false)
+        sw = SwitchStatement.new(numargs)
+
+        arg_names = []
+        name_candidate.take_while { |x| !x.sym?('&') }.each do |x|
+          arg_names << (x.sym? ? x.value : fresh('p'))
+        end
+
+        if variadic_arity >= 0
+          arg_names << 'var_args'
+
+          max_arity = arity_cache.keys.max
+          if max_arity > variadic_arity
+            ser!("Can't have fixed arity #{max_arity} more than variadic arity #{variadic_arity}", variants)
+          end
+        end
+
+        arg_names.each do |arg_name|
+          fn.params << Identifier.new(arg_name)
+        end
+
+        arity_cache.each do |arity, tmp|
+          caze = SwitchCase.new(arity == -1 ? nil : make_literal(arity))
+
+          if arity == -1
+            mexp = MemberExpression.new(make_ident(tmp), Identifier.new('apply'), false)
+            call = CallExpression.new(mexp)
+            call << Identifier.new('this')
+            call << Identifier.new('arguments')
+          else
+            mexp = MemberExpression.new(make_ident(tmp), Identifier.new('call'), false)
+            call = CallExpression.new(mexp)
+            call << Identifier.new('this')
+            (0...arity).each do |i|
+              call << make_ident(arg_names[i])
+            end
+          end
+          caze << ReturnStatement.new(call)
+          sw << caze
+        end
+
+        @builder << sw
+
+        text = make_literal("Invalid arity: ")
+
+        msg = BinaryExpression.new('+', text, numargs)
+        thr = ThrowStatement.new(msg)
+        @builder << thr
       end
 
       return fn
