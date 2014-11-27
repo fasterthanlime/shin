@@ -429,6 +429,24 @@ module Shin
       end
     end
 
+    def translate_condp(list)
+      # TODO: support :>>
+      form = list.first; list = list.drop(1)
+      rhs  = list.first; list = list.drop(1)
+      
+      i = 0
+      while i < list.size
+        lhs = list[i]
+        unless lhs.kw?('else')
+          inner = Hamster.vector(form, lhs, rhs)
+          list = list.set(i, List.new(lhs.token, inner))
+        end
+        i += 2
+      end
+
+      tr(unwrap_cond(list))
+    end
+
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
@@ -1083,6 +1101,8 @@ module Shin
           translate_if(rest)
         when "cond"
           translate_cond(rest)
+        when "condp"
+          translate_condp(rest)
         when "loop"
           translate_loop(rest)
         when "recur"
