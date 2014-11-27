@@ -1,4 +1,5 @@
 
+require 'benchmark'
 require 'shin/parser'
 require 'shin/ns_parser'
 require 'shin/mutator'
@@ -38,33 +39,58 @@ module Shin
     end
 
     def compile(source, additionals = {})
-      main = parse_module(source, additionals)
+      main = nil
+      parse_time = Benchmark.measure do
+        main = parse_module(source, additionals)
+      end
+      puts "Parsing\t#{parse_time}" if @opts[:profile]
 
       all_mods = collect_deps(main)
-      all_mods.each do |slug, mod|
-        next if mod.ast2
-        Shin::Mutator.new(self, mod).mutate
+      mutate_skips = []
+      mutate_time = Benchmark.measure do
+        all_mods.each do |slug, mod|
+          if mod.ast2
+            mutate_skips << slug
+            next
+          end
+          Shin::Mutator.new(self, mod).mutate
+        end
       end
+      puts "Mutating\t#{mutate_time} (skips: #{mutate_skips.join(" ")})" if @opts[:profile]
 
       if opts[:ast2]
         puts Oj.dump(main.ast2, :mode => :object, :indent => 2)
         exit 0
       end
 
-      all_mods.each do |slug, mod|
-        next if mod.jst
-        Shin::Translator.new(self, mod).translate
+      translate_skips = []
+      translate_time = Benchmark.measure do
+        all_mods.each do |slug, mod|
+          if mod.jst
+            translate_skips << slug
+            next
+          end
+          Shin::Translator.new(self, mod).translate
+        end
       end
+      puts "Translating\t#{translate_time} (skips: #{translate_skips.join(" ")})" if @opts[:profile]
 
       if opts[:jst]
         puts Oj.dump(main.jst, :mode => :compat, :indent => 2)
         exit 0
       end
 
-      all_mods.each do |slug, mod|
-        next if mod.code
-        Shin::Generator.new(mod).generate
+      generate_skips = []
+      generate_time = Benchmark.measure do
+        all_mods.each do |slug, mod|
+          if mod.code
+            generate_skips << slug
+            next
+          end
+          Shin::Generator.new(mod).generate
+        end
       end
+      puts "Generation\t#{generate_time} (skips: #{generate_skips.join(" ")})" if @opts[:profile]
 
       if opts[:js]
         puts main.code

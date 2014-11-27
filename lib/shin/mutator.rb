@@ -62,10 +62,11 @@ module Shin
           invoc = node
           info = resolve_macro(first.value)
           if info
-            debug "Should expand macro invoc\n\n#{invoc}\n\nwith\n\n#{info[:macro]}\n\n"
+            debug "Should expand macro invoc\n\n#{invoc}\n\nwith\n\n#{info[:macro]}\n\n" if DEBUG
 
             eval_mod = make_macro_module(invoc, info)
             expanded_ast = eval_macro_module(eval_mod)
+
             return expand(expanded_ast)
           end
         end
@@ -87,13 +88,13 @@ module Shin
           Shin::Translator.new(@compiler, macros).translate
           Shin::Generator.new(macros).generate
           @compiler.modules << macros
-          debug "Generated macro code for #{macros.ns}."
+          debug "Generated macro code from #{macros.slug}"
         end
 
         defs = macros.defs
         res = defs[name]
         if res
-          debug "Found '#{name}' in #{macros.slug}, which has defs #{defs.keys.join(", ")}"
+          debug "Found '#{name}' in #{macros.slug}, which has defs #{defs.keys.join(", ")}" if DEBUG
           return {:macro => res, :module => macros}
         end
       end
@@ -123,7 +124,7 @@ module Shin
       info_ns = info[:module].ns
       req = Shin::Require.new(info_ns, :macro => true, :refer => :all)
       eval_mod.requires << req
-      debug "eval_mod ast =\n\n#{eval_mod.ast.join(" ")}\n\n"
+      debug "eval_mod ast =\n\n#{eval_mod.ast.join(" ")}\n\n" if DEBUG
 
       eval_mod.source = @mod.source
       Shin::NsParser.new(eval_mod).parse
@@ -131,17 +132,18 @@ module Shin
       Shin::Generator.new(eval_mod).generate
 
       debug "eval_mod got NS: #{eval_mod.ns}"
-      debug "eval_mod code =\n\n#{eval_mod.code}\n\n"
+      debug "eval_mod code =\n\n#{eval_mod.code}\n\n" if DEBUG
 
       deps = @compiler.collect_deps(eval_mod)
       debug "deps for eval_mod: #{deps.keys.join(", ")}"
+
       deps.each do |slug, dep|
         next if slug == eval_mod.ns
         debug "Compiling dep #{dep.slug}"
-        Shin::NsParser.new(dep).parse
-        Shin::Mutator.new(@compiler, dep).mutate
-        Shin::Translator.new(@compiler, dep).translate
-        Shin::Generator.new(dep).generate
+        Shin::NsParser.new(dep).parse unless dep.ns
+        Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
+        Shin::Translator.new(@compiler, dep).translate unless dep.jst
+        Shin::Generator.new(dep).generate unless dep.code
       end
 
       eval_mod
@@ -158,10 +160,10 @@ module Shin
 
       res_parser = Shin::Parser.new(result.to_s)
       expanded_ast = res_parser.parse.first
-      debug "Expanded AST:\n\n#{expanded_ast}\n\n"
+      debug "Expanded AST:\n\n#{expanded_ast}\n\n" if DEBUG
 
       dequoted_ast = dequote(expanded_ast)
-      debug "Dequoted AST:\n\n#{dequoted_ast}\n\n"
+      debug "Dequoted AST:\n\n#{dequoted_ast}\n\n" if DEBUG
 
       dequoted_ast
     end

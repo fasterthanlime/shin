@@ -1,6 +1,7 @@
 
 require 'slop'
 require 'oj'
+require 'benchmark'
 
 require 'shin'
 require 'shin/compiler'
@@ -22,6 +23,7 @@ module Shin
         on 'J', 'jst', 'Dump JST (Mozilla Parse API AST) and exit'
         on 'j', 'js', 'Dump generated JavaScript and exit'
         on 'V', 'version', 'Print version and exit'
+        on 'p', 'profile', 'Profile the compiler', :default => false
       end
 
       if opts.version?
@@ -45,7 +47,10 @@ module Shin
       end
 
       compiler = Shin::Compiler.new(opts)
-      compiler.compile(source, :file => file)
+      compile_time = Benchmark.measure do
+        compiler.compile(source, :file => file)
+      end
+      puts "Total\t#{compile_time}"
 
       puts "Compiled #{file || "<stdin>"}" if opts[:output]
     end
