@@ -17,8 +17,6 @@ module Shin
     
     attr_reader :input
 
-    WS_RE = /[ \t\n,]/
-    OPEN_RE = /[(\[{]/
     NUMBER_RE = /[0-9]+/
     OPEN_MAP = {
       '(' => List,
@@ -26,7 +24,6 @@ module Shin
       '{' => Map,
     }
 
-    CLOS_RE = /[)\]}]/
     CLOS_REV_MAP = {
       List    => ')',
       Vector  => ']',
@@ -62,8 +59,8 @@ module Shin
 
     def parse
       nodes = []
-      heap = [nodes]
-      state = [:expr]
+      heap  = Hamster.deque(nodes)
+      state = Hamster.deque(:expr)
 
       @pos = 0
       @input.each_char do |c|
@@ -75,44 +72,44 @@ module Shin
 
         case state.last
         when :expr, :expr_one
-          state.pop if state.last == :expr_one
+          state = state.pop if state.last == :expr_one
 
           case c
-          when WS_RE
+          when ' ', "\t", "\n", ','
             # muffin
           when '@'
-            heap << Deref << token << []
-            state << :close_one << :expr_one
+            heap   = heap  << Deref       << token     << []
+            state  = state << :close_one  << :expr_one
           when '`'
-            heap << SyntaxQuote << token << []
-            state << :close_one << :expr_one
+            heap   = heap  << SyntaxQuote << token     << []
+            state  = state << :close_one  << :expr_one
           when "'"
-            heap << Quote << token << []
-            state << :close_one << :expr_one
+            heap   = heap  << Quote       << token     << []
+            state  = state << :close_one  << :expr_one
           when "~"
-            heap << Unquote << token << []
-            state << :close_one << :expr_one
+            heap   = heap  << Unquote     << token     << []
+            state  = state << :close_one  << :expr_one
           when "^"
-            heap << MetaData << token << []
-            state << :close_one << :expr_one
+            heap   = heap  << MetaData    << token     << []
+            state  = state << :close_one  << :expr_one
           when ';'
-            state << :comment
+            state <<= :comment
           when '#'
-            state << :sharp
+            state <<= :sharp
           when ':'
-            state << :keyword
-            heap << token << ""
+            state = state << :keyword
+            heap  = heap  << token    << ""
           when '"'
-            state << :string
-            heap << token << ""
-          when OPEN_RE
-            heap << OPEN_MAP[c] << token << []
-            state << :expr
-          when CLOS_RE
-            state.pop # expr
-            els  = heap.pop
-            tok  = heap.pop
-            type = heap.pop
+            state = state << :string
+            heap  = heap  << token   << ""
+          when '(', '[', '{'
+            heap  = heap  << OPEN_MAP[c] << token << []
+            state = state << :expr
+          when ')', ']', '}'
+            state = state.pop # expr
+            els  = heap.last; heap = heap.pop
+            tok  = heap.last; heap = heap.pop
+            type = heap.last; heap = heap.pop
 
             ex = CLOS_REV_MAP[type]
             unless c === ex
@@ -120,47 +117,47 @@ module Shin
             end
             heap.last << type.new(tok.extend!(@pos), els)
           when SYM_START_REGEXP
-            state << :symbol
-            heap << token << ""
+            state = state << :symbol
+            heap  = heap  << token   << ""
             redo
           when NUMBER_RE
-            state << :number
-            heap << token << ""
+            state = state << :number
+            heap  = heap  << token   << ""
             redo
           else
             ser!("Unexpected char: #{c}")
           end
         when :close_one
-          inner = heap.pop
-          tok   = heap.pop
-          type  = heap.pop
+          inner = heap.last; heap = heap.pop
+          tok   = heap.last; heap = heap.pop
+          type  = heap.last; heap = heap.pop
 
           raise "Internal error" if inner.length != 1
           heap.last << type.new(tok.extend!(@pos), inner[0])
-          state.pop
+          state = state.pop
           redo
         when :comment
-          state.pop if c == "\n"
+          state = state.pop if c == "\n"
         when :sharp
-          state.pop
+          state = state.pop
           case c
           when '('
-            heap << Closure << token << [] << List << token << []
-            state << :close_one << :expr
+            heap  = heap  << Closure    << token << [] << List << token << []
+            state = state << :close_one << :expr
           when '{'
-            heap << Set << token << []
-            state << :expr
+            heap  = heap  << Set        << token << []
+            state = state << :expr
           when '"'
-            heap << token << ""
-            state << :regexp
+            heap  = heap  << token      << ""
+            state = state << :regexp
           else
             ser!("Unexpected char after #: #{c}")
           end
         when :string, :regexp
           case c
           when '"'
-            value = heap.pop
-            tok   = heap.pop
+            value = heap.last; heap = heap.pop
+            tok   = heap.last; heap = heap.pop
             case state.last
             when :string
               heap.last << String.new(tok.extend!(@pos), value)
@@ -169,7 +166,7 @@ module Shin
             else
               raise "Internal error"
             end
-            state.pop
+            state = state.pop
           else
             heap.last << c
           end
@@ -178,10 +175,10 @@ module Shin
           when NUMBER_RE
             heap.last << c
           else
-            value = heap.pop
-            tok   = heap.pop
+            value = heap.last; heap = heap.pop
+            tok   = heap.last; heap = heap.pop
             heap.last << Number.new(tok.extend!(@pos), value.to_f)
-            state.pop
+            state = state.pop
             redo
           end
         when :symbol
@@ -189,10 +186,10 @@ module Shin
           when SYM_INNER_REGEXP
             heap.last << c
           else
-            value = heap.pop
-            tok   = heap.pop
+            value = heap.last; heap = heap.pop
+            tok   = heap.last; heap = heap.pop
             heap.last << Symbol.new(tok.extend!(@pos), value)
-            state.pop
+            state = state.pop
             redo
           end
         when :keyword
@@ -200,10 +197,10 @@ module Shin
           when SYM_INNER_REGEXP
             heap.last << c
           else
-            value = heap.pop
-            tok   = heap.pop
+            value = heap.last; heap = heap.pop
+            tok   = heap.last; heap = heap.pop
             heap.last << Keyword.new(tok.extend!(@pos), value)
-            state.pop
+            state = state.pop
             redo
           end
         else
@@ -214,21 +211,22 @@ module Shin
 
       case state.last
       when :number
-        value = heap.pop
-        tok   = heap.pop
+        value = heap.last; heap = heap.pop
+        tok   = heap.last; heap = heap.pop
         heap.last << Number.new(tok.extend!(@pos), value.to_f)
       when :keyword
-        value = heap.pop
-        tok   = heap.pop
+        value = heap.last; heap = heap.pop
+        tok   = heap.last; heap = heap.pop
         heap.last << Keyword.new(tok.extend!(@pos), value)
       when :symbol
-        value = heap.pop
-        tok   = heap.pop
+        value = heap.last; heap = heap.pop
+        tok   = heap.last; heap = heap.pop
         heap.last << Symbol.new(tok.extend!(@pos), value)
       end
 
       if heap.length > 1
-        heap.reverse_each do |type|
+        until heap.empty?
+          type = heap.last; heap = heap.pop
           if Class === type
             ser!("Unclosed #{type.name.split('::').last}")
             break
