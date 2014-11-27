@@ -154,16 +154,16 @@ module Shin
       arr[0]
     end
 
-    def as_specified(expr, mode, dest: nil)
+    def as_specified(expr, mode)
       arr = []
-      @builder.into(arr, mode, :dest => dest) do
+      @builder.into(arr, mode) do
         translate_expr(expr, :shove => true)
       end
       arr[0]
     end
 
     def as_parent(expr)
-      as_specified(expr, @builder.mode, :dest => @builder.dest)
+      as_specified(expr, @builder.mode)
     end
 
     def destructure(lhs, rhs, mode: :declare)
@@ -334,7 +334,7 @@ module Shin
                  fn = FunctionExpression.new
                  @builder << CallExpression.new(fn)
                  fn
-               when :statement, :return, :assign
+               when :statement, :return
                  block = BlockStatement.new
                  @builder << block
                  block
@@ -362,9 +362,6 @@ module Shin
           when :return
             # return at the end, we're in a return-friendly vase
             trbody(body, vase)
-          when :assign
-            # assign at the end, we're in a vase that expects an assign
-            trbody_captured(body, vase, @builder.dest)
           else
             raise "let in unknown builder mode: #{@builder.mode}"
           end
@@ -388,10 +385,6 @@ module Shin
         block = BlockStatement.new
         trbody(list, block)
         @builder << block
-      when :assign
-        block = BlockStatement.new
-        trbody_captured(list, block, @builder.dest)
-        @builder << block
       else
         raise "do in unknown builder mode: #{@builder.mode}"
       end
@@ -407,7 +400,7 @@ module Shin
         cond.consequent = consequent ? as_expr(consequent) : make_literal(nil)
         cond.alternate  = alternate  ? as_expr(alternate)  : make_literal(nil)
         @builder << cond
-      when :statement, :return, :assign
+      when :statement, :return
         ifs = IfStatement.new(as_expr(test))
         ifs.consequent = as_parent(consequent) if consequent
         ifs.alternate  = as_parent(alternate)  if alternate
@@ -435,7 +428,7 @@ module Shin
       support = case @builder.mode
                 when :expression
                   FunctionExpression.new
-                when :statement, :return, :assign
+                when :statement, :return
                   BlockStatement.new
                 else
                   raise "loop in unknown builder mode: #{@builder.mode}"
@@ -480,7 +473,7 @@ module Shin
       case @builder.mode
       when :expression
         @builder << CallExpression.new(support)
-      when :statement, :return, :assign
+      when :statement, :return
         @builder << support
       else
         raise "loop in unknown builder mode: #{@builder.mode}"
@@ -883,22 +876,6 @@ module Shin
         body.each_with_index do |expr, i|
           if last_index == i
             @builder.into(block, :return) { tr(expr) }
-          else
-            tr(expr)
-          end
-        end
-      end
-    end
-
-    def trbody_captured(body, block, dest)
-      last_index = body.length - 1
-      
-      @builder.into(block, :statement) do
-        body.each_with_index do |expr, i|
-          if last_index == i
-            @builder.into(block, :assign, :dest => dest) do
-              tr(expr)
-            end
           else
             tr(expr)
           end

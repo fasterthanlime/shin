@@ -36,13 +36,13 @@ module Shin
       end
     end
 
-    def into(recipient, mode = :expression, dest: nil, &block)
-      with_vase(:into => recipient, :mode => mode, :dest => dest, &block)
+    def into(recipient, mode = :expression, &block)
+      with_vase(:into => recipient, :mode => mode, &block)
       recipient
     end
 
-    def into!(recipient, mode = :expression, dest: nil, &block)
-      self << into(recipient, mode, :dest => dest, &block)
+    def into!(recipient, mode = :expression, &block)
+      self << into(recipient, mode, &block)
     end
 
     REQUIRED_VASE_ARGS = %i(into mode)
@@ -55,7 +55,7 @@ module Shin
                opts
              else
                raise unless REQUIRED_VASE_ARGS.all? { |x| opts.has_key?(x) }
-               Vase.new(opts[:into], opts[:mode], :dest => opts[:dest])
+               Vase.new(opts[:into], opts[:mode])
              end
 
       begin
@@ -74,11 +74,6 @@ module Shin
     def mode
       raise "Trying to get mode in no-vase builder" if @vases.empty?
       @vases.first.mode
-    end
-
-    def dest
-      raise "Trying to get dest in no-vase builder" if @vases.empty?
-      @vases.first.dest
     end
 
     def recipient
@@ -122,19 +117,15 @@ module Shin
 
     attr_reader :into
     attr_reader :mode
-    attr_reader :dest
 
-    VALID_MODES = %i(expression statement return assign)
+    VALID_MODES = %i(expression statement return)
 
-    def initialize(into, mode, dest: nil)
+    def initialize(into, mode)
       raise unless VALID_MODES.include?(mode)
 
       raise "Invalid recipient in vase, should respond to :<<" unless into.respond_to?(:<<)
       @into = into
       @mode = mode
-
-      raise "Need dest for 'assign' mode" if (mode == :assign && dest.nil?)
-      @dest = dest
     end
 
     def << (candidate)
@@ -160,14 +151,8 @@ module Shin
                  ReturnStatement.new(candidate)
                end
         into << stat
-      when :assign
-        if Statement === candidate
-          # probably good.
-          into << candidate
-          return
-        end
-        ass = AssignmentExpression.new(@dest, candidate)
-        into << ExpressionStatement.new(ass)
+      else
+        raise "Unknown mode #{@mode}"
       end
     end
 
