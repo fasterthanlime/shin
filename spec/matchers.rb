@@ -31,7 +31,6 @@ RSpec::Matchers.define :have_output do |expected_output|
   code = nil
 
   match do |actual|
-
     source = nil
     macros = nil
     case actual
@@ -53,7 +52,11 @@ RSpec::Matchers.define :have_output do |expected_output|
     js.load(code, :inline => true)
     js.providers.delete(compiler)
 
-    output.join(" ") === expected_output
+    if Array === expected_output
+      output === expected_output
+    else
+      output.join(" ") === expected_output
+    end
   end
 
   failure_message do |actual|

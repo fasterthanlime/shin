@@ -412,9 +412,7 @@ module Shin
     end
 
     def translate_cond(list)
-      chain = unwrap_cond(list)
-      puts "Unwrapped cond = #{chain}"
-      tr(chain)
+      tr(unwrap_cond(list))
     end
 
     def unwrap_cond(list)
