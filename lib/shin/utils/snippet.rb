@@ -4,7 +4,7 @@ module Shin
     module Snippet
       def snippet(p_input, pos, p_length = 1)
         length = [p_length, 1].max
-        input = p_input.dup
+        input = StringIO.new(p_input.dup)
         input.seek 0
 
         line = ""

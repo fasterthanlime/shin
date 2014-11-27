@@ -3,7 +3,7 @@ module Shin
   module Utils
     module LineColumn
       def line_column(p_input, pos)
-        input = p_input.dup
+        input = StringIO.new(p_input.dup)
         input.seek 0
 
         line = 1

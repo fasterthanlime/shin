@@ -2,8 +2,8 @@
 module Shin
   module Utils
     module Mangler
-      ID_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|]/
-      ID_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|#\$0-9]/
+      SYM_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|]/
+      SYM_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|#\$0-9]/
 
       MANGLE_REGEXP   = /[\-\*\+\/\?!\$%&<>=\.\|]/
       UNMANGLE_REGEXP = /\$[\$_a-z]/

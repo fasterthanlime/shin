@@ -733,7 +733,7 @@ module Shin
           lhs = Shin::AST::Vector.new(t, args.inner)
           apply     = Shin::AST::Symbol.new(t, '.apply')
           vector    = Shin::AST::Symbol.new(t, 'vector')
-          _nil      = Shin::AST::Nil.new(t)
+          _nil      = Shin::AST::Symbol.new(t, 'nil')
           arguments = Shin::AST::Symbol.new(t, 'arguments')
           rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
 
@@ -885,7 +885,11 @@ module Shin
           lit = make_literal(expr.value)
           @builder << CallExpression.new(make_ident("symbol"), [lit])
         else
-          @builder << make_ident(expr.value)
+          if expr.value == 'nil'
+            @builder << make_literal(nil)
+          else
+            @builder << make_ident(expr.value)
+          end
         end
         nil
       when Shin::AST::RegExp
@@ -987,6 +991,7 @@ module Shin
       when Shin::AST::Closure
         translate_closure(expr)
       else
+        puts "Unknown expr form: #{expr}"
         ser!("Unknown expr form #{expr}", expr.token)
       end
     end

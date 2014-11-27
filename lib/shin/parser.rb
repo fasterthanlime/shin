@@ -12,12 +12,26 @@ module Shin
 
     class Error < StandardError; end
     class EOF < Error; end
-
+    
     attr_reader :input
 
-    LPAREN = '('.freeze; RPAREN = ')'.freeze
-    LBRACK = '['.freeze; RBRACK = ']'.freeze
-    LBRACE = '{'.freeze; RBRACE = '}'.freeze
+    WS_RE = /[ \t\n,]/
+    OPEN_RE = /[(\[{]/
+    NUMBER_RE = /[0-9]+/
+    OPEN_MAP = {
+      '(' => List,
+      '[' => Vector,
+      '{' => Map,
+    }
+
+    CLOS_RE = /[)\]}]/
+    CLOS_REV_MAP = {
+      List    => ')',
+      Vector  => ']',
+      Map     => '}',
+      Set     => '}',
+      Closure => ')',
+    }
 
     def self.parse(source)
       # parse is a no-op if source is not a String.
@@ -33,16 +47,12 @@ module Shin
     def initialize(input, options = {})
       @options = options.dup
 
-      # Lifted from sxp-ruby
-      # @see https://github.com/bendiken/sxp-ruby
       case
-      when %i(getc ungetc eof seek).all? { |x| input.respond_to? x }
-        @input = input
+      when input.respond_to?(:each_char)
+        @input = input.freeze
       when input.respond_to?(:to_str)
         require 'stringio' unless defined?(StringIO)
-        # NOTE: StringIO#ungetc mutates the string, so we use #dup to take a copy.
-        @input = StringIO.new(input.to_str.dup)
-        @input.set_encoding('UTF-8') if @input.respond_to?(:set_encoding)
+        @input = input.to_str.freeze
       else
         raise ArgumentError, "expected an IO or String input stream, but got #{input.inspect}"
       end
@@ -50,14 +60,167 @@ module Shin
 
     def parse
       nodes = []
+      heap = [nodes]
+      state = [:expr]
 
-      skip_ws
+      @pos = -1
+      @input.each_char do |c|
+        # puts "#{c}\t<- #{state}"
+        # puts " \t<- [#{heap.join(", ")}]"
+        # puts
 
-      until eof?
-        node = read_expr
-        ser! "Expected S-expression!" unless node
-        nodes << node
-        skip_ws
+        case state.last
+        when :expr, :expr_one
+          state.pop if state.last == :expr_one
+
+          case c
+          when WS_RE
+            # muffin
+          when '@'
+            heap << Deref << []
+            state << :close_one << :expr_one
+          when '`'
+            heap << SyntaxQuote << []
+            state << :close_one << :expr_one
+          when "'"
+            heap << Quote << []
+            state << :close_one << :expr_one
+          when "~"
+            heap << Unquote << []
+            state << :close_one << :expr_one
+          when "^"
+            heap << MetaData << []
+            state << :close_one << :expr_one
+          when ';'
+            state << :comment
+          when '#'
+            state << :sharp
+          when ':'
+            state << :keyword
+            heap << ""
+          when '"'
+            state.push :string
+            heap.push ""
+          when OPEN_RE
+            heap << OPEN_MAP[c] << []
+            state << :expr
+          when CLOS_RE
+            state.pop # expr
+            els = heap.pop
+            type = heap.pop
+
+            ex = CLOS_REV_MAP[type]
+            unless c === ex
+              ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
+            end
+            heap.last << type.new(nil, els)
+          when SYM_START_REGEXP
+            state << :symbol
+            heap << ""
+            redo
+          when NUMBER_RE
+            state << :number
+            heap << ""
+            redo
+          else
+            ser!("Unexpected char: #{c}")
+          end
+        when :close_one
+          inner = heap.pop
+          type = heap.pop
+
+          raise "Internal error" if inner.length != 1
+          heap.last << type.new(nil, inner[0])
+          state.pop
+          redo
+        when :comment
+          state.pop if c == "\n"
+        when :sharp
+          state.pop
+          case c
+          when '('
+            heap << Closure << [] << List << []
+            state << :close_one << :expr
+          when '{'
+            heap << Set << []
+            state << :expr
+          when '"'
+            state << :regexp
+            heap << ""
+          else
+            ser!("Unexpected char after #: #{c}")
+          end
+        when :string, :regexp
+          case c
+          when '"'
+            value = heap.pop
+            case state.last
+            when :string
+              heap.last << String.new(nil, value)
+            when :regexp
+              heap.last << RegExp.new(nil, value)
+            else
+              raise "Internal error"
+            end
+            state.pop
+          else
+            heap.last << c
+          end
+        when :number
+          case c
+          when NUMBER_RE
+            heap.last << c
+          else
+            value = heap.pop
+            heap.last << Number.new(nil, value.to_f)
+            state.pop
+            redo
+          end
+        when :symbol
+          case c
+          when SYM_INNER_REGEXP
+            heap.last << c
+          else
+            value = heap.pop
+            heap.last << Symbol.new(nil, value)
+            state.pop
+            redo
+          end
+        when :keyword
+          case c
+          when SYM_INNER_REGEXP
+            heap.last << c
+          else
+            value = heap.pop
+            heap.last << Keyword.new(nil, value)
+            state.pop
+            redo
+          end
+        else
+          raise "Inconsistent state: #{state.last}"
+        end # case state
+        @pos += 1
+      end # each_char
+
+      case state.last
+      when :number
+        value = heap.pop
+        heap.last << Number.new(nil, value.to_f)
+      when :keyword
+        value = heap.pop
+        heap.last << Keyword.new(nil, value)
+      when :symbol
+        value = heap.pop
+        heap.last << Symbol.new(nil, value)
+      end
+
+      if heap.length > 1
+        heap.reverse_each do |type|
+          if Class === type
+            ser!("Unclosed #{type.name.split('::').last}")
+            break
+          end
+        end
       end
 
       nodes.map! do |node|
@@ -65,263 +228,6 @@ module Shin
       end
 
       return nodes
-    end
-
-    protected
-
-    def read_sequence(sequence_type, ldelim, rdelim)
-      skip_ws
-      sequence_name = lambda do
-        sequence_type.name.split('::').last.downcase
-      end
-
-      return nil unless (char = peek_char).chr == ldelim
-      skip_char
-      skip_ws
-
-      node = sequence_type.new(token)
-      skip_ws
-      until eof?
-        case (char = peek_char.chr)
-        when ','
-          skip_char
-        when rdelim
-          break
-        else
-          child = read_expr
-          if child.nil?
-            ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'")
-          end
-          node.inner << child
-          node.token.extend!(pos)
-        end
-
-        skip_ws
-      end
-
-      unless (char = read_char).chr == rdelim
-        ser!("Unclosed #{sequence_name[]} literal, expected: '#{rdelim}' got '#{char}'")
-      end
-
-      node.token.extend!(pos)
-      node
-    end
-
-    def read_list
-      read_sequence(List, LPAREN, RPAREN)
-    end
-
-    def read_vector
-      read_sequence(Vector, LBRACK, RBRACK)
-    end
-
-    def read_map
-      read_sequence(Map, LBRACE, RBRACE)
-    end
-
-    def read_expr
-      read_quote ||
-        read_syntax_quote ||
-        read_unquote ||
-        read_symbol_like ||
-        read_list ||
-        read_vector ||
-        read_map ||
-        read_number ||
-        read_string ||
-        read_keyword ||
-        read_metadata ||
-        read_closure_or_set ||
-        read_deref
-    end
-
-    def read_number
-      skip_ws
-      s = ""
-      t = token
-
-      until eof?
-        case (char = peek_char).chr
-        when /[0-9]/
-          s << char
-          skip_char
-        else
-          break
-        end
-      end
-
-      return nil if s.empty?
-      Number.new(t.extend!(pos), s.to_f)
-    end
-
-    def read_string
-      skip_ws
-      s = ""
-      t = token
-
-      return nil unless peek_char.chr == '"'
-      skip_char
-
-      until eof?
-        case (char = read_char).chr
-        when '"'
-          break
-        else
-          s << char
-        end
-      end
-
-      String.new(t.extend!(pos), s)
-    end
-
-    def read_symbol_like
-      id = read_symbol
-      return nil if id.nil?
-
-      case id.value
-      when "true"
-        Bool.new(id.token, true)
-      when "false"
-        Bool.new(id.token, false)
-      when "nil"
-        Nil.new(id.token)
-      else
-        id
-      end
-    end
-
-    def read_symbol
-      skip_ws
-      s = ""
-
-      return nil unless peek_char.chr =~ ID_START_REGEXP
-      t = token
-      s << read_char
-
-      until eof?
-        case (char = peek_char).chr
-        when ID_INNER_REGEXP
-          s << char
-          skip_char
-        else
-          break
-        end
-      end
-
-      return nil if s.empty?
-      Symbol.new(t.extend!(pos), s)
-    end
-
-    def read_closure_or_set
-      skip_ws
-
-      return nil unless peek_char.chr == '#'
-      t = token
-      skip_char
-
-      follower = read_expr
-      case follower
-      when Map
-        set = Set.new(t.extend!(pos))
-        follower.inner.each { |el| set.inner << el }
-        set
-      when List
-        Closure.new(t.extend!(pos), follower)
-      when String
-        RegExp.new(t.extend!(pos), follower.value)
-      else
-        ser!("Invalid #-form")
-      end
-    end
-
-    def read_quote
-      skip_ws
-
-      return nil unless peek_char.chr == "'"
-      t = token
-      skip_char
-
-      inner = read_expr
-      ser!("Expected expr after quote start") unless inner
-      Quote.new(t.extend!(pos), inner)
-    end
-
-    def read_syntax_quote
-      skip_ws
-
-      return nil unless peek_char.chr == '`'
-      t = token
-      skip_char
-
-      inner = read_expr
-      ser!("Expected expr after syntax quote start") unless inner
-      SyntaxQuote.new(t.extend!(pos), inner)
-    end
-
-    def read_unquote
-      skip_ws
-
-      return nil unless peek_char.chr == '~'
-      t = token
-      skip_char
-
-      inner = read_expr
-      ser!("Expected expr after unquote start") unless inner
-      Unquote.new(t.extend!(pos), inner)
-    end
-
-    def read_deref
-      skip_ws
-
-      return nil unless peek_char.chr == '@'
-      t = token
-      skip_char
-
-      inner = read_expr
-      ser!("Expected expr after deref start") unless inner
-      Deref.new(t.extend!(pos), inner)
-    end
-
-    def read_metadata
-      skip_ws
-
-      return nil unless peek_char.chr == '^'
-      t = token
-      skip_char
-
-      inner = read_expr
-      ser!("Expected metadata expr after ^") unless inner
-      MetaData.new(t.extend!(pos), inner)
-    end
-
-    def read_keyword
-      skip_ws
-
-      return nil unless peek_char.chr == ':'
-      t = token
-      skip_char
-
-      id = read_symbol
-      return nil if id.nil?
-
-      Keyword.new(t.extend!(pos), id.value)
-    end
-
-    def skip_ws
-      until eof?
-        case (char = peek_char).chr
-        when /\s+/
-          skip_char
-        when /;/
-          skip_char
-          until eof?
-            char = read_char.chr
-            break if char == "\n"
-          end
-        else
-          break
-        end
-      end
     end
 
     def token
@@ -332,46 +238,8 @@ module Shin
       @options[:file] || "<stdin>"
     end
 
-    def skip_line
-      loop do
-        break if eof? || read_char.chr == $/
-      end
-    end
-
-    def read_chars(count = 1)
-      buffer = ''
-      count.times { buffer << read_char.chr }
-      buffer
-    end
-
-    def read_char
-      char = @input.getc
-      raise Shin::SyntaxError, 'unexpected end of input' if char.nil?
-      char
-    end
-
-    alias_method :skip_char, :read_char
-
-    def peek_char
-      char = @input.getc
-      @input.ungetc(char) unless char.nil?
-      char
-    end
-
-    def unread(string)
-      string.reverse.each_char {|c| @input.ungetc(c)}
-    end
-
-    def pos
-      @input.pos
-    end
-
-    def eof?
-      @input.eof?
-    end
-
     def ser!(msg, token = nil)
-      start = token ? token.start : pos
+      start = token ? token.start : @pos
       length = token ? token.length : 1
 
       line, column = line_column(@input, start)

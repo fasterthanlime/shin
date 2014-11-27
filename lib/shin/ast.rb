@@ -123,7 +123,7 @@ module Shin
     class Literal < Node
       attr_accessor :value
 
-      def initialize(token ,value)
+      def initialize(token, value)
         super(token)
         @value = value
       end
@@ -149,17 +149,8 @@ module Shin
       end
     end
 
-    class Bool < Literal
-    end
-
-    class Nil < Literal
-      def initialize(token)
-        super(token, nil)
-      end
-    end
-
     class Symbol < Node
-      attr_accessor :value
+      attr_reader :value
 
       def initialize(token, value)
         super(token)
@@ -177,7 +168,7 @@ module Shin
     end
 
     class Keyword < Node
-      attr_accessor :value
+      attr_reader :value
 
       def initialize(token, value)
         super(token)
