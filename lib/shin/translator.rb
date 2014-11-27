@@ -125,10 +125,10 @@ module Shin
               when first.sym?("deftype")
                 translate_deftype(node.inner.drop 1)
               else
-                translate_expr(node, shove: true)
+                tr(node)
               end
             else
-              translate_expr(node, shove: true)
+              tr(node)
             end
           else
           end
@@ -149,7 +149,7 @@ module Shin
     def as_expr(expr)
       arr = []
       @builder.into(arr, :expression) do
-        translate_expr(expr, :shove => true)
+        tr(expr)
       end
       arr[0]
     end
@@ -157,7 +157,7 @@ module Shin
     def as_specified(expr, mode)
       arr = []
       @builder.into(arr, mode) do
-        translate_expr(expr, :shove => true)
+        tr(expr)
       end
       arr[0]
     end
@@ -627,7 +627,7 @@ module Shin
         case
         when matches?(rest, DEF_WITH_DOC_PATTERN)
           doc, expr = rest
-          dtor.init = translate_expr(expr)
+          dtor.init = as_expr(expr)
         when matches?(rest, DEF_WITHOUT_DOC_PATTERN)
           expr = rest.first
           dtor.init = as_expr(expr)
@@ -858,14 +858,9 @@ module Shin
     # Weapons of mass translation
     #########################
 
-    def tr(expr)
-      # TODO: fold into translate_expr itself
-      translate_expr(expr, :shove => true)
-    end
-
     def treach(list)
       list.each do |el|
-        translate_expr(el, :shove => true)
+        tr(el)
       end
     end
 
@@ -883,123 +878,117 @@ module Shin
       end
     end
 
-    def translate_expr(expr, shove: false)
-      raise "Shoulda shoved." unless shove
+    def tr(expr)
+      case expr
+      when Shin::AST::Symbol
+        if @quoting
+          lit = make_literal(expr.value)
+          @builder << CallExpression.new(make_ident("symbol"), [lit])
+        else
+          @builder << make_ident(expr.value)
+        end
+        nil
+      when Shin::AST::RegExp
+        lit = make_literal(expr.value)
+        @builder << NewExpression.new(make_ident("RegExp"), [lit])
+        nil
+      when Shin::AST::Literal
+        @builder << make_literal(expr.value)
+        nil
+      when Shin::AST::Deref
+        t = expr.token
+        els = [Shin::AST::Symbol.new(t, "deref"), expr.inner]
+        tr(Shin::AST::List.new(t, els))
+        nil
+      when Shin::AST::Quote, Shin::AST::SyntaxQuote
+        # TODO: find a less terrible solution.
+        begin
+          @quoting = true
+          tr(expr.inner)
+        ensure
+          @quoting = false
+        end
+        nil
+      when Shin::AST::Vector
+        first = expr.inner.first
+        if first && first.sym?('$')
+          @builder.into!(ArrayExpression.new) do
+            treach(expr.inner.drop(1))
+          end
+        else
+          @builder.into!(CallExpression.new(make_ident('vector'))) do
+            treach(expr.inner)
+          end
+        end
+        nil
+      when Shin::AST::Set
+        els = @builder.into(ArrayExpression.new) do
+          treach(expr.inner)
+        end
+        @builder << CallExpression.new(make_ident('set'), [els])
+        nil
+      when Shin::AST::Map
+        first = expr.inner.first
+        if first && first.sym?('$')
+          list = expr.inner.drop(1)
+          props = []
+          list.each_slice(2) do |pair|
+            key, val = pair
+            props << Property.new(as_expr(key), as_expr(val))
+          end
+          @builder << ObjectExpression.new(props)
+        else
+          unless expr.inner.count.even?
+            ser!("Map literal requires even number of forms", expr)
+          end
+          @builder.into!(CallExpression.new(make_ident('hash-map'))) do
+            treach(expr.inner)
+          end
+        end
+        nil
+      when Shin::AST::Keyword
+        lit = make_literal(expr.value)
+        @builder << CallExpression.new(make_ident('keyword'), [lit])
+        nil
+      when Shin::AST::List
+        if @quoting
+          call = CallExpression.new(make_ident("list"))
+          @builder.into(call, :expression) do
+            treach(expr.inner)
+          end
+          @builder << call
+          nil
+        else
+          translate_listform(expr)
+        end
+      when Shin::AST::Unquote
+        ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
+        call = CallExpression.new(make_ident('--unquote'))
 
-      result = case expr
-               when Shin::AST::Symbol
-                 if @quoting
-                   lit = make_literal(expr.value)
-                   @builder << CallExpression.new(make_ident("symbol"), [lit])
-                 else
-                   @builder << make_ident(expr.value)
-                 end
-                 nil
-               when Shin::AST::RegExp
-                 lit = make_literal(expr.value)
-                 @builder << NewExpression.new(make_ident("RegExp"), [lit])
-                 nil
-               when Shin::AST::Literal
-                 @builder << make_literal(expr.value)
-                 nil
-               when Shin::AST::Deref
-                 t = expr.token
-                 els = [Shin::AST::Symbol.new(t, "deref"), expr.inner]
-                 translate_expr(Shin::AST::List.new(t, els), :shove => true)
-                 nil
-               when Shin::AST::Quote, Shin::AST::SyntaxQuote
-                 # TODO: find a less terrible solution.
-                 begin
-                  @quoting = true
-                  translate_expr(expr.inner, :shove => true)
-                 ensure
-                  @quoting = false
-                 end
-                 nil
-               when Shin::AST::Vector
-                 first = expr.inner.first
-                 if first && first.sym?('$')
-                   @builder.into!(ArrayExpression.new) do
-                     treach(expr.inner.drop(1))
-                   end
-                 else
-                   @builder.into!(CallExpression.new(make_ident('vector'))) do
-                     treach(expr.inner)
-                   end
-                 end
-                 nil
-               when Shin::AST::Set
-                 els = @builder.into(ArrayExpression.new) do
-                   treach(expr.inner)
-                 end
-                 @builder << CallExpression.new(make_ident('set'), [els])
-                 nil
-               when Shin::AST::Map
-                 first = expr.inner.first
-                 if first && first.sym?('$')
-                   list = expr.inner.drop(1)
-                   props = []
-                   list.each_slice(2) do |pair|
-                     key, val = pair
-                     props << Property.new(as_expr(key), as_expr(val))
-                   end
-                   @builder << ObjectExpression.new(props)
-                 else
-                   unless expr.inner.count.even?
-                     ser!("Map literal requires even number of forms", expr)
-                   end
-                   @builder.into!(CallExpression.new(make_ident('hash-map'))) do
-                     treach(expr.inner)
-                   end
-                 end
-                 nil
-               when Shin::AST::Keyword
-                 lit = make_literal(expr.value)
-                 @builder << CallExpression.new(make_ident('keyword'), [lit])
-                 nil
-               when Shin::AST::List
-                 if @quoting
-                   call = CallExpression.new(make_ident("list"))
-                   @builder.into(call, :expression) do
-                     expr.inner.each do |el|
-                       translate_expr(el, :shove => true)
-                     end
-                   end
-                   @builder << call
-                   nil
-                 else
-                   translate_listform(expr)
-                 end
-               when Shin::AST::Unquote
-                 ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
-                 call = CallExpression.new(make_ident('--unquote'))
+        @builder.into(call, :expression) do
+          spliced = false
+          inner = expr.inner
+          if Shin::AST::Deref === inner
+            spliced = true
+            inner = inner.inner
+          end
 
-                 @builder.into(call, :expression) do
-                  spliced = false
-                  inner = expr.inner
-                  if Shin::AST::Deref === inner
-                    spliced = true
-                    inner = inner.inner
-                  end
+          begin
+            @quoting = false
+            tr(inner)
+          ensure
+            @quoting = true
+          end
+          @builder << Literal.new(spliced)
+        end
 
-                  begin
-                    @quoting = false
-                    translate_expr(inner, :shove => true)
-                  ensure
-                    @quoting = true
-                  end
-                  @builder << Literal.new(spliced)
-                 end
-
-                 @builder << call
-                 nil
-               when Shin::AST::Closure
-                 translate_closure(expr)
-               else
-                 ser!("Unknown expr form #{expr}", expr.token)
-               end
-
-      raise "non-nil translate_expr result: #{result} for #{expr}" unless result.nil?
+        @builder << call
+        nil
+      when Shin::AST::Closure
+        translate_closure(expr)
+      else
+        ser!("Unknown expr form #{expr}", expr.token)
+      end
     end
 
     def translate_listform(expr)
