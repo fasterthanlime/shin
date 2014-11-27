@@ -163,7 +163,7 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value
+        @value = value.freeze
       end
 
       def sym?(value = nil)
@@ -181,7 +181,7 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value
+        @value = value.freeze
       end
 
       def kw?(value = nil)

@@ -167,7 +167,7 @@ module Shin
         when '"'
           break
         else
-          s += char
+          s << char
         end
       end
 
@@ -201,7 +201,7 @@ module Shin
       until eof?
         case (char = peek_char).chr
         when ID_INNER_REGEXP
-          s += char
+          s << char
           skip_char
         else
           break
