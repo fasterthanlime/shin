@@ -488,14 +488,16 @@ module Shin
         dtor = VariableDeclarator.new(make_ident(name.value))
 
         t = name.token
-        proto_map = Shin::AST::Map.new(t)
-        proto_map.inner << Shin::AST::Keyword.new(t, "sigs")
-        sigs_map = Shin::AST::Map.new(t)
+        proto_map_inner = Hamster.vector(Shin::AST::Keyword.new(t, "sigs"))
+        sigs_map_inner = Hamster.vector
         sigs.each do |sig|
-          sigs_map.inner << Shin::AST::Keyword.new(t, sig.inner.first.value)
-          sigs_map.inner << Shin::AST::SyntaxQuote.new(t, sig)
+          sigs_map_inner <<= Shin::AST::Keyword.new(t, sig.inner.first.value)
+          sigs_map_inner <<= Shin::AST::SyntaxQuote.new(t, sig)
         end
-        proto_map.inner << sigs_map
+        sigs_map = Shin::AST::Map.new(t, sigs_map_inner)
+        proto_map_inner <<= sigs_map
+        proto_map = Shin::AST::Map.new(t, proto_map_inner)
+
         dtor.init = as_expr(proto_map)
 
         ex = make_ident("exports/#{name}")
@@ -668,9 +670,10 @@ module Shin
       body = desugar_closure_inner(closure.inner, arg_map)
 
       num_args = arg_map.keys.max || 0
-      args = (0..num_args).map do |index|
+      args = Hamster.vector()
+      (0..num_args).map do |index|
         name = arg_map[index] || fresh("aarg#{index}-")
-        Shin::AST::Symbol.new(t, name)
+        args <<= Shin::AST::Symbol.new(t, name)
       end
       @builder << translate_fn_inner(Shin::AST::Vector.new(t, args), [body])
       nil
@@ -679,9 +682,17 @@ module Shin
     def desugar_closure_inner(node, arg_map)
       case node
       when Sequence
-        node = node.clone
-        node.inner.map! { |x| desugar_closure_inner(x, arg_map) }
-        node
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = desugar_closure_inner(child, arg_map)
+          inner = inner.set(i, poster_child) if poster_child != child
+        end
+
+        if inner == node.inner
+          node
+        else
+          node.class.new(node.token, inner)
+        end
       when Symbol
         if node.value.start_with?('%')
           index = closure_arg_to_index(node)
@@ -735,7 +746,7 @@ module Shin
           vector    = Shin::AST::Symbol.new(t, 'vector')
           _nil      = Shin::AST::Symbol.new(t, 'nil')
           arguments = Shin::AST::Symbol.new(t, 'arguments')
-          rhs = Shin::AST::List.new(t, [apply, vector, _nil, arguments])
+          rhs = Shin::AST::List.new(t, Hamster.vector(apply, vector, _nil, arguments))
 
           @builder.into(fn.body, :statement) do
             destructure(lhs, rhs)
@@ -901,7 +912,7 @@ module Shin
         nil
       when Shin::AST::Deref
         t = expr.token
-        els = [Shin::AST::Symbol.new(t, "deref"), expr.inner]
+        els = Hamster.vector(Shin::AST::Symbol.new(t, "deref"), expr.inner)
         tr(Shin::AST::List.new(t, els))
         nil
       when Shin::AST::Quote, Shin::AST::SyntaxQuote
@@ -1056,8 +1067,12 @@ module Shin
         when "loop"
           translate_loop(rest)
         when "recur"
-          anchor = @builder.anchor
-          ser!("Recur with no anchor!", expr) unless anchor
+          anchor = nil
+          begin
+            anchor = @builder.anchor
+          rescue
+            ser!("Recur with no anchor: #{expr}", first)
+          end
 
           values = list.drop(1)
           block = BlockStatement.new

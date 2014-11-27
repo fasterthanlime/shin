@@ -66,7 +66,7 @@ module Shin
       @input.each_char do |c|
         if DEBUG
           puts "#{c} at #{@pos}\t<- #{state}"
-          puts "      \t<- [#{heap.join(", ")}]"
+          puts "      \t<- [#{heap.to_a.join(", ")}]"
           puts
         end
 
@@ -115,7 +115,7 @@ module Shin
             unless c === ex
               ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
             end
-            heap.last << type.new(tok.extend!(@pos), els)
+            heap.last << type.new(tok.extend!(@pos), Hamster::Vector.new(els))
           when SYM_START_REGEXP
             state = state << :symbol
             heap  = heap  << token   << ""
@@ -264,23 +264,32 @@ module Shin
     def post_parse(node, trail = [])
       case node
       when Sequence
-        node = node.clone
         _trail = trail + [node]
-        node.inner.map! do |child|
-          post_parse(child, _trail)
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = post_parse(child, _trail)
+          inner = inner.set(i, poster_child) if poster_child != child
         end
-        node
-      when SyntaxQuote
-        node = node.clone
-        candidate = LetCandidate.new(node)
 
+        if inner == node.inner
+          node
+        else
+          node.class.new(node.token, inner)
+        end
+      when SyntaxQuote
+        candidate = LetCandidate.new(node)
         _trail = trail + [node, candidate]
+
         inner = post_parse(node.inner, _trail)
 
+        if inner != node.inner
+          node = SyntaxQuote.new(node.token, inner)
+        end
+
         if candidate.useful?
-          candidate.let
+          candidate.let(node)
         else
-          SyntaxQuote.new(node.token, inner)
+          node
         end
       when Symbol
         if node.value.end_with? '#'
@@ -298,7 +307,7 @@ module Shin
           end
 
           unless found
-            raise "auto-gensym used outside syntax quote: #{node}"
+            ser!("auto-gensym used outside syntax quote: #{node}", node.token)
           end
 
           name = node.value[0..-2]
@@ -315,16 +324,11 @@ module Shin
   class LetCandidate
     include Shin::AST
 
-    attr_reader :t
-    attr_reader :let
+    def initialize(inner)
+      @t = inner.token
+      @ginseng = Symbol.new(@t, 'gensym')
+      @decls_inner = []
 
-    def initialize(node)
-      @t = node.token
-      @let = List.new(t)
-      @let.inner << Symbol.new(t, "let")
-      @decls = Vector.new(t)
-      @let.inner << @decls
-      @let.inner << node
       @cache = {}
     end
 
@@ -333,10 +337,20 @@ module Shin
       unless sym
         sym = "#{name}#{Shin::Mutator.fresh_sym}"
         @cache[name] = sym
-        @decls.inner << Symbol.new(t, sym)
-        @decls.inner << List.new(t, [Symbol.new(t, "gensym"), String.new(t, name)])
+        @decls_inner << Symbol.new(@t, sym)
+        @decls_inner << gensym_call(name)
       end
       sym
+    end
+
+    def gensym_call(name)
+      List.new(@t, Hamster.vector(@ginseng, String.new(@t, name)))
+    end
+
+    def let(inner)
+      decls = Vector.new(@t, Hamster::Vector.new(@decls_inner))
+      let_inner = Hamster.vector(Symbol.new(@t, 'let'), decls, inner)
+      List.new(@t, let_inner)
     end
 
     def to_s
@@ -344,7 +358,7 @@ module Shin
     end
 
     def useful?
-      !@decls.inner.empty?
+      !@decls_inner.empty?
     end
 
   end

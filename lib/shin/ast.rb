@@ -1,4 +1,6 @@
 
+require 'hamster/vector'
+
 module Shin
   module AST
     class Token
@@ -78,9 +80,11 @@ module Shin
     class Sequence < Node
       attr_accessor :inner
 
-      def initialize(token, inner = [])
+      def initialize(token, inner = Hamster.vector)
         super(token)
+        raise "Sequence needs immutable vector" unless Hamster::Vector === inner
         @inner = inner
+        self.freeze
       end
     end
 
@@ -129,7 +133,8 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value
+        @value = value.freeze
+        self.freeze
       end
 
       def literal?
@@ -159,6 +164,7 @@ module Shin
       def initialize(token, value)
         super(token)
         @value = value.freeze
+        self.freeze
       end
 
       def sym?(value = nil)
@@ -177,6 +183,7 @@ module Shin
       def initialize(token, value)
         super(token)
         @value = value.freeze
+        self.freeze
       end
 
       def kw?(value = nil)
@@ -195,6 +202,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def meta?(value = nil)
@@ -213,6 +221,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def to_s
@@ -226,6 +235,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def to_s
@@ -239,6 +249,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def to_s
@@ -252,6 +263,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def to_s
@@ -265,6 +277,7 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
+        self.freeze
       end
 
       def to_s

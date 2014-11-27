@@ -18,6 +18,7 @@ module Shin
       return if mod.ns
 
       nsdef = mod.ast[0]
+
       if nsdef && nsdef.list?
         matches?(nsdef.inner, "ns :sym :expr*") do |_, name, specs|
           # get rid of nsdef (don't translate it)

@@ -49,9 +49,15 @@ module Shin
 
     def expand(node)
       if Sequence === node
-        # FIXME: mutator isn't supposed to mutate the old AST. is clone a proper fix?
-        node = node.clone
-        node.inner.map! { |x| expand(x) }
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = expand(child)
+          inner = inner.set(i, poster_child) if poster_child != child
+        end
+
+        if inner != node.inner
+          node = node.class.new(node.token, inner)
+        end
       end
 
       case node
@@ -113,12 +119,13 @@ module Shin
       _yield = Symbol.new(t, "yield")
       pr_str = Symbol.new(t, "pr-str")
 
-      eval_node = List.new(t, [macro_sym])
+      eval_args = Hamster.vector(macro_sym)
       invoc.inner.drop(1).each do |arg|
-        eval_node.inner << SyntaxQuote.new(arg.token, arg)
+        eval_args <<= SyntaxQuote.new(arg.token, arg)
       end
+      eval_node = List.new(t, eval_args)
 
-      eval_ast = List.new(t, [_yield, List.new(t, [pr_str, eval_node])])
+      eval_ast = List.new(t, Hamster.vector(_yield, List.new(t, Hamster.vector(pr_str, eval_node))))
       eval_mod.ast = eval_mod.ast2 = [eval_ast]
 
       info_ns = info[:module].ns
@@ -187,31 +194,44 @@ module Shin
     def dequote(node)
       case node
       when Sequence
-        res = node.clone
-        res.inner = []
-        node.inner.each do |x|
-          deq = dequote(x)
-          if Array === deq
-            deq.each { |x| res.inner << x }
-          else
-            res.inner << deq
+        inner = node.inner
+
+        offset = 0
+        inner.each_with_index do |child, i|
+          poster_child = dequote(child)
+          if poster_child != child
+            if Hamster::Vector === poster_child
+              inner = inner.delete_at(i + offset)
+              poster_child.each do |el|
+                inner = inner.insert(i + offset, el)
+                offset += 1
+              end
+            else
+              inner = inner.set(i + offset, poster_child)
+            end
           end
         end
 
-        return res
+        if node.inner == inner
+          node
+        else
+          node.class.new(node.token, inner)
+        end
       when Unquote
         if Deref === node.inner
           deref = node.inner
+
           unless Sequence === deref.inner
             ser!("Cannot use splicing on non-list form #{deref.inner}")
           end
-          return deref.inner.inner.map { |x| dequote(x) }
-        else
-          return dequote(node.inner)
-        end
-      end
 
-      node
+          deref.inner.inner.map { |x| dequote(x) }
+        else
+          dequote(node.inner)
+        end
+      else
+        node
+      end
     end
 
     def fresh
