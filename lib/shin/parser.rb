@@ -116,7 +116,7 @@ module Shin
             unless c === ex
               ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
             end
-            heap.last << type.new(tok, els)
+            heap.last << type.new(tok.extend!(@pos), els)
           when SYM_START_REGEXP
             state << :symbol
             heap << token << ""
@@ -134,7 +134,7 @@ module Shin
           type  = heap.pop
 
           raise "Internal error" if inner.length != 1
-          heap.last << type.new(tok, inner[0])
+          heap.last << type.new(tok.extend!(@pos), inner[0])
           state.pop
           redo
         when :comment
@@ -161,9 +161,9 @@ module Shin
             tok   = heap.pop
             case state.last
             when :string
-              heap.last << String.new(tok, value)
+              heap.last << String.new(tok.extend!(@pos), value)
             when :regexp
-              heap.last << RegExp.new(tok, value)
+              heap.last << RegExp.new(tok.extend!(@pos), value)
             else
               raise "Internal error"
             end
@@ -178,7 +178,7 @@ module Shin
           else
             value = heap.pop
             tok   = heap.pop
-            heap.last << Number.new(tok, value.to_f)
+            heap.last << Number.new(tok.extend!(@pos), value.to_f)
             state.pop
             redo
           end
@@ -189,7 +189,7 @@ module Shin
           else
             value = heap.pop
             tok   = heap.pop
-            heap.last << Symbol.new(tok, value)
+            heap.last << Symbol.new(tok.extend!(@pos), value)
             state.pop
             redo
           end
@@ -200,7 +200,7 @@ module Shin
           else
             value = heap.pop
             tok   = heap.pop
-            heap.last << Keyword.new(tok, value)
+            heap.last << Keyword.new(tok.extend!(@pos), value)
             state.pop
             redo
           end
@@ -214,15 +214,15 @@ module Shin
       when :number
         value = heap.pop
         tok   = heap.pop
-        heap.last << Number.new(tok, value.to_f)
+        heap.last << Number.new(tok.extend!(@pos), value.to_f)
       when :keyword
         value = heap.pop
         tok   = heap.pop
-        heap.last << Keyword.new(tok, value)
+        heap.last << Keyword.new(tok.extend!(@pos), value)
       when :symbol
         value = heap.pop
         tok   = heap.pop
-        heap.last << Symbol.new(tok, value)
+        heap.last << Symbol.new(tok.extend!(@pos), value)
       end
 
       if heap.length > 1
