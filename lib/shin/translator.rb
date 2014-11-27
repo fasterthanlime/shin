@@ -411,6 +411,26 @@ module Shin
       nil
     end
 
+    def translate_cond(list)
+      chain = unwrap_cond(list)
+      puts "Unwrapped cond = #{chain}"
+      tr(chain)
+    end
+
+    def unwrap_cond(list)
+      if list.size >= 2
+        cond = list.first; list = list.drop(1)
+        form = list.first; list = list.drop(1)
+
+        t = cond.token
+        fi = Shin::AST::Symbol.new(t, "if")
+        inner = Hamster.vector(fi, cond, form, unwrap_cond(list))
+        Shin::AST::List.new(t, inner)
+      else
+        nil
+      end
+    end
+
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
@@ -1002,8 +1022,7 @@ module Shin
       when Shin::AST::Closure
         translate_closure(expr)
       else
-        puts "Unknown expr form: #{expr}"
-        ser!("Unknown expr form #{expr}", expr.token)
+        ser!("Unknown expr form #{expr}", expr)
       end
     end
 
@@ -1064,6 +1083,8 @@ module Shin
           translate_do(rest)
         when "if"
           translate_if(rest)
+        when "cond"
+          translate_cond(rest)
         when "loop"
           translate_loop(rest)
         when "recur"
