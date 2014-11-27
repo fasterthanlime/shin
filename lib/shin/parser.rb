@@ -5,6 +5,8 @@ require 'shin/utils'
 
 module Shin
   class Parser
+    DEBUG = ENV['PARSER_DEBUG']
+
     include Shin::Utils::LineColumn
     include Shin::Utils::Snippet
     include Shin::Utils::Mangler
@@ -65,7 +67,7 @@ module Shin
 
       @pos = 0
       @input.each_char do |c|
-        if file.include?('test')
+        if DEBUG
           puts "#{c} at #{@pos}\t<- #{state}"
           puts "      \t<- [#{heap.join(", ")}]"
           puts
