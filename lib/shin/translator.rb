@@ -544,27 +544,10 @@ module Shin
 
     def translate_defprotocol(list)
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
-        decl = VariableDeclaration.new
-        dtor = VariableDeclarator.new(make_ident(name.value))
-
-        t = name.token
-        proto_map_inner = Hamster.vector(Shin::AST::Keyword.new(t, "sigs"))
-        sigs_map_inner = Hamster.vector
-        sigs.each do |sig|
-          sigs_map_inner <<= Shin::AST::Keyword.new(t, sig.inner.first.value)
-          sigs_map_inner <<= Shin::AST::SyntaxQuote.new(t, sig)
-        end
-        sigs_map = Shin::AST::Map.new(t, sigs_map_inner)
-        proto_map_inner <<= sigs_map
-        proto_map = Shin::AST::Map.new(t, proto_map_inner)
-
-        dtor.init = as_expr(proto_map)
-
+        empty = ObjectExpression.new
         ex = make_ident("exports/#{name}")
-        dtor.init = AssignmentExpression.new(ex, dtor.init)
-        decl.declarations << dtor
-
-        @builder << decl
+        ass = AssignmentExpression.new(ex, empty)
+        @builder << make_decl(Identifier.new(name.value), ass)
 
         sigs.each do |sig|
           name = sig.inner.first
