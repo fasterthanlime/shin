@@ -153,8 +153,13 @@ module Shin
           else
             ser!("Unexpected char after #: #{c}")
           end
+        when :escape_sequence
+          heap.last << c
+          state = state.pop
         when :string, :regexp
           case c
+          when '\\'
+            state = state << :escape_sequence
           when '"'
             value = heap.last; heap = heap.pop
             tok   = heap.last; heap = heap.pop
