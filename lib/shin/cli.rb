@@ -46,13 +46,17 @@ module Shin
         file = path
       end
 
-      compiler = Shin::Compiler.new(opts)
-      compile_time = Benchmark.measure do
-        compiler.compile(source, :file => file)
-      end
-      puts "Total\t#{compile_time}"
+      begin
+        compiler = Shin::Compiler.new(opts)
+        compile_time = Benchmark.measure do
+          compiler.compile(source, :file => file)
+        end
+        puts "Total\t#{compile_time}"
 
-      puts "Compiled #{file || "<stdin>"}" if opts[:output]
+        puts "Compiled #{file || "<stdin>"}" if opts[:output]
+      rescue SyntaxError => e
+        puts "\n[ERROR] #{e.message}"
+      end
     end
   end
 end

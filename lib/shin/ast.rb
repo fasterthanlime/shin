@@ -24,6 +24,10 @@ module Shin
         self
       end
 
+      def to_s
+        "<#{@file} at #{@start}>"
+      end
+
       private
 
       def compute_linecol

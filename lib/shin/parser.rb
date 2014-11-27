@@ -63,11 +63,13 @@ module Shin
       heap = [nodes]
       state = [:expr]
 
-      @pos = -1
+      @pos = 0
       @input.each_char do |c|
-        # puts "#{c}\t<- #{state}"
-        # puts " \t<- [#{heap.join(", ")}]"
-        # puts
+        if file.include?('test')
+          puts "#{c} at #{@pos}\t<- #{state}"
+          puts "      \t<- [#{heap.join(", ")}]"
+          puts
+        end
 
         case state.last
         when :expr, :expr_one
@@ -77,19 +79,19 @@ module Shin
           when WS_RE
             # muffin
           when '@'
-            heap << Deref << []
+            heap << Deref << token << []
             state << :close_one << :expr_one
           when '`'
-            heap << SyntaxQuote << []
+            heap << SyntaxQuote << token << []
             state << :close_one << :expr_one
           when "'"
-            heap << Quote << []
+            heap << Quote << token << []
             state << :close_one << :expr_one
           when "~"
-            heap << Unquote << []
+            heap << Unquote << token << []
             state << :close_one << :expr_one
           when "^"
-            heap << MetaData << []
+            heap << MetaData << token << []
             state << :close_one << :expr_one
           when ';'
             state << :comment
@@ -97,40 +99,42 @@ module Shin
             state << :sharp
           when ':'
             state << :keyword
-            heap << ""
+            heap << token << ""
           when '"'
-            state.push :string
-            heap.push ""
+            state << :string
+            heap << token << ""
           when OPEN_RE
-            heap << OPEN_MAP[c] << []
+            heap << OPEN_MAP[c] << token << []
             state << :expr
           when CLOS_RE
             state.pop # expr
-            els = heap.pop
+            els  = heap.pop
+            tok  = heap.pop
             type = heap.pop
 
             ex = CLOS_REV_MAP[type]
             unless c === ex
               ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
             end
-            heap.last << type.new(nil, els)
+            heap.last << type.new(tok, els)
           when SYM_START_REGEXP
             state << :symbol
-            heap << ""
+            heap << token << ""
             redo
           when NUMBER_RE
             state << :number
-            heap << ""
+            heap << token << ""
             redo
           else
             ser!("Unexpected char: #{c}")
           end
         when :close_one
           inner = heap.pop
-          type = heap.pop
+          tok   = heap.pop
+          type  = heap.pop
 
           raise "Internal error" if inner.length != 1
-          heap.last << type.new(nil, inner[0])
+          heap.last << type.new(tok, inner[0])
           state.pop
           redo
         when :comment
@@ -139,14 +143,14 @@ module Shin
           state.pop
           case c
           when '('
-            heap << Closure << [] << List << []
+            heap << Closure << token << [] << List << token << []
             state << :close_one << :expr
           when '{'
-            heap << Set << []
+            heap << Set << token << []
             state << :expr
           when '"'
+            heap << token << ""
             state << :regexp
-            heap << ""
           else
             ser!("Unexpected char after #: #{c}")
           end
@@ -154,11 +158,12 @@ module Shin
           case c
           when '"'
             value = heap.pop
+            tok   = heap.pop
             case state.last
             when :string
-              heap.last << String.new(nil, value)
+              heap.last << String.new(tok, value)
             when :regexp
-              heap.last << RegExp.new(nil, value)
+              heap.last << RegExp.new(tok, value)
             else
               raise "Internal error"
             end
@@ -172,7 +177,8 @@ module Shin
             heap.last << c
           else
             value = heap.pop
-            heap.last << Number.new(nil, value.to_f)
+            tok   = heap.pop
+            heap.last << Number.new(tok, value.to_f)
             state.pop
             redo
           end
@@ -182,7 +188,8 @@ module Shin
             heap.last << c
           else
             value = heap.pop
-            heap.last << Symbol.new(nil, value)
+            tok   = heap.pop
+            heap.last << Symbol.new(tok, value)
             state.pop
             redo
           end
@@ -192,7 +199,8 @@ module Shin
             heap.last << c
           else
             value = heap.pop
-            heap.last << Keyword.new(nil, value)
+            tok   = heap.pop
+            heap.last << Keyword.new(tok, value)
             state.pop
             redo
           end
@@ -205,13 +213,16 @@ module Shin
       case state.last
       when :number
         value = heap.pop
-        heap.last << Number.new(nil, value.to_f)
+        tok   = heap.pop
+        heap.last << Number.new(tok, value.to_f)
       when :keyword
         value = heap.pop
-        heap.last << Keyword.new(nil, value)
+        tok   = heap.pop
+        heap.last << Keyword.new(tok, value)
       when :symbol
         value = heap.pop
-        heap.last << Symbol.new(nil, value)
+        tok   = heap.pop
+        heap.last << Symbol.new(tok, value)
       end
 
       if heap.length > 1
@@ -231,7 +242,7 @@ module Shin
     end
 
     def token
-      Token.new(file, pos)
+      Token.new(file, @pos)
     end
 
     def file
