@@ -295,6 +295,30 @@ module Shin
 
     LET_PATTERN = "[] :expr*".freeze
 
+    LOGIC_MAP = {
+      "or"  => "||",
+      "and" => "&&",
+    }
+
+    def translate_logic(op, rest)
+      real = LOGIC_MAP[op.value]
+      ser!("Unknown operator #{op.value}") unless real
+
+      case rest.length
+      when 0
+        ser!("Invalid use of #{op.value}, needs at least one operand", op)
+      when 1
+        tr(rest.first)
+        return
+      end
+
+      truthy = Symbol.new(op.token, "truthy")
+      truthy_rest = rest.map do |x|
+        List.new(x.token, Hamster.vector(truthy, x))
+      end
+      translate_comp(Symbol.new(op.token, real), truthy_rest)
+    end
+
     def translate_comp(op, rest)
       terms = []
 
@@ -305,7 +329,7 @@ module Shin
         list = list.drop(1)
         terms << BinaryExpression.new(op.value, l, r)
       end
-      ser!("Invalid comparison, needs at least two operands", op) if terms.empty?
+      ser!("Invalid use of #{op.value}, needs at least two operands", op) if terms.empty?
 
       if terms.length == 1
         @builder << terms.first
@@ -1091,6 +1115,8 @@ module Shin
         case name
         when "<", ">", "<=", ">="
           translate_comp(first, rest)
+        when "and", "or"
+          translate_logic(first, rest)
         when "let"
           translate_let(rest)
         when "fn"
