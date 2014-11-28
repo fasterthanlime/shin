@@ -873,7 +873,8 @@ module Shin
         end
 
         arg_names.each do |arg_name|
-          fn.params << Identifier.new(arg_name)
+          id = make_ident(arg_name)
+          fn.params << id 
         end
 
         arity_cache.each do |arity, tmp|
