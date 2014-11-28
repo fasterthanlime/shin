@@ -66,14 +66,6 @@ module Shin
 
       body = factory.body
 
-      unless @mod.macro?
-        shin_init = MemberExpression.new(make_ident('shin'), make_ident('init'), false)
-        init_call = CallExpression.new(shin_init)
-        init_call.arguments << make_ident('this')
-        init_call.arguments << make_literal(@mod.ns)
-        body << ExpressionStatement.new(init_call)
-      end
-
       @mod.requires.each do |req|
         next if req.macro? && !@mod.macro?
         if req.all?
@@ -426,8 +418,8 @@ module Shin
         @builder << cond
       when :statement, :return
         ifs = IfStatement.new(as_expr(test))
-        ifs.consequent = as_parent(consequent) if consequent
-        ifs.alternate  = as_parent(alternate)  if alternate
+        @builder.into(ifs.consequent = BlockStatement.new, @builder.mode) { tr(consequent) } if consequent
+        @builder.into(ifs.alternate  = BlockStatement.new, @builder.mode) { tr(alternate ) } if alternate 
         @builder << ifs
       else
         raise "if in unknown builder mode: #{@builder.mode}"
@@ -496,11 +488,11 @@ module Shin
 
       @builder.with_scope(scope) do
         @builder.into(support, :statement) do
-          lhs_bindings = []
+          lhs_bindings = Hamster.vector
 
           bindings.each_slice(2) do |binding|
             lhs, rhs = binding
-            lhs_bindings << lhs
+            lhs_bindings <<= lhs
             destructure(lhs, rhs)
           end
 
@@ -981,10 +973,9 @@ module Shin
         end
         nil
       when Shin::AST::Set
-        els = @builder.into(ArrayExpression.new) do
+        @builder.into!(CallExpression.new(make_ident('hash-set'))) do
           treach(expr.inner)
         end
-        @builder << CallExpression.new(make_ident('set'), [els])
         nil
       when Shin::AST::Map
         first = expr.inner.first
@@ -1130,6 +1121,12 @@ module Shin
           @builder.into(block, :statement) do
             t = expr.token
             tmps = []
+
+            # TODO: fix that. cf #56
+            # lhs_vec = Shin::AST::Vector.new(t, anchor.bindings)
+            # rhs_vec = Shin::AST::Vector.new(t, values)
+            # destructure(lhs_vec, rhs_vec)
+
             anchor.bindings.each_with_index do |lhs, i|
               rhs = values[i]
               ser!("Missing value in recur", values) unless rhs
@@ -1209,6 +1206,8 @@ module Shin
     def contains_recur?(ast)
       case ast
       when Shin::AST::List
+        return false if ast.inner.empty?
+
         first = ast.inner.first
         if first.sym?
           case first.value

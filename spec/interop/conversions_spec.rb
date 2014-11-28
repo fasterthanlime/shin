@@ -13,6 +13,10 @@ RSpec.describe "Language", "conversions" do
       expect(%Q{ (print (aget (clj->js '("one" "two" "three")) 1)) }).to have_output("two")
     end
 
+    it "works on cons" do
+      expect(%Q{ (print (aget (clj->js (cons "one" '("two" "three"))) 1)) }).to have_output("two")
+    end
+
     it "works on vectors" do
       expect(%Q{ (print (aget (clj->js ["one" "two" "three"]) 1)) }).to have_output("two")
     end

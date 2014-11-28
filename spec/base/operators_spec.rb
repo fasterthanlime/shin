@@ -29,18 +29,54 @@ RSpec.describe "Language", "operators" do
            }).to have_output(%w(true true false))
   end
 
-  it "has working = and not=" do
-    expect(%Q{
-           (defn comp [a b]
-             (print (= a b))
-             (print (not (not= a b))))
-           (comp 97 97)
-           (comp "banana" "banana")
-           (comp (list 1 2 3) (list 1 2 3))
-           (comp (vector 1 2 3) (vector 1 2 3))
-           (comp 97 "banana")
-           (comp 97 (list 1 2 3))
-           }).to have_output(%w(true) * 8 + %w(false) * 4)
+  describe "= and not=" do
+    it "works on basic types" do
+      expect(%Q{
+            (defn comp [a b]
+              (print (= a b))
+              (print (not (not= a b))))
+            (comp 97 97)
+            (comp "banana" "banana")
+            (comp 97 23)
+            (comp "banana" "hannah")
+            }).to have_output(%w(true) * 4 + %w(false) * 4)
+    end
+    
+    it "works on lists" do
+      expect(%Q{
+            (defn comp [a b]
+              (print (= a b))
+              (print (not (not= a b))))
+            (comp '(1 2 3) '(1 2 3))
+            (comp '(1 2 3) '(4 5 6))
+            (comp 97 '())
+            (comp '() 97)
+            }).to have_output(%w(true) * 2 + %w(false) * 6)
+    end
+
+    it "works on vectors" do
+      expect(%Q{
+            (defn comp [a b]
+              (print (= a b))
+              (print (not (not= a b))))
+            (comp [1 2 3] [1 2 3])
+            (comp [1 2 3] [4 5 6])
+            (comp 97 [])
+            (comp [] 97)
+            }).to have_output(%w(true) * 2 + %w(false) * 6)
+    end
+
+    it "works on maps" do
+      expect(%Q{
+            (defn comp [a b]
+              (print (= a b))
+              (print (not (not= a b))))
+            (comp {:a "Abaca" :b "Bolero"} {:b "Bolero" :a "Abaca"})
+            (comp {:a "Abaca" :b "Bolero"} {:a "Abaca"})
+            (comp 97 {})
+            (comp {} 97)
+            }).to have_output(%w(true) * 2 + %w(false) * 6)
+    end
   end
 
   it "has working <=" do

@@ -26,7 +26,7 @@ RSpec.describe "Language", "basic macros" do
       :source => %Q{ (vector-call [print "hello" "world"]) },
       :macros => %Q{
         (defmacro vector-call [v]
-          `(apply ~(first v) ~(rest v)))
+          `(apply ~(first v) ~(vec (rest v))))
       }
     ).to have_output("hello world")
   end

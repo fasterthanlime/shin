@@ -219,7 +219,6 @@ but it hasn't been tested whatsoever.
 
 Shin ships with some pure JS files:
 
-- `shin.js` is hand-written JS, basis for the language
 - `hamt.js` is [hamt+][], for data structures
 - `escodegen.js` is [escodegen][], only there for compiler use
 
@@ -382,11 +381,13 @@ Straight up naive, basically a PersistentArrayMap with integer keys, but
 hashing, so we should come up with something better, probably a fork
 of [hamt+][] based on [ancient-oak][]'s work on arrays/vectors.
 
-### PersistentList
+### List
 
-Good old hand-rolled singly-linked list.
+Similar to ClojureScript
 
-Empty list is *not* nil.
+### Cons
+
+Similar to ClojureScript
 
 ### LazySeq
 
@@ -414,9 +415,6 @@ API][moz-parser-api] that does *not* serialize to JSON. :hankey:
 as advertised. Implementation is deceptively simple though, don't way you weren't
 warned.
 
-No `IAtom` interface or anything yet, since [no type support](https://github.com/memoways/shin/issues/9)
-yet.
-
 ## Special forms
 
 We've got:
@@ -427,10 +425,8 @@ We've got:
   - do
   - quote
   - def, defn, defmacro
-
-No [short form anonymous fns](https://github.com/memoways/shin/issues/21) yet.
-
-No [loop/recur](https://github.com/memoways/shin/issues/8) yet.
+  - closures, e.g. `#()`
+  - loop/recur
 
 There is no try (yet).
 

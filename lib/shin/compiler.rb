@@ -286,6 +286,7 @@ module Shin
         next unless node.list?
         first = node.inner.first
         if first.sym? && first.value.start_with?("def")
+          raise "Invalid def: #{node}" unless node.inner.length >= 2
           name = node.inner[1].value
           defs[name] = node
         end

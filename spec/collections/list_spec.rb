@@ -18,7 +18,7 @@ RSpec.describe "Language", "list" do
     expect(%Q{ (print (count '(1 2 3))) }).to have_output("3")
   end
 
-  %w(list seq collection sequential counted reduceable seqable).each do |property|
+  %w(list seq coll sequential counted reduceable seqable).each do |property|
     it "satisfies #{property}?" do
       expect("(print (#{property}? '(1 2 3)))").to have_output("true")
     end

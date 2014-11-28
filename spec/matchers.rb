@@ -60,7 +60,21 @@ RSpec::Matchers.define :have_output do |expected_output|
   end
 
   failure_message do |actual|
-    "expected output '#{expected_output}', got '#{output.join(" ")}', JS code:\n#{code}"
+    case expected_output
+    when Array
+      s = "mismatches:\n"
+      l1 = expected_output.length
+      l2 = output.length
+      s << " - wrong length, (expected #{l1}, got #{l2})\n" unless l1 == l2
+      (0...[l1, l2].min).each do |i|
+        e = expected_output[i]
+        g = output[i]
+        s << " - at #{i}, expected #{e}, got #{g}\n" unless e == g
+      end
+      s
+    else
+      "expected output '#{expected_output}', got '#{output.join(" ")}'"
+    end + (ENV['MATCHERS_DEBUG'] ? ", JS code:\n#{code}" : "")
   end
 end
 

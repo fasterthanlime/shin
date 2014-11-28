@@ -131,7 +131,10 @@ module Shin
     def << (candidate)
       case mode
       when :expression
-        if Statement === candidate
+        case candidate
+        when ThrowStatement
+          # it's okay, there's no going back anyway...
+        when Statement
           raise "[expr mode] Expected expression, got statement:\n\n #{candidate}"
         end
         into << candidate
@@ -194,6 +197,7 @@ module Shin
     attr_reader :sentinel
 
     def initialize(bindings, sentinel)
+      raise "Anchor bindings must be a vector" unless Hamster::Vector === bindings
       @bindings = bindings
       @sentinel = sentinel
     end

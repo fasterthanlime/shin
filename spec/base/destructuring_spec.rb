@@ -5,7 +5,7 @@ RSpec.describe "Language", "destructuring" do
       expect(%Q{
              (let [r1     [1 2 3]
                    [& r2] [1 2 3]]
-               (print (= r1 r2)))
+               (print (= (seq r1) (seq r2))))
              }).to have_output("true")
     end
 
@@ -127,9 +127,7 @@ RSpec.describe "Language", "destructuring" do
              (let [{j :j, k :k, i :i, [r s & t :as v] :ivec, :or {i 12 j 13}}
                    {:j 15 :k 16 :ivec [22 23 24 25]}]
                      (print (pr-str [i j k r s t v])))
-             }).to have_output("[12 15 16 22 23 [24 25] [22 23 24 25]]")
-      # FIXME: the actual string output should be '... (24 25) ...' - but it isn't,
-      # because seq isn't doing the right thing.
+             }).to have_output("[12 15 16 22 23 (24 25) [22 23 24 25]]")
     end
   end
 end
