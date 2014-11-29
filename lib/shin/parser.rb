@@ -32,6 +32,13 @@ module Shin
       Closure => ')',
     }
 
+    NAMED_ESCAPES = {
+      "newline"   => "\n",
+      "return"    => "\r",
+      "tab"       => "\t",
+      "backspace" => "\b",
+    }
+
     def self.parse(source)
       # parse is a no-op if source is not a String.
       # it might be a piece of already-parsed AST.
@@ -124,6 +131,9 @@ module Shin
             state = state << :number
             heap  = heap  << token   << ""
             redo
+          when "\\"
+            state = state << :named_escape
+            heap  = heap  << token   << ""
           else
             ser!("Unexpected char: #{c}")
           end
@@ -152,6 +162,20 @@ module Shin
             state = state << :regexp
           else
             ser!("Unexpected char after #: #{c}")
+          end
+        when :named_escape
+          case c
+          when /[a-z]/
+            heap.last << c
+          else
+            value = heap.last; heap = heap.pop
+            tok   = heap.last; heap = heap.pop
+            state = state.pop
+
+            real_value = NAMED_ESCAPES[value]
+            ser!("Unknown escape: \\#{value}") unless real_value
+            heap.last << String.new(tok.extend!(@pos), real_value)
+            redo
           end
         when :escape_sequence
           heap.last << c
