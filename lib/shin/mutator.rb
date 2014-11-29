@@ -42,18 +42,6 @@ module Shin
     protected
 
     def expand(node)
-      if Sequence === node
-        inner = node.inner
-        inner.each_with_index do |child, i|
-          poster_child = expand(child)
-          inner = inner.set(i, poster_child) if poster_child != child
-        end
-
-        if inner != node.inner
-          node = node.class.new(node.token, inner)
-        end
-      end
-
       case node
       when List
         first = node.inner.first
@@ -72,8 +60,20 @@ module Shin
             debug "; Original AST:\n#{invoc}\n\n" if DEBUG
             expanded_ast = eval_macro_module(eval_mod)
 
-            return expand(expanded_ast)
+            node = expand(expanded_ast)
           end
+        end
+      end
+
+      if Sequence === node
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = expand(child)
+          inner = inner.set(i, poster_child) if poster_child != child
+        end
+
+        if inner != node.inner
+          node = node.class.new(node.token, inner)
         end
       end
 
