@@ -5,7 +5,7 @@ module Shin
       SYM_START_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|]/
       SYM_INNER_REGEXP = /[A-Za-z\-_\*'\+\/\?!\$%&<>=\.\|#\$0-9]/
 
-      MANGLE_REGEXP   = /[\-\*\+\/\?!\$%&<>=\.\|]/
+      MANGLE_REGEXP   = /[\-\*\+\/\?!\$%&<>=\.\|']/
       UNMANGLE_REGEXP = /\$[\$_a-z]/
 
       MANGLE_MAP = {
