@@ -128,11 +128,11 @@ module Shin
 
     def add_core_requires(mod)
       unless mod.core? && !mod.macro?
-        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'core')
+        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'clojure.core')
       end
 
       unless mod.core? && mod.macro?
-        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'core', :macro => true)
+        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'clojure.core', :macro => true)
       end
     end
 
