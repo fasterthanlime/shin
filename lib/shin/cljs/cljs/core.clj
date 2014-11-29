@@ -39,7 +39,7 @@
   ([cond]
    (assert cond "Assert failed"))
   ([cond message]
-   `(when-not ~cond (throw (js/Error. message)))))
+   `(when-not ~cond (throw (js/Error. ~message)))))
 
 (defmacro exists? [something]
   `(*js-bop != "undefined" (*js-uop typeof ~something)))
