@@ -280,7 +280,8 @@ module Shin
       end
 
       nodes.map! do |node|
-        post_parse(node)
+        tmp = handle_auto_gensym(node)
+        desugar_closure(tmp)
       end
 
       return nodes
@@ -305,14 +306,17 @@ module Shin
     end
 
     # Post-parsing logic (auto-gensym, etc.)
+    # TODO: break out into separate files
+    
+    ## Auto-gensym
 
-    def post_parse(node, trail = [])
+    def handle_auto_gensym(node, trail = [])
       case node
       when Sequence
         _trail = trail + [node]
         inner = node.inner
         inner.each_with_index do |child, i|
-          poster_child = post_parse(child, _trail)
+          poster_child = handle_auto_gensym(child, _trail)
           inner = inner.set(i, poster_child) if poster_child != child
         end
 
@@ -325,7 +329,7 @@ module Shin
         candidate = LetCandidate.new(node)
         _trail = trail + [node, candidate]
 
-        inner = post_parse(node.inner, _trail)
+        inner = handle_auto_gensym(node.inner, _trail)
 
         if inner != node.inner
           node = SyntaxQuote.new(node.token, inner)
@@ -364,6 +368,93 @@ module Shin
         node
       end
     end
+
+    ## Closure desugaring
+
+    def desugar_closure(node)
+      case node
+      when Sequence
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = desugar_closure(child)
+          inner = inner.set(i, poster_child) if poster_child != child
+        end
+
+        if inner == node.inner
+          node
+        else
+          node.class.new(node.token, inner)
+        end
+      when SyntaxQuote
+        inner = desugar_closure(node.inner)
+
+        if inner == node.inner
+          node
+        else
+          SyntaxQuote.new(node.token, inner)
+        end
+      when Closure
+        t = node.token
+        arg_map = {}
+        body = desugar_closure_inner(node.inner, arg_map)
+
+        num_args = arg_map.keys.max || 0
+        args = Hamster.vector()
+        (0..num_args).map do |index|
+          name = arg_map[index] || "aarg#{Shin::Mutator.fresh_sym}#{index}-"
+          args <<= Shin::AST::Symbol.new(t, name)
+        end
+        arg_vec = Vector.new(t, args)
+        List.new(t, Hamster.vector(Symbol.new(t, "fn"), arg_vec, body))
+      else
+        node
+      end
+    end
+
+    def desugar_closure_inner(node, arg_map)
+      case node
+      when Sequence
+        inner = node.inner
+        inner.each_with_index do |child, i|
+          poster_child = desugar_closure_inner(child, arg_map)
+          inner = inner.set(i, poster_child) if poster_child != child
+        end
+
+        if inner == node.inner
+          node
+        else
+          node.class.new(node.token, inner)
+        end
+      when Symbol
+        if node.value.start_with?('%')
+          index = closure_arg_to_index(node)
+          name = arg_map[index]
+          unless name
+            name = arg_map[index] = "aarg#{Shin::Mutator.fresh_sym}#{index}-"
+          end
+          return Symbol.new(node.token, name)
+        end
+        node
+      when Closure
+        ser!("Nested closures are forbidden", node.token)
+      else
+        node
+      end
+    end
+
+    def closure_arg_to_index(sym)
+      name = sym.value
+      case name
+      when '%'  then 0
+      when '%%' then 1
+      else
+        num = name[1..-1]
+        ser!("Invalid closure argument: #{name}", sym.token) unless num =~ /^[0-9]+$/
+        num.to_i - 1
+      end
+    end
+
+
   end
 
   class LetCandidate
@@ -407,4 +498,5 @@ module Shin
     end
 
   end
+
 end

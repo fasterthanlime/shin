@@ -19,5 +19,11 @@ RSpec.describe "Language", "closure" do
       expect(%Q{ (#(print #(str "Hello world"))) }).to have_output("Hello")
     end.to raise_error(Shin::SyntaxError)
   end
+
+  it "raises error when invalid closure argument" do
+    expect do
+      expect(%Q{ (#(print %n) "Hi") }).to have_output("Hello")
+    end.to raise_error(Shin::SyntaxError)
+  end
 end
 

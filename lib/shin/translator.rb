@@ -707,64 +707,6 @@ module Shin
       @builder << make_decl(lhs, rhs)
     end
 
-    def translate_closure(closure)
-      t = closure.token
-      arg_map = {}
-      body = desugar_closure_inner(closure.inner, arg_map)
-
-      num_args = arg_map.keys.max || 0
-      args = Hamster.vector()
-      (0..num_args).map do |index|
-        name = arg_map[index] || fresh("aarg#{index}-")
-        args <<= Shin::AST::Symbol.new(t, name)
-      end
-      @builder << translate_fn_inner(Shin::AST::Vector.new(t, args), [body])
-      nil
-    end
-
-    def desugar_closure_inner(node, arg_map)
-      case node
-      when Sequence
-        inner = node.inner
-        inner.each_with_index do |child, i|
-          poster_child = desugar_closure_inner(child, arg_map)
-          inner = inner.set(i, poster_child) if poster_child != child
-        end
-
-        if inner == node.inner
-          node
-        else
-          node.class.new(node.token, inner)
-        end
-      when Symbol
-        if node.value.start_with?('%')
-          index = closure_arg_to_index(node)
-          name = arg_map[index]
-          unless name
-            name = arg_map[index] = fresh("aarg#{index}-")
-          end
-          return Shin::AST::Symbol.new(node.token, name)
-        end
-        node
-      when Closure
-        ser!("Nested closures are forbidden", node)
-      else
-        node
-      end
-    end
-
-    def closure_arg_to_index(sym)
-      name = sym.value
-      case name
-      when '%'  then 0
-      when '%%' then 1
-      else
-        num = name[1..-1]
-        ser!("Invalid closure argument: #{name}", sym) unless num =~ /^[0-9]+$/
-        num.to_i - 1
-      end
-    end
-
     FN_PATTERN = ":sym? [:expr*] :expr*".freeze
 
     def translate_fn(list)
@@ -1100,7 +1042,7 @@ module Shin
         @builder << call
         nil
       when Shin::AST::Closure
-        translate_closure(expr)
+        ser!("Closures are supposed to be gone by the time we reach the translator", expr)
       else
         ser!("Unknown expr form #{expr}", expr)
       end
