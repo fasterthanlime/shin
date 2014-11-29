@@ -22,5 +22,12 @@ RSpec.describe "clojure.string" do
            }).to have_output("\t \n  halp")
   end
 
+  it "trim-newline" do
+    expect(%Q{
+           (ns test (:require [clojure.string :as string]))
+           (print (string/trim-newline "kalamazoo\n"))
+           }).to have_output("kalamazoo")
+  end
+
 end
 
