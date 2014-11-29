@@ -23,6 +23,7 @@ module Shin
         '=' => '$l',
         '.' => '$d',
         '|' => '$i',
+        "'" => '$u',
       }
       UNMANGLE_MAP = MANGLE_MAP.invert
       raise "Mangle map has overlaps (#{MANGLE_MAP.count} vs #{UNMANGLE_MAP.count})" unless MANGLE_MAP.count == UNMANGLE_MAP.count
