@@ -222,7 +222,7 @@ Shin ships with some pure JS files:
 - `hamt.js` is [hamt+][], for data structures
 - `escodegen.js` is [escodegen][], only there for compiler use
 
-And of course, `shin.core.cljs` and `shin.core.clj` (for macros),
+And of course, `cljs/core.cljs` and `cljs/core.clj` (for macros),
 which are required (with :refer :all) into all modules by default.
 
 (`:refer-clojure` is not implemented yet, so no exclusion is possible.
@@ -310,7 +310,7 @@ When macro expansion is required:
 
 That means we actually invoke V8 during compilation, if macros are involved.
 Also, the order in which stuff is done is still kind of shady, especially
-considering `shin.core` is required (with `:refer :all`) everywhere by
+considering `cljs.core` is required (with `:refer :all`) everywhere by
 default. If macros break don't hit me!
 
 `gensym` manual calling is supported, however the compiler believes in big

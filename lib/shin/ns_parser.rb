@@ -112,11 +112,11 @@ module Shin
 
     def add_core_requires(mod)
       unless mod.core? && !mod.macro?
-        mod.requires << Require.new('shin.core', :refer => :all, :as => 'shin')
+        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'core')
       end
 
       unless mod.core? && mod.macro?
-        mod.requires << Require.new('shin.core', :refer => :all, :as => 'shin', :macro => true)
+        mod.requires << Require.new('cljs.core', :refer => :all, :as => 'core', :macro => true)
       end
     end
 

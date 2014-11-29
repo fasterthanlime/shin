@@ -274,7 +274,7 @@ module Shin
     end
 
     def core?
-      @ns == 'shin.core'
+      @ns == 'cljs.core'
     end
 
     def defs

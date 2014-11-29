@@ -1,4 +1,4 @@
-(ns shin.core)
+(ns cljs.core)
 
 (defmacro when [cond & body]
   `(if ~cond
