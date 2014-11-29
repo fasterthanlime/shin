@@ -103,19 +103,22 @@ module Shin
           case node
           when Shin::AST::List
             first = node.inner.first
-            if first
-              case
-              when first.sym?("def")
-                translate_def(node.inner.drop 1)
-              when first.sym?("defn")
-                translate_defn(node.inner.drop 1)
-              when first.sym?("defmacro")
+            if first && first.sym?
+              rest = node.inner.drop(1)
+              case first.value
+              when "def"
+                translate_def(rest)
+              when "defn"
+                translate_defn(rest)
+              when "defn-"
+                translate_defn(rest, :export => false)
+              when "defmacro"
                 ser!("Macro in a non-macro module", node) unless @mod.macro?
-                translate_defn(node.inner.drop 1)
-              when first.sym?("defprotocol")
-                translate_defprotocol(node.inner.drop(1))
-              when first.sym?("deftype")
-                translate_deftype(node.inner.drop 1)
+                translate_defn(rest)
+              when "defprotocol"
+                translate_defprotocol(rest)
+              when "deftype"
+                translate_deftype(rest)
               else
                 tr(node)
               end
@@ -682,7 +685,7 @@ module Shin
     DEFN_PATTERN       = ":sym :str? [:expr*] :expr*".freeze
     DEFN_MULTI_PATTERN = ":sym :str? :list+".freeze
 
-    def translate_defn(list)
+    def translate_defn(list, export: true)
       f = nil
       _name = nil
 
@@ -694,9 +697,14 @@ module Shin
         f = translate_fn_inner_multi(variants, :name => name.value)
       end or ser!("Invalid defn form", list)
 
-      export = make_ident("exports/#{_name}")
-      ass = AssignmentExpression.new(export, f)
-      @builder << make_decl(make_ident(_name.value), ass)
+      lhs = make_ident(_name.value)
+      rhs = if export
+              ex = make_ident("exports/#{_name}")
+              AssignmentExpression.new(ex, f)
+            else
+              f
+            end
+      @builder << make_decl(lhs, rhs)
     end
 
     def translate_closure(closure)
