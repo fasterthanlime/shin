@@ -35,8 +35,11 @@
   `(let [~x ~y]
      (if ~x ~@body)))
 
-(defmacro assert [cond message]
-  `(when-not ~cond (throw (js/Error. message))))
+(defmacro assert
+  ([cond]
+   (assert cond "Assert failed"))
+  ([cond message]
+   `(when-not ~cond (throw (js/Error. message)))))
 
 (defmacro exists? [something]
   `(*js-bop != "undefined" (*js-uop typeof ~something)))
