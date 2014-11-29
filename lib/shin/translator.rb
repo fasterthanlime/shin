@@ -1077,7 +1077,7 @@ module Shin
           translate_listform(expr)
         end
       when Shin::AST::Unquote
-        ser!("Invalid usage of unquoting outside of a quote", expr) unless @quoting
+        ser!("Invalid usage of unquoting outside of a quote: #{expr}", expr) unless @quoting
         call = CallExpression.new(make_ident('--unquote'))
 
         @builder.into(call, :expression) do
@@ -1229,9 +1229,16 @@ module Shin
           property, val = rest
           @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
         when "aset"
-          object, property, val = rest
-          mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
-          @builder << AssignmentExpression.new(mexpr, as_expr(val))
+          object = rest.first
+          props = rest.drop(1)
+
+          curr = as_expr(object)
+          while props.size > 1
+            prop = props.first; props = props.drop(1)
+            curr = MemberExpression.new(curr, as_expr(prop), true)
+          end
+          val = props.first
+          @builder << AssignmentExpression.new(curr, as_expr(val))
         when "aget"
           object = rest.first
           props = rest.drop(1)

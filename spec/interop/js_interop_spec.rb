@@ -51,6 +51,14 @@ RSpec.describe "Language", "js interop" do
             (print (aget dude "name") (aget dude "job"))
              }).to have_output("buddy holly singer")
     end
+
+    it "works nested" do
+      expect(%Q{
+             (let [m {$ "dude" {$ "name" [$ "Joe" "Swanson" ]}}]
+               (aset m "dude" "name" 0 "Nina")
+               (print (aget m "dude" "name" 0)))
+             }).to have_output("Nina")
+    end
   end
 end
 
