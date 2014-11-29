@@ -924,8 +924,13 @@ module Shin
         end
         nil
       when Shin::AST::RegExp
-        lit = make_literal(expr.value)
-        @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
+        if @quoting
+          call = CallExpression.new(make_ident('--quoted-re'))
+          @builder.into(call, :expression) { tr(expr.inner) }
+        else
+          lit = make_literal(expr.value)
+          @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
+        end
         nil
       when Shin::AST::Literal
         @builder << make_literal(expr.value)
