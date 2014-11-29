@@ -909,7 +909,7 @@ module Shin
       return fn
     end
 
-    def translate_callchain(rest)
+    def translate_chain(rest)
       curr = rest.first
       forms = rest.drop(1)
 
@@ -917,10 +917,18 @@ module Shin
         form = forms.first
         forms = forms.drop(1)
 
-        ser!("Expected list in call chain", form) unless form.list?
-
-        dot = Shin::AST::Symbol.new(form.token, ".")
-        curr = Shin::AST::List.new(form.token, form.inner.insert(1, curr).insert(0, dot))
+        case form
+        when Shin::AST::List
+          dot = Shin::AST::Symbol.new(form.token, ".")
+          curr = Shin::AST::List.new(form.token, form.inner.insert(1, curr).insert(0, dot))
+        when Shin::AST::Symbol
+          ser!("Expected access in chain") unless form.value.start_with?("-")
+          dod = Shin::AST::Symbol.new(form.token, ".-")
+          prop = Shin::AST::Symbol.new(form.token, form.value[1..-1])
+          curr = Shin::AST::List.new(form.token, Hamster.vector(dod, prop, curr))
+        else
+          ser!("Expected list or access in chain", form)
+        end
       end
 
       tr(curr)
@@ -1097,7 +1105,7 @@ module Shin
           object = as_expr(rest[0])
           @builder << MemberExpression.new(object, property, false)
         when name == '..'
-          translate_callchain(rest)
+          translate_chain(rest)
         when name.start_with?('.')
           # method call
           propname = name[1..-1]
