@@ -235,6 +235,9 @@ an even more sizable portion remains untouched. Hopefully the balance will
 tip eventually, but with 611 vars in `clojure.core` at the time of this
 writing, my money's on Rich.
 
+The full `clojure.string` package has been adapted from ClojureScript and
+is covered by specs.
+
 ## Specs
 
 RSpec 3.x, ran [on travis-ci][travis].
