@@ -1,5 +1,22 @@
 (ns cljs.core)
 
+(defmacro ->
+  ([x]
+   x)
+  ([x & forms]
+   (let [[y & ys] forms
+         s        (if (list? y) y (list y))
+         [b & a] s]
+     `(-> (~b ~x ~@a) ~@ys))))
+
+(defmacro ->>
+  ([x]
+   x)
+  ([x & forms]
+   (let [[y & ys] forms
+         s        (if (list? y) y (list y))]
+     `(->> (~@s ~x) ~@ys))))
+
 (defmacro when [cond & body]
   `(if ~cond
      (do ~@body)))

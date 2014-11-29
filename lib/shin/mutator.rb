@@ -204,13 +204,17 @@ module Shin
         inner.each_with_index do |child, i|
           poster_child = dequote(child)
           if poster_child != child
-            if Hamster::Vector === poster_child
+            case poster_child
+            when Hamster::Vector
               inner = inner.delete_at(i + offset)
               offset -= 1
               poster_child.each do |el|
                 offset += 1
                 inner = inner.insert(i + offset, el)
               end
+            when nil
+              inner = inner.delete_at(i + offset)
+              offset -= 1
             else
               inner = inner.set(i + offset, poster_child)
             end
@@ -226,11 +230,15 @@ module Shin
         if Deref === node.inner
           deref = node.inner
 
-          unless Sequence === deref.inner
+          case
+          when Sequence === deref.inner
+            deref.inner.inner.map { |x| dequote(x) }
+          when deref.inner.sym?("nil")
+            nil
+          else
             ser!("Cannot use splicing on non-list form #{deref.inner}")
           end
 
-          deref.inner.inner.map { |x| dequote(x) }
         else
           dequote(node.inner)
         end

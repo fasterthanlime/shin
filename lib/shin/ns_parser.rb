@@ -105,6 +105,22 @@ module Shin
               raise "can only refer symbols: #{arg}" unless arg.sym?
               req.refer << arg.value
             end
+          when 'refer-macros'
+            mreq = Require.new(req.ns, :macro => true)
+            mod.requires << mreq
+            case
+            when Shin::AST::Sequence === args
+              args.inner.each do |arg|
+                raise "can only refer symbols: #{arg}" unless arg.sym?
+                mreq.refer << arg.value
+              end
+            when args.kw?('all')
+              mreq.refer = :all
+            else
+              raise "invalid refer-macros arg: #{args}"
+            end
+          else
+            raise "Unknown directive: #{directive.value}"
           end
         end 
       end

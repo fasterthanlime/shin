@@ -1,7 +1,7 @@
 
 RSpec.describe "Language", "threading" do
 
-  it "has working ->" do
+  it "has working -> (threadf)" do
     expect(%Q{
            (print (-> "a b c d"
                       .toUpperCase
@@ -11,7 +11,7 @@ RSpec.describe "Language", "threading" do
           }).to have_output("X")
   end
 
-  it "has working ->>" do
+  it "has working ->> (threadl)" do
     expect(%Q{
            (print (->> 2
                       (/ 10)

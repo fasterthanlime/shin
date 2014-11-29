@@ -861,39 +861,6 @@ module Shin
       return fn
     end
 
-    def translate_threadf(rest)
-      curr = rest.first
-      forms = rest.drop(1)
-
-      until forms.empty?
-        form = forms.first; forms = forms.drop(1)
-        if form.list?
-          curr = Shin::AST::List.new(form.token, form.inner.insert(1, curr))
-        else
-          curr = Shin::AST::List.new(form.token, Hamster.vector(form, curr))
-        end
-      end
-
-      tr(curr)
-    end
-
-    def translate_threadl(rest)
-      curr = rest.first
-      forms = rest.drop(1)
-
-      until forms.empty?
-        form = forms.first; forms = forms.drop(1)
-        if form.list?
-          len = form.inner.length
-          curr = Shin::AST::List.new(form.token, form.inner.insert(len, curr))
-        else
-          curr = Shin::AST::List.new(form.token, Hamster.vector(curr, form))
-        end
-      end
-
-      tr(curr)
-    end
-
     def translate_chain(rest)
       curr = rest.first
       forms = rest.drop(1)
@@ -1213,10 +1180,6 @@ module Shin
         when "*js-bop"
           op, l, r = rest
           @builder << BinaryExpression.new(op.value, as_expr(l), as_expr(r))
-        when "->"
-          translate_threadf(rest)
-        when "->>"
-          translate_threadl(rest)
         else
           handled = false
         end
