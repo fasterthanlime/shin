@@ -901,6 +901,23 @@ module Shin
       return fn
     end
 
+    def translate_callchain(rest)
+      curr = rest.first
+      forms = rest.drop(1)
+
+      until forms.empty?
+        form = forms.first
+        forms = forms.drop(1)
+
+        ser!("Expected list in call chain", form) unless form.list?
+
+        dot = Shin::AST::Symbol.new(form.token, ".")
+        curr = Shin::AST::List.new(form.token, form.inner.insert(1, curr).insert(0, dot))
+      end
+
+      tr(curr)
+    end
+
     #########################
     # Weapons of mass translation
     #########################
@@ -1060,17 +1077,35 @@ module Shin
         case
         when name.start_with?('.-')
           # field access
-          property = Identifier.new(name[2..-1])
-          object = as_expr(list[1])
+          propname = name[2..-1]
+          if propname.empty?
+            sym = rest.first
+            ser!("Expected symbol", sym) unless sym.sym?
+            propname = sym.value
+            rest = rest.drop(1)
+          end
+
+          property = Identifier.new(propname)
+          object = as_expr(rest[0])
           @builder << MemberExpression.new(object, property, false)
+        when name == '..'
+          translate_callchain(rest)
         when name.start_with?('.')
           # method call
-          property = Identifier.new(name[1..-1])
-          object = as_expr(list[1])
+          propname = name[1..-1]
+          if propname.empty?
+            sym = rest.first
+            ser!("Expected symbol", sym) unless sym.sym?
+            propname = sym.value
+            rest = rest.drop(1)
+          end
+
+          property = Identifier.new(propname)
+          object = as_expr(rest[0])
           mexp = MemberExpression.new(object, property, false)
 
           @builder.into!(CallExpression.new(mexp)) do
-            treach(list.drop(2))
+            treach(rest.drop(1))
           end
         when name.end_with?('.')
           # instanciation
