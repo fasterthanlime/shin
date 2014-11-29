@@ -39,6 +39,17 @@ module Shin
       "backspace" => "\b",
     }
 
+    ESCAPES = {
+      "\\"  => "\\",
+      "\""  => "\"",
+      "a"   => "\a",
+      "b"   => "\b",
+      "r"   => "\r",
+      "n"   => "\n",
+      "s"   => "\s",
+      "t"   => "\t",
+    }
+
     def self.parse(source)
       # parse is a no-op if source is not a String.
       # it might be a piece of already-parsed AST.
@@ -173,12 +184,17 @@ module Shin
             state = state.pop
 
             real_value = NAMED_ESCAPES[value]
-            ser!("Unknown escape: \\#{value}") unless real_value
+            ser!("Unknown named escape: \\#{value}") unless real_value
             heap.last << String.new(tok.extend!(@pos), real_value)
             redo
           end
         when :escape_sequence
-          heap.last << c
+          real_value = ESCAPES[c]
+          if real_value
+            heap.last << real_value
+          else
+            heap.last << "\\#{c}"
+          end
           state = state.pop
         when :string, :regexp
           case c

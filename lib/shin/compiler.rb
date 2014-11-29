@@ -59,7 +59,7 @@ module Shin
       puts "Mutating\t#{mutate_time} (skips: #{mutate_skips.join(" ")})" if @opts[:profile]
 
       if opts[:ast2]
-        puts Oj.dump(main.ast2, :mode => :object, :indent => 2)
+        puts main.ast2.join("\n")
         exit 0
       end
 
@@ -76,7 +76,7 @@ module Shin
       puts "Translating\t#{translate_time} (skips: #{translate_skips.join(" ")})" if @opts[:profile]
 
       if opts[:jst]
-        puts Oj.dump(main.jst, :mode => :compat, :indent => 2)
+        puts Oj.dump(main.jst, :mode => :object, :indent => 2)
         exit 0
       end
 
@@ -145,7 +145,7 @@ module Shin
       mod.ast = parser.parse
 
       if opts[:ast]
-        puts Oj.dump(main.ast2, :mode => :object, :indent => 2)
+        puts mod.ast.join("\n")
         exit 0
       end
 
