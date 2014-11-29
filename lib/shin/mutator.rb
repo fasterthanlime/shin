@@ -29,12 +29,6 @@ module Shin
         return
       end
 
-      if @mod.macro?
-        # FIXME: this is probably wrong? or is it?
-        mod.ast2 = mod.ast
-        return
-      end
-
       debug "Mutating #{mod.slug}"
       mod.mutating = true
       mod.ast2 = mod.ast.map { |x| expand(x) }
