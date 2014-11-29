@@ -162,7 +162,12 @@ module Shin
       js.context['yield'] = lambda do |_, ast_back|
         result = ast_back
       end
-      js.load(eval_mod.code, :inline => true)
+      begin
+        js.load(eval_mod.code, :inline => true)
+      rescue => e
+        puts "While trying to load:\n\n#{eval_mod.code}\n\n"
+        raise e
+      end
 
       res_parser = Shin::Parser.new(result.to_s)
       expanded_ast = res_parser.parse.first

@@ -1106,7 +1106,7 @@ module Shin
           @builder << MemberExpression.new(object, property, false)
         when name == '..'
           translate_chain(rest)
-        when name.start_with?('.')
+        when name =~ /^[.][A-Za-z_]*$/
           # method call
           propname = name[1..-1]
           if propname.empty?
