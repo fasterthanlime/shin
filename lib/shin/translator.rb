@@ -108,6 +108,8 @@ module Shin
               case first.value
               when "def"
                 translate_def(rest)
+              when "declare"
+                translate_declare(rest)
               when "defn"
                 translate_defn(rest)
               when "defn-"
@@ -655,30 +657,38 @@ module Shin
       end or ser!("Invalid deftype form", list)
     end
 
+    def translate_declare(list)
+      list.each do |el|
+        next if el.meta?
+        ser!("Expected symbol in declare", el) unless el.sym?
+        ex = make_ident("exports/#{el.value}")
+        ass = AssignmentExpression.new(ex, Identifier.new("null"))
+        @builder << make_decl(make_ident(el.value), ass)
+      end
+    end
+
     DEF_PATTERN             = ":sym :expr*".freeze
     DEF_WITH_DOC_PATTERN    = ":str :expr".freeze
     DEF_WITHOUT_DOC_PATTERN = ":expr".freeze
 
     def translate_def(list)
       matches?(list, DEF_PATTERN) do |name, rest|
-        decl = VariableDeclaration.new
-        dtor = VariableDeclarator.new(make_ident(name.value))
+        init = nil
 
         case
         when matches?(rest, DEF_WITH_DOC_PATTERN)
           doc, expr = rest
-          dtor.init = as_expr(expr)
+          init = as_expr(expr)
         when matches?(rest, DEF_WITHOUT_DOC_PATTERN)
           expr = rest.first
-          dtor.init = as_expr(expr)
+          init = as_expr(expr)
         else
           ser!("Invalid def form", list)
         end
 
         ex = make_ident("exports/#{name}")
-        dtor.init = AssignmentExpression.new(ex, dtor.init)
-        decl.declarations << dtor
-        @builder << decl
+        ass = AssignmentExpression.new(ex, init)
+        @builder << make_decl(make_ident(name.value), ass)
       end or ser!("Invalid def form", list)
     end
 
