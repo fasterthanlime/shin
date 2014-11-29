@@ -958,7 +958,7 @@ module Shin
         nil
       when Shin::AST::RegExp
         lit = make_literal(expr.value)
-        @builder << NewExpression.new(make_ident("RegExp"), [lit])
+        @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
         nil
       when Shin::AST::Literal
         @builder << make_literal(expr.value)
@@ -1282,7 +1282,12 @@ module Shin
       matches = /^([^\/]+)[\/](.*)?$/.match(id)
       if matches
         ns, name = matches.to_a.drop(1)
-        MemberExpression.new(make_ident(ns), make_ident(name), false)
+        case ns
+        when "js"
+          Identifier.new(name)
+        else
+          MemberExpression.new(make_ident(ns), make_ident(name), false)
+        end
       else
         aka = @builder.lookup(id)
         if aka
