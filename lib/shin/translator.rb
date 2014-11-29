@@ -1193,8 +1193,15 @@ module Shin
           mexpr = MemberExpression.new(as_expr(object), as_expr(property), true)
           @builder << AssignmentExpression.new(mexpr, as_expr(val))
         when "aget"
-          object, property, val = rest
-          @builder << MemberExpression.new(as_expr(object), as_expr(property), true)
+          object = rest.first
+          props = rest.drop(1)
+
+          curr = as_expr(object)
+          until props.empty?
+            prop = props.first; props = props.drop(1)
+            curr = MemberExpression.new(curr, as_expr(prop), true)
+          end
+          @builder << curr
         when "instance?"
           r, l = rest
           @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
