@@ -1123,7 +1123,7 @@ module Shin
 
         # special forms
         case name
-        when "<", ">", "<=", ">="
+        when "<", ">", "<=", ">=", "==", "==="
           translate_comp(first, rest)
         when "and", "or"
           translate_logic(first, rest)
