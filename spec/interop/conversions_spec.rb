@@ -21,7 +21,11 @@ RSpec.describe "Language", "conversions" do
       expect(%Q{ (print (aget (clj->js ["one" "two" "three"]) 1)) }).to have_output("two")
     end
 
-    it "works on maps" do
+    it "works on maps (string keys)" do
+      expect(%Q{ (print (aget (clj->js {"ruby" "Ruby" "cpp" "C++"}) "ruby")) }).to have_output("Ruby")
+    end
+
+    it "works on maps (non-string keys)" do
       expect(%Q{ (print (aget (clj->js {"ruby" "Ruby" "cpp" "C++"}) "ruby")) }).to have_output("Ruby")
     end
   end

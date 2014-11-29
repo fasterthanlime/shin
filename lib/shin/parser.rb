@@ -158,7 +158,7 @@ module Shin
           state = state.pop
         when :string, :regexp
           case c
-          when '\\'
+          when "\\"
             state = state << :escape_sequence
           when '"'
             value = heap.last; heap = heap.pop
