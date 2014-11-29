@@ -206,9 +206,10 @@ module Shin
           if poster_child != child
             if Hamster::Vector === poster_child
               inner = inner.delete_at(i + offset)
+              offset -= 1
               poster_child.each do |el|
-                inner = inner.insert(i + offset, el)
                 offset += 1
+                inner = inner.insert(i + offset, el)
               end
             else
               inner = inner.set(i + offset, poster_child)
