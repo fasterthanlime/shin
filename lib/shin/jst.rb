@@ -384,6 +384,38 @@ module Shin
         @argument = argument
       end
     end
+
+    class TryStatement < Statement
+      attr_reader :block
+      attr_reader :handlers
+      attr_accessor :finalizer
+
+      def initialize
+        @type = "TryStatement"
+        @block = BlockStatement.new
+        @handlers = []
+        @finalizer = nil
+      end
+
+      def << (stat)
+        @block << stat
+      end
+    end
+
+    class CatchClause < Node
+      attr_reader :param
+      attr_reader :body
+
+      def initialize(param)
+        @type = "CatchClause"
+        @param = param
+        @body = BlockStatement.new
+      end
+
+      def << (stat)
+        @body << stat
+      end
+    end
   end
 end
 

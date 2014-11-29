@@ -412,6 +412,89 @@ module Shin
       nil
     end
 
+    def is_catch?(node)
+      node.list? && node.inner.first && node.inner.first.sym?("catch")
+    end
+
+    def translate_try(list)
+      exprs   = list.take_while { |x| !is_catch?(x) }
+      clauses = list.drop_while { |x| !is_catch?(x) }
+      ser!("All 'catch' clauses must be at the end of a try form.", list) unless clauses.all? { |x| is_catch?(x) }
+
+      # TODO: support finally
+      # TODO: support expression mode
+      
+      mode = @builder.mode
+      support = case mode
+                when :expression
+                  FunctionExpression.new
+                when :statement, :return
+                  BlockStatement.new
+                else
+                  raise "try in unknown mode: #{mode}"
+                end
+
+      trie = TryStatement.new
+      case mode
+      when :expression, :return
+        trbody(exprs, trie.block)
+      when :statement
+        @builder.into(trie.block, :statement) do
+          treach(exprs)
+        end
+      end
+
+      exarg = Identifier.new(fresh('ex'))
+      pitch = CatchClause.new(exarg)
+      trie.handlers << pitch
+
+      t = list.first.token
+      exsym = Shin::AST::Symbol.new(t, exarg.name)
+      condp_sym = Shin::AST::Symbol.new(t, "condp")
+      inst_sym = Shin::AST::Symbol.new(t, "instance?")
+      condp_vec = Hamster.vector(condp_sym, inst_sym, exsym)
+
+      clauses.each do |clause|
+        t = clause.token
+
+        args = clause.inner.drop(1)
+        etype = args.first; args = args.drop(1)
+        param = args.first; args = args.drop(1)
+        cbody = args.first
+
+        condp_vec <<= etype
+
+        binds_vec = Hamster.vector(param, exsym)
+        let_binds = Shin::AST::Vector.new(t, binds_vec)
+
+        let_sym = Shin::AST::Symbol.new(t, "let")
+        let_vec = Hamster.vector(let_sym, let_binds, cbody)
+        condp_vec <<= Shin::AST::List.new(t, let_vec)
+      end
+
+      condp = Shin::AST::List.new(t, condp_vec)
+
+      case mode
+      when :expression, :return
+        @builder.into(pitch, :return) do
+          tr(condp)
+        end
+      when :statement
+        @builder.into(pitch, :statement) do
+          tr(condp)
+        end
+      end
+
+      support << trie
+
+      case mode
+      when :expression
+        @builder << CallExpression.new(support)
+      else
+        @builder << support
+      end
+    end
+
     def translate_if(list)
       test, consequent, alternate = list
 
@@ -452,6 +535,9 @@ module Shin
 
     def translate_condp(list)
       # TODO: support :>>
+      
+      return if list.size <= 2
+
       form = list.first; list = list.drop(1)
       rhs  = list.first; list = list.drop(1)
       
@@ -1106,6 +1192,11 @@ module Shin
           translate_do(rest)
         when "if"
           translate_if(rest)
+        when "try"
+          translate_try(rest)
+        when "catch"
+          # it's normalled all handled in translate_try
+          ser!("Unexpected 'catch'", expr)
         when "cond"
           translate_cond(rest)
         when "condp"
@@ -1313,7 +1404,7 @@ module Shin
     end
 
     def fresh(prefix)
-      "$$__#{prefix}#{@seed += 1}"
+      "T__#{prefix}#{@seed += 1}"
     end
   end
 end

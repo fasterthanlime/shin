@@ -124,6 +124,7 @@ module Shin
       raise unless VALID_MODES.include?(mode)
 
       raise "Invalid recipient in vase, should respond to :<<" unless into.respond_to?(:<<)
+      raise "Nil recipient in vase!" if into.nil?
       @into = into
       @mode = mode
     end
