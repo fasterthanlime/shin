@@ -780,7 +780,7 @@ module Shin
                 matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
                   args_len = args.inner.length
                   fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
-                end or ser!("Invalid fn form", list)
+                end or ser!("Invalid fn form in deftype: #{limb}", list)
 
                 self_decl = VariableDeclaration.new
                 self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
@@ -911,7 +911,7 @@ module Shin
       matches?(list, FN_PATTERN) do |name, args, body|
         fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
         @builder << fn
-      end or ser!("Invalid fn form", list)
+      end or ser!("Invalid fn form: #{list.join(" ")}", list)
       nil
     end
 
@@ -1395,8 +1395,6 @@ module Shin
           translate_logic(first, rest)
         when "let"
           translate_let(rest)
-        when "fn"
-          translate_fn(rest)
         when "do"
           translate_do(rest)
         when "if"
@@ -1485,7 +1483,11 @@ module Shin
           op, l, r = rest
           @builder << BinaryExpression.new(op.value, as_expr(l), as_expr(r))
         else
-          handled = false
+          if name == "fn" && !rest.empty?
+            translate_fn(rest)
+          else
+            handled = false
+          end
         end
 
         return if handled
