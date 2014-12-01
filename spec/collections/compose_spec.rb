@@ -26,6 +26,14 @@ RSpec.describe "Language" do
   end
 
   it "interpose works" do
+    expect(%Q{ (print (= '(1 0 2 0 3) (interpose 0 '(1 2 3)))) }).to have_output("true")
+  end
+
+  it "range works" do
+    expect(%Q{ (print (= '(0 1 2 3 4 5) (range 0 6))) }).to have_output("true")
+    expect(%Q{ (print (= '(0 1 2 3 4 5) (range 0 6 1))) }).to have_output("true")
+    expect(%Q{ (print (= '(0 2 4) (range 0 6 2))) }).to have_output("true")
+    expect(%Q{ (print (= '(0 1 2 3 4 5) (take 6 (range)))) }).to have_output("true")
   end
 end
 
