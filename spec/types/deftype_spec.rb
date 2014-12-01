@@ -98,5 +98,22 @@ RSpec.describe "Language", "defprotocol and deftype" do
             }).to have_output(['Arity 1', 'Arity 2'])
     end.to raise_error(V8::Error, "Unimplemented protocol function ITestProtocol.-test for arity 2")
   end
+
+  it "implementing IFn makes something callable" do
+    expect(%Q{
+           (deftype Tester []
+             IFn
+             (-invoke [_]
+               (print "Arity 1"))
+             (-invoke [_ x]
+               (print "Arity 2"))
+             (-invoke [_ x y]
+               (print "Arity 3")))
+           (let [d (Tester.)]
+             (d)
+             (d 1)
+             (d 1 2))
+           }).to have_output(['Arity 1', 'Arity 2', 'Arity 3'])
+  end
 end
 

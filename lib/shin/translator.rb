@@ -750,7 +750,7 @@ module Shin
           ctor.body << ExpressionStatement.new(ass)
         end if fields
 
-        @builder << make_decl(name.value, ctor)
+        block << make_decl(name.value, ctor)
 
         prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
         protocols_mexpr = MemberExpression.new(prototype_mexpr, make_ident("_protocols"), false)
@@ -798,6 +798,30 @@ module Shin
               call = CallExpression.new(push)
               call.arguments << make_ident(limb.value)
               @builder << ExpressionStatement.new(call)
+
+              # IFn is special, cf. #50
+              if limb.value == "IFn"
+                fn = FunctionExpression.new(nil)
+                invoke_apply = MemberExpression.new(make_ident("-invoke"), Identifier.new("apply"), false)
+                arguments = Identifier.new("arguments")
+                this_id = Identifier.new("this")
+                array_proto = MemberExpression.new(Identifier.new("Array"), Identifier.new("prototype"), false)
+                slice = MemberExpression.new(array_proto, Identifier.new("slice"), false)
+                slice_apply = MemberExpression.new(slice, Identifier.new("call"), false)
+                sliced_args = CallExpression.new(slice_apply, [arguments, make_literal(1)])
+
+                this_array = ArrayExpression.new([this_id])
+                this_concat = MemberExpression.new(this_array, Identifier.new("concat"), false)
+                concat = CallExpression.new(this_concat, [sliced_args])
+
+                apply_args = [make_literal(nil),
+                              concat]
+                apply_call = CallExpression.new(invoke_apply, apply_args)
+                fn << ReturnStatement.new(apply_call)
+                slot = MemberExpression.new(prototype_mexpr, Identifier.new("call"), false)
+                ass = AssignmentExpression.new(slot, fn)
+                @builder << ExpressionStatement.new(ass)
+              end
             else
               ser!("Unrecognized thing in deftype", limb)
             end

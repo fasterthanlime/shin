@@ -283,13 +283,20 @@ module Shin
       a = ast2 || ast
     
       a.each do |node|
-        next unless node.list?
+        next unless node.list? || node.inner.empty?
         first = node.inner.first
+
         # a non-private def
         if first.sym? && first.value.start_with?("def") && !first.value.end_with?("-")
           raise "Invalid def: #{node}" unless node.inner.length >= 2
           name = node.inner[1].value
           defs[name] = node
+
+          if first.value == "defprotocol"
+            # protocols define some methods that are top-level symbols too
+            # cf. #70
+            gather_defprotocol_defs(defs, node.inner.drop(2))
+          end
         end
       end
       defs
@@ -301,6 +308,17 @@ module Shin
 
     def slug
       "#{ns}#{macro ? '..macro' : ''}"
+    end
+
+    private
+
+    def gather_defprotocol_defs(defs, decls)
+      decls.each do |decl|
+        raise "Invalid protocol function decl" unless decl.list?
+        first = decl.inner.first
+        raise "Invalid protocol function decl" unless first.sym?
+        defs[first.value] = decl
+      end
     end
   end
 
