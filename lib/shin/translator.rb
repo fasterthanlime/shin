@@ -631,12 +631,13 @@ module Shin
     def translate_defprotocol(list)
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
         empty = ObjectExpression.new
-        ex = make_ident("exports/#{name}")
+        protocol_name = name.value
+        ex = make_ident("exports/#{protocol_name}")
         ass = AssignmentExpression.new(ex, empty)
-        @builder << make_decl(Identifier.new(name.value), ass)
+        @builder << make_decl(Identifier.new(protocol_name), ass)
 
         sigs.each do |sig|
-          name = sig.inner.first
+          meth_name = sig.inner.first
 
           arg_lists = sig.inner.drop(1)
           arg_lists.each do |arg_list|
@@ -644,26 +645,37 @@ module Shin
           end
 
           fn = if arg_lists.length == 1
-                 translate_protocol_simple_fun(name, arg_lists.first)
+                 translate_protocol_simple_fun(protocol_name, meth_name, arg_lists.first)
                else
-                 translate_protocol_multi_fun(name, arg_lists)
+                 translate_protocol_multi_fun(protocol_name, meth_name, arg_lists)
                end
-          ex = make_ident("exports/#{name}")
+          ex = make_ident("exports/#{meth_name}")
           ass = AssignmentExpression.new(ex, fn)
-          @builder << make_decl(make_ident(name.value), ass)
+          @builder << make_decl(make_ident(meth_name.value), ass)
         end
       end or ser!("Invalid defprotocol form", list)
     end
 
-    def translate_protocol_simple_fun(name, arg_list)
+    def translate_protocol_simple_fun(protocol_name, name, arg_list)
+      arity = arg_list.inner.length
       fn = FunctionExpression.new(nil)
       arguments = make_ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
       slot_aware_name = "#{name.value}$arity#{arg_list.inner.length}"
 
-      # TODO: don't always use apply, just relay args if non-variadic
       meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
+      
+      # err if not implemented
+      # TODO: remove code duplication with translate_protocol_multi_fun
+      slot_null = BinaryExpression.new("==", meth_acc, make_literal(nil))
+      if_notimpl = IfStatement.new(slot_null)
+      err_message = "Unimplemented protocol function #{protocol_name}.#{name} for arity #{arity}"
+      err = NewExpression.new(Identifier.new("Error"), [make_literal(err_message)])
+      if_notimpl.consequent << ThrowStatement.new(err)
+      fn.body << if_notimpl
+
+      # TODO: don't always use apply, just relay args if non-variadic
       apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
       first_arg = MemberExpression.new(arguments, make_literal(0), true)
       meth_call = CallExpression.new(apply_acc)
@@ -674,7 +686,7 @@ module Shin
       return fn
     end
 
-    def translate_protocol_multi_fun(name, arg_lists)
+    def translate_protocol_multi_fun(protocol_name, name, arg_lists)
       fn = FunctionExpression.new(nil)
       arguments = make_ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
@@ -690,8 +702,19 @@ module Shin
         caze = SwitchCase.new(variadic_args?(arg_list) ?  nil : make_literal(arity))
         sw.cases << caze
 
+        slot_id = make_ident(slot_aware_name)
+        meth_acc = MemberExpression.new(this_access, slot_id, false)
+
+        # err if not implemented
+        # TODO: remove code duplication with translate_protocol_simple_fun
+        slot_null = BinaryExpression.new("==", meth_acc, make_literal(nil))
+        if_notimpl = IfStatement.new(slot_null)
+        err_message = "Unimplemented protocol function #{protocol_name}.#{name} for arity #{arity}"
+        err = NewExpression.new(Identifier.new("Error"), [make_literal(err_message)])
+        if_notimpl.consequent << ThrowStatement.new(err)
+        caze << if_notimpl
+
         # TODO: don't always use apply, just relay args if non-variadic
-        meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
         apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
         first_arg = MemberExpression.new(arguments, make_literal(0), true)
         meth_call = CallExpression.new(apply_acc)
