@@ -44,3 +44,6 @@
 (defmacro exists? [something]
   `(*js-bop != "undefined" (*js-uop typeof ~something)))
 
+(defmacro lazy-seq [& body]
+  `(LazySeq. (fn [] ~@body) nil))
+

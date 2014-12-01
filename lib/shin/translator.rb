@@ -758,6 +758,9 @@ module Shin
 
         prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
 
+        # naked methods won't have arity suffixes or whatever.
+        naked = false
+
         @builder.into(block, :statement) do
           body.each do |limb|
             case
@@ -789,7 +792,7 @@ module Shin
               end
 
               raise "Internal error" if args_len == -1
-              arity_aware_slot_name = "#{id.value}$arity#{args_len}"
+              arity_aware_slot_name = naked ? id.value : "#{id.value}$arity#{args_len}"
               slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
               ass = AssignmentExpression.new(slot, fn)
               @builder << ExpressionStatement.new(ass)
@@ -797,12 +800,17 @@ module Shin
               # listing a protocol the type implements
 
               # new way
-              begin
-                proto = make_ident(limb.value)
-                protocol_name = MemberExpression.new(proto, make_ident("protocol-name"), false)
-                slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
-                ass = AssignmentExpression.new(slot, make_literal(true))
-                @builder << ass
+              proto = make_ident(limb.value)
+              protocol_name = MemberExpression.new(proto, make_ident("protocol-name"), false)
+              slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
+              ass = AssignmentExpression.new(slot, make_literal(true))
+              @builder << ass
+
+              # Object is special, cf. #76
+              if limb.value == "Object"
+                naked = true
+              else
+                naked = false
               end
 
               # IFn is special, cf. #50
@@ -1419,7 +1427,7 @@ module Shin
           end
 
           values = list.drop(1)
-          block = BlockStatement.new
+          block = RecurBlockStatement.new
           @builder << block
 
           @builder.into(block, :statement) do

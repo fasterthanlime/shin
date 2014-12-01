@@ -136,7 +136,8 @@ module Shin
         when ThrowStatement
           # it's okay, there's no going back anyway...
         when Statement
-          raise "[expr mode] Expected expression, got statement:\n\n #{candidate}"
+          # raise "[expr mode] Expected expression, got statement:\n\n #{candidate}"
+          raise "[expr mode] Expected expression, got statement:\n\n #{Oj.dump(candidate, :mode => :object, :indent => 2)}"
         end
         into << candidate
       when :statement
