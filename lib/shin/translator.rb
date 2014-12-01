@@ -988,24 +988,12 @@ module Shin
       arg_comp_vec = Hamster.vector(gt_sym, arglen, num_fixed_args)
       arg_comp = AST::List.new(t, arg_comp_vec)
 
-      proto_vec = Hamster.vector(AST::Symbol.new(t, ".-prototype"),
-                                 AST::Symbol.new(t, "Array"))
-      proto = AST::List.new(t, proto_vec)
-      slice_fn_vec = Hamster.vector(AST::Symbol.new(t, ".-slice"), proto)
-      slice_fn = AST::List.new(t, slice_fn_vec)
-      rest_of_args_vec = Hamster.vector(AST::Symbol.new(t, ".call"),
-                                        slice_fn,
+      rest_of_args_vec = Hamster.vector(AST::Symbol.new(t, "IndexedSeq."),
                                         AST::Symbol.new(t, "arguments"),
                                         num_fixed_args)
       rest_of_args = AST::List.new(t, rest_of_args_vec)
 
-      vector_apply_vec = Hamster.vector(AST::Symbol.new(t, ".apply"),
-                                        AST::Symbol.new(t, "vector"),
-                                        nil_sym,
-                                        rest_of_args)
-      vector_apply = AST::List.new(t, vector_apply_vec)
-
-      if_enough_args_vec = Hamster.vector(if_sym, arg_comp, vector_apply, nil_sym)
+      if_enough_args_vec = Hamster.vector(if_sym, arg_comp, rest_of_args, nil_sym)
       if_enough_args = AST::List.new(t, if_enough_args_vec)
       varargs_prepared = if_enough_args
 
@@ -1044,12 +1032,11 @@ module Shin
       @builder.with_scope(scope) do
         if args.inner.any? { |x| destructuring_needed?(x) }
           t = args.token
-          lhs = Shin::AST::Vector.new(t, args.inner)
-          apply     = Shin::AST::Symbol.new(t, '.apply')
-          vector    = Shin::AST::Symbol.new(t, 'vector')
-          _nil      = Shin::AST::Symbol.new(t, 'nil')
-          arguments = Shin::AST::Symbol.new(t, 'arguments')
-          rhs = Shin::AST::List.new(t, Hamster.vector(apply, vector, _nil, arguments))
+          lhs = AST::Vector.new(t, args.inner)
+          iseq      = AST::Symbol.new(t, "IndexedSeq.")
+          arguments = AST::Symbol.new(t, "arguments")
+          zero      = AST::Literal.new(t, 0)
+          rhs = AST::List.new(t, Hamster.vector(iseq, arguments, zero))
 
           @builder.into(fn.body, :statement) do
             destructure(lhs, rhs)
@@ -1298,11 +1285,15 @@ module Shin
         nil
       when Shin::AST::List
         if @quoting
-          call = CallExpression.new(make_ident("list"))
-          @builder.into(call, :expression) do
-            treach(expr.inner)
+          if expr.inner.empty?
+            @builder << MemberExpression.new(make_ident("List"), Identifier.new("EMPTY"), false)
+          else
+            call = CallExpression.new(make_ident("list"))
+            @builder.into(call, :expression) do
+              treach(expr.inner)
+            end
+            @builder << call
           end
-          @builder << call
           nil
         else
           translate_listform(expr)
@@ -1342,7 +1333,7 @@ module Shin
       first = list.first
 
       unless first
-        @builder << CallExpression.new(make_ident("list"))
+        @builder << MemberExpression.new(make_ident("List"), Identifier.new("EMPTY"), false)
         return
       end
 

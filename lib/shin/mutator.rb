@@ -50,8 +50,6 @@ module Shin
           invoc = node
           info = resolve_macro(first.value)
           if info
-            # debug "Should expand macro invoc\n\n#{invoc}\n\nwith\n\n#{info[:macro]}\n\n" if DEBUG
-
             eval_mod = make_macro_module(invoc, info)
 
             debug "=============================================="
