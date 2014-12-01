@@ -9,6 +9,15 @@
          [b & a] s]
      `(-> (~b ~x ~@a) ~@ys))))
 
+(defmacro some->
+  ([x]
+   x)
+  ([x & forms]
+   (let [[y & ys] forms
+         s        (if (list? y) y (list y))
+         [b & a] s])
+   `(let [x# (~b ~x ~@a)] (if x# (some-> x# ~@ys) nil))))
+
 (defmacro ->>
   ([x]
    x)

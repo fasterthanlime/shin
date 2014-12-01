@@ -20,6 +20,21 @@ RSpec.describe "Language", "threading" do
           }).to have_output("3")
   end
 
+  it "has working some->" do
+    expect(%Q{
+           (print (some-> {:a {:b 1}}
+                          :a
+                          (get :b)
+                          inc))
+          }).to have_output("2")
+    expect(%Q{
+           (print (nil? (some-> {:a {:b 1}}
+                                :a
+                                (get :c)
+                                inc)))
+          }).to have_output("true")
+  end
+
 end
 
 
