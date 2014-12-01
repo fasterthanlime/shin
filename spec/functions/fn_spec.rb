@@ -28,8 +28,8 @@ RSpec.describe "Language", "fn" do
            (print
             ((fn rec [x]
               (if (< x 10)
-                  (rec (inc x))
-                  x))
+                (rec (inc x))
+                x))
             0))
            }).to have_output("10")
   end
@@ -69,20 +69,20 @@ RSpec.describe "Language", "fn" do
   end
 
   describe "recursive functions" do
-    it "works" do
+    it "works with fixed-args functions" do
       expect(%Q{
              ((fn [x]
                 (print x)
-                (if (< x 5) (recur (inc x)))) 1)
+                (if (< x 5)
+                  (recur (inc x)))) 1)
              }).to have_output("1 2 3 4 5")
     end
 
     it "works with variadic functions" do
       expect(%Q{
              ((fn [x & xs]
-                (when xs
-                  (print x)
-                  (recur (first xs) (rest xs)))) 1 2 3 4 5)
+                (print x)
+                (when xs (recur (first xs) (next xs)))) 1 2 3 4 5)
              }).to have_output("1 2 3 4 5")
     end
   end
