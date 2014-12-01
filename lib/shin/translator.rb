@@ -524,13 +524,18 @@ module Shin
         cond = list.first; list = list.drop(1)
         form = list.first; list = list.drop(1)
 
-        t = cond.token
-        fi = Shin::AST::Symbol.new(t, "if")
-        inner = Hamster.vector(fi, cond, form)
-        if rec = unwrap_cond(list)
-          inner <<= rec
+        if cond.kw?('else')
+          ser!(":else directive must be in last position", cond) unless list.empty?
+          form
+        else
+          t = cond.token
+          fi = Shin::AST::Symbol.new(t, "if")
+          inner = Hamster.vector(fi, cond, form)
+          if rec = unwrap_cond(list)
+            inner <<= rec
+          end
+          Shin::AST::List.new(t, inner)
         end
-        Shin::AST::List.new(t, inner)
       else
         nil
       end
