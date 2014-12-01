@@ -101,7 +101,7 @@ module Shin
       @builder.into(body, :statement) do
         ast.each do |node|
           case node
-          when Shin::AST::List
+          when AST::List
             first = node.inner.first
             if first && first.sym?
               rest = node.inner.drop(1)
@@ -165,11 +165,11 @@ module Shin
 
     def destructure(lhs, rhs, mode: :declare)
       case lhs
-      when Shin::AST::Vector
+      when AST::Vector
         destructure_vector(lhs.inner, rhs, mode)
-      when Shin::AST::Map
+      when AST::Map
         destructure_map(lhs.inner, rhs, mode)
-      when Shin::AST::Symbol
+      when AST::Symbol
         decline(lhs, rhs, mode)
       else
         ser!("Invalid let form: first binding form should be a symbol or collection, instead, got #{lhs.class}", lhs)
@@ -181,7 +181,7 @@ module Shin
       list = inner
       rhs_memo = fresh("rhsmemo")
       @builder << make_decl(rhs_memo, rhs)
-      rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
+      rhs_sym = AST::Symbol.new(rhs.token, rhs_memo)
       rhs_id = make_ident(rhs_memo)
 
       i = 0
@@ -215,7 +215,7 @@ module Shin
             else
               part_memo = fresh("partmemo")
               @builder << make_decl(part_memo, part)
-              destructure(name, Shin::AST::Symbol.new(name.token, part_memo))
+              destructure(name, AST::Symbol.new(name.token, part_memo))
             end
           end
         end
@@ -228,7 +228,7 @@ module Shin
     def destructure_map(inner, rhs, mode, alt_map = {})
       rhs_memo = fresh("rhsmemo")
       @builder << make_decl(rhs_memo, rhs)
-      rhs_sym = Shin::AST::Symbol.new(rhs.token, rhs_memo)
+      rhs_sym = AST::Symbol.new(rhs.token, rhs_memo)
       rhs_id = make_ident(rhs_memo)
 
       # filter out 'or', store in alt_map
@@ -260,11 +260,11 @@ module Shin
               ser!("Expected symbol in :#{directive} vector (in map destructuring)") unless sym.sym?
               binds << sym
               binds << case directive
-              when 'keys' then Shin::AST::Keyword.new(sym.token, sym.value)
-              when 'strs' then Shin::AST::String.new(sym.token, sym.value)
+              when 'keys' then AST::Keyword.new(sym.token, sym.value)
+              when 'strs' then AST::String.new(sym.token, sym.value)
               when 'syms'
-                s = Shin::AST::Symbol.new(sym.token, sym.value)
-                Shin::AST::Quote.new(sym.token, s)
+                s = AST::Symbol.new(sym.token, sym.value)
+                AST::Quote.new(sym.token, s)
               else raise Shin::SyntaxError, "Unknown directive #{directive}"
               end
             end
@@ -284,7 +284,7 @@ module Shin
           else
             part_memo = fresh("partmemo")
             @builder << make_decl(part_memo, part)
-            destructure(name, Shin::AST::Symbol.new(name.token, part_memo))
+            destructure(name, AST::Symbol.new(name.token, part_memo))
           end
         end
       end
@@ -449,9 +449,9 @@ module Shin
       trie.handlers << pitch
 
       t = list.first.token
-      exsym = Shin::AST::Symbol.new(t, exarg.name)
-      condp_sym = Shin::AST::Symbol.new(t, "condp")
-      inst_sym = Shin::AST::Symbol.new(t, "instance?")
+      exsym = AST::Symbol.new(t, exarg.name)
+      condp_sym = AST::Symbol.new(t, "condp")
+      inst_sym = AST::Symbol.new(t, "instance?")
       condp_vec = Hamster.vector(condp_sym, inst_sym, exsym)
 
       clauses.each do |clause|
@@ -465,14 +465,14 @@ module Shin
         condp_vec <<= etype
 
         binds_vec = Hamster.vector(param, exsym)
-        let_binds = Shin::AST::Vector.new(t, binds_vec)
+        let_binds = AST::Vector.new(t, binds_vec)
 
-        let_sym = Shin::AST::Symbol.new(t, "let")
+        let_sym = AST::Symbol.new(t, "let")
         let_vec = Hamster.vector(let_sym, let_binds, cbody)
-        condp_vec <<= Shin::AST::List.new(t, let_vec)
+        condp_vec <<= AST::List.new(t, let_vec)
       end
 
-      condp = Shin::AST::List.new(t, condp_vec)
+      condp = AST::List.new(t, condp_vec)
 
       case mode
       when :expression, :return
@@ -529,12 +529,12 @@ module Shin
           form
         else
           t = cond.token
-          fi = Shin::AST::Symbol.new(t, "if")
+          fi = AST::Symbol.new(t, "if")
           inner = Hamster.vector(fi, cond, form)
           if rec = unwrap_cond(list)
             inner <<= rec
           end
-          Shin::AST::List.new(t, inner)
+          AST::List.new(t, inner)
         end
       else
         nil
@@ -1054,7 +1054,7 @@ module Shin
           scope = Scope.new
 
           args.inner.each do |arg|
-            sym = Shin::AST::Symbol.new(t, arg.value)
+            sym = AST::Symbol.new(t, arg.value)
             bindings += [sym, sym]
           end
 
@@ -1164,14 +1164,14 @@ module Shin
         form = forms.first; forms = forms.drop(1)
 
         case form
-        when Shin::AST::List
-          dot = Shin::AST::Symbol.new(form.token, ".")
-          curr = Shin::AST::List.new(form.token, form.inner.insert(1, curr).insert(0, dot))
-        when Shin::AST::Symbol
+        when AST::List
+          dot = AST::Symbol.new(form.token, ".")
+          curr = AST::List.new(form.token, form.inner.insert(1, curr).insert(0, dot))
+        when AST::Symbol
           ser!("Expected access in chain") unless form.value.start_with?("-")
-          dod = Shin::AST::Symbol.new(form.token, ".-")
-          prop = Shin::AST::Symbol.new(form.token, form.value[1..-1])
-          curr = Shin::AST::List.new(form.token, Hamster.vector(dod, prop, curr))
+          dod = AST::Symbol.new(form.token, ".-")
+          prop = AST::Symbol.new(form.token, form.value[1..-1])
+          curr = AST::List.new(form.token, Hamster.vector(dod, prop, curr))
         else
           ser!("Expected list or access in chain", form)
         end
@@ -1206,7 +1206,7 @@ module Shin
 
     def tr(expr)
       case expr
-      when Shin::AST::Symbol
+      when AST::Symbol
         if @quoting
           lit = make_literal(expr.value)
           @builder << CallExpression.new(make_ident("symbol"), [lit])
@@ -1218,7 +1218,7 @@ module Shin
           end
         end
         nil
-      when Shin::AST::RegExp
+      when AST::RegExp
         lit = make_literal(expr.value)
         if @quoting
           @builder << CallExpression.new(make_ident('--quoted-re'), [lit])
@@ -1226,15 +1226,15 @@ module Shin
           @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
         end
         nil
-      when Shin::AST::Literal
+      when AST::Literal
         @builder << make_literal(expr.value)
         nil
-      when Shin::AST::Deref
+      when AST::Deref
         t = expr.token
-        els = Hamster.vector(Shin::AST::Symbol.new(t, "deref"), expr.inner)
-        tr(Shin::AST::List.new(t, els))
+        els = Hamster.vector(AST::Symbol.new(t, "deref"), expr.inner)
+        tr(AST::List.new(t, els))
         nil
-      when Shin::AST::Quote, Shin::AST::SyntaxQuote
+      when AST::Quote, Shin::AST::SyntaxQuote
         # TODO: find a less terrible solution.
         begin
           @quoting = true
@@ -1243,7 +1243,7 @@ module Shin
           @quoting = false
         end
         nil
-      when Shin::AST::Vector
+      when AST::Vector
         first = expr.inner.first
         if first && first.sym?('$')
           @builder.into!(ArrayExpression.new) do
@@ -1255,12 +1255,12 @@ module Shin
           end
         end
         nil
-      when Shin::AST::Set
+      when AST::Set
         @builder.into!(CallExpression.new(make_ident('hash-set'))) do
           treach(expr.inner)
         end
         nil
-      when Shin::AST::Map
+      when AST::Map
         first = expr.inner.first
         if first && first.sym?('$')
           list = expr.inner.drop(1)
@@ -1279,11 +1279,11 @@ module Shin
           end
         end
         nil
-      when Shin::AST::Keyword
+      when AST::Keyword
         lit = make_literal(expr.value)
         @builder << CallExpression.new(make_ident('keyword'), [lit])
         nil
-      when Shin::AST::List
+      when AST::List
         if @quoting
           if expr.inner.empty?
             @builder << MemberExpression.new(make_ident("List"), Identifier.new("EMPTY"), false)
@@ -1298,14 +1298,14 @@ module Shin
         else
           translate_listform(expr)
         end
-      when Shin::AST::Unquote
+      when AST::Unquote
         ser!("Invalid usage of unquoting outside of a quote: #{expr}", expr) unless @quoting
         call = CallExpression.new(make_ident('--unquote'))
 
         @builder.into(call, :expression) do
           spliced = false
           inner = expr.inner
-          if Shin::AST::Deref === inner
+          if AST::Deref === inner
             spliced = true
             inner = inner.inner
           end
@@ -1321,7 +1321,7 @@ module Shin
 
         @builder << call
         nil
-      when Shin::AST::Closure
+      when AST::Closure
         ser!("Closures are supposed to be gone by the time we reach the translator", expr)
       else
         ser!("Unknown expr form #{expr}", expr)
@@ -1431,14 +1431,14 @@ module Shin
             tmps = []
 
             # TODO: fix that. cf #56
-            # lhs_vec = Shin::AST::Vector.new(t, anchor.bindings)
-            # rhs_vec = Shin::AST::Vector.new(t, values)
+            # lhs_vec = AST::Vector.new(t, anchor.bindings)
+            # rhs_vec = AST::Vector.new(t, values)
             # destructure(lhs_vec, rhs_vec)
 
             anchor.bindings.each_with_index do |lhs, i|
               rhs = values[i]
               ser!("Missing value in recur", values) unless rhs
-              tmp = Shin::AST::Symbol.new(t, fresh("G__"))
+              tmp = AST::Symbol.new(t, fresh("G__"))
               destructure(tmp, rhs)
               tmps << tmp
             end
@@ -1514,7 +1514,7 @@ module Shin
 
     # declare or assign, depending on mode
     def decline(lhs, rhs, mode)
-      rhs = as_expr(rhs) if Shin::AST::Node === rhs
+      rhs = as_expr(rhs) if AST::Node === rhs
 
       case mode
       when :declare
@@ -1531,7 +1531,7 @@ module Shin
 
     def contains_recur?(ast)
       case ast
-      when Shin::AST::List
+      when AST::List
         return false if ast.inner.empty?
 
         first = ast.inner.first
@@ -1546,7 +1546,7 @@ module Shin
         end
 
         ast.inner.any? { |x| contains_recur?(x) }
-      when Shin::AST::Sequence
+      when AST::Sequence
         ast.inner.any? { |x| contains_recur?(x) }
       else
         false
@@ -1556,7 +1556,7 @@ module Shin
     # JST helpers
 
     def make_decl(name, expr)
-      expr = as_expr(expr)    if     Shin::AST::Node       === expr
+      expr = as_expr(expr)    if     AST::Node       === expr
       name = make_ident(name) unless Shin::JST::Identifier === name
 
       decl = VariableDeclaration.new
@@ -1606,8 +1606,8 @@ module Shin
 
     def ser!(msg, token)
       token = token.to_a.first if token.respond_to?(:to_a)
-      token = token.token if Shin::AST::Node === token
-      token = nil unless Shin::AST::Token === token
+      token = token.token if AST::Node === token
+      token = nil unless AST::Token === token
 
       start  = token ? token.start  : 0
       length = token ? token.length : 1
