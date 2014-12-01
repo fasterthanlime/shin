@@ -637,29 +637,70 @@ module Shin
 
         sigs.each do |sig|
           name = sig.inner.first
-          name_ident = make_ident(name.value)
-          decl = VariableDeclaration.new
-          dtor = VariableDeclarator.new(name_ident)
 
-          dtor.init = fn = FunctionExpression.new(fn)
-          arguments = make_ident('arguments')
-          this_access = MemberExpression.new(arguments, make_literal(0), true)
+          arg_lists = sig.inner.drop(1)
+          arg_lists.each do |arg_list|
+            res!("Expected argument list", arg_list) unless arg_list.vector?
+          end
 
-          meth_acc = MemberExpression.new(this_access, name_ident, false)
-          apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
-          first_arg = MemberExpression.new(arguments, make_literal(0), true)
-          meth_call = CallExpression.new(apply_acc)
-          meth_call.arguments << first_arg
-          meth_call.arguments << make_ident('arguments')
-          fn.body << ReturnStatement.new(meth_call)
-
+          fn = if arg_lists.length == 1
+                 translate_protocol_simple_fun(name, arg_lists.first)
+               else
+                 translate_protocol_multi_fun(name, arg_lists)
+               end
           ex = make_ident("exports/#{name}")
-          dtor.init = AssignmentExpression.new(ex, dtor.init)
-          decl.declarations << dtor
-
-          @builder << decl
+          ass = AssignmentExpression.new(ex, fn)
+          @builder << make_decl(make_ident(name.value), ass)
         end
       end or ser!("Invalid defprotocol form", list)
+    end
+
+    def translate_protocol_simple_fun(name, arg_list)
+      fn = FunctionExpression.new(nil)
+      arguments = make_ident('arguments')
+      this_access = MemberExpression.new(arguments, make_literal(0), true)
+
+      slot_aware_name = "#{name.value}$arity#{arg_list.inner.length}"
+
+      # TODO: don't always use apply, just relay args if non-variadic
+      meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
+      apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+      first_arg = MemberExpression.new(arguments, make_literal(0), true)
+      meth_call = CallExpression.new(apply_acc)
+      meth_call.arguments << first_arg
+      meth_call.arguments << make_ident('arguments')
+      fn.body << ReturnStatement.new(meth_call)
+
+      return fn
+    end
+
+    def translate_protocol_multi_fun(name, arg_lists)
+      fn = FunctionExpression.new(nil)
+      arguments = make_ident('arguments')
+      this_access = MemberExpression.new(arguments, make_literal(0), true)
+
+      numargs = MemberExpression.new(arguments, make_ident('length'), false)
+      sw = SwitchStatement.new(numargs)
+      fn << sw
+
+      arg_lists.each do |arg_list|
+        arity = arg_list.inner.length
+        slot_aware_name = "#{name.value}$arity#{arity}"
+
+        caze = SwitchCase.new(variadic_args?(arg_list) ?  nil : make_literal(arity))
+        sw.cases << caze
+
+        # TODO: don't always use apply, just relay args if non-variadic
+        meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
+        apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+        first_arg = MemberExpression.new(arguments, make_literal(0), true)
+        meth_call = CallExpression.new(apply_acc)
+        meth_call.arguments << first_arg
+        meth_call.arguments << make_ident('arguments')
+        caze << ReturnStatement.new(meth_call)
+      end
+
+      return fn
     end
 
     DEFTYPE_PATTERN         = ":sym :str? :vec? :expr*".freeze
@@ -693,45 +734,50 @@ module Shin
         empty_arr = ArrayExpression.new
         block.body << ExpressionStatement.new(AssignmentExpression.new(protocols_mexpr, empty_arr))
 
-        body.each do |limb|
-          case
-          when limb.list?
-            id = limb.inner.first
-            fn = nil
-
-            type_scope = Scope.new
-
-            @builder.with_scope(type_scope) do
-              self_name = fresh("self")
-              fields.inner.each do |field|
-                next if field.meta?  # FIXME: woooooooooo #28
-                type_scope[field.value] = "#{self_name}/#{field.value}"
-              end if fields
-
-              # FIXME: That's uh, not good. Feex it!
+        @builder.into(block, :statement) do
+          body.each do |limb|
+            case
+            when limb.list?
+              id = limb.inner.first
               fn = nil
-              matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
-                fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
-              end or ser!("Invalid fn form", list)
 
-              self_decl = VariableDeclaration.new
-              self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
-              self_decl.declarations << self_dtor
-              fn.body.body.unshift(self_decl)
-              @builder << fn
+              type_scope = Scope.new
+
+              args_len = -1
+
+              @builder.with_scope(type_scope) do
+                self_name = fresh("self")
+                fields.inner.each do |field|
+                  next if field.meta?  # FIXME: woooooooooo #28
+                  type_scope[field.value] = "#{self_name}/#{field.value}"
+                end if fields
+
+                fn = nil
+                matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
+                  args_len = args.inner.length
+                  fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+                end or ser!("Invalid fn form", list)
+
+                self_decl = VariableDeclaration.new
+                self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
+                self_decl.declarations << self_dtor
+                fn.body.body.unshift(self_decl)
+              end
+
+              raise "Internal error" if args_len == -1
+              arity_aware_slot_name = "#{id.value}$arity#{args_len}"
+              slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
+              ass = AssignmentExpression.new(slot, fn)
+              @builder << ExpressionStatement.new(ass)
+            when limb.sym?
+              # Ehhhh ignore for now.
+              push = MemberExpression.new(protocols_mexpr, make_ident('push'), false)
+              call = CallExpression.new(push)
+              call.arguments << make_ident(limb.value)
+              @builder << ExpressionStatement.new(call)
+            else
+              ser!("Unrecognized thing in deftype", limb)
             end
-
-            slot = MemberExpression.new(prototype_mexpr, make_ident(id.value), false)
-            ass = AssignmentExpression.new(slot, fn)
-            block.body << ExpressionStatement.new(ass)
-          when limb.sym?
-            # Ehhhh ignore for now.
-            push = MemberExpression.new(protocols_mexpr, make_ident('push'), false)
-            call = CallExpression.new(push)
-            call.arguments << make_ident(limb.value)
-            block.body << ExpressionStatement.new(call)
-          else
-            ser!("Unrecognized thing in deftype", limb)
           end
         end
 

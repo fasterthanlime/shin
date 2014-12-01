@@ -50,5 +50,24 @@ RSpec.describe "Language", "defprotocol and deftype" do
              (-shout d))
            }).to have_output("Sir Fido: Woof! Sir Rufus: Woof!")
   end
+
+  it "defines a protocol with multiple arity functions" do
+    expect(%Q{
+           (defprotocol ITestProtocol
+             (-test [x] [x y] [x y & ys]))
+           (deftype Tester []
+            ITestProtocol
+            (-test [x]
+              (print "Arity 1"))
+            (-test [x y]
+              (print "Arity 2"))
+            (-test [x y & ys]
+              (print "Arity variadic")))
+           (let [d (Tester.)]
+             (-test d)
+             (-test d 1)
+             (-test d 1 2 3))
+           }).to have_output(['Arity 1', 'Arity 2', 'Arity variadic'])
+  end
 end
 
