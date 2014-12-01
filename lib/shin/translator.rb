@@ -630,10 +630,14 @@ module Shin
 
     def translate_defprotocol(list)
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
-        empty = ObjectExpression.new
+        protocol_obj = ObjectExpression.new
+        fullname = mangle("#{@mod.ns}/#{name.value}")
+        fullname_property = Property.new(make_ident("protocol-name"), make_literal(fullname))
+        protocol_obj.properties << fullname_property
+
         protocol_name = name.value
         ex = make_ident("exports/#{protocol_name}")
-        ass = AssignmentExpression.new(ex, empty)
+        ass = AssignmentExpression.new(ex, protocol_obj)
         @builder << make_decl(Identifier.new(protocol_name), ass)
 
         sigs.each do |sig|
@@ -753,9 +757,6 @@ module Shin
         block << make_decl(name.value, ctor)
 
         prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
-        protocols_mexpr = MemberExpression.new(prototype_mexpr, make_ident("_protocols"), false)
-        empty_arr = ArrayExpression.new
-        block.body << ExpressionStatement.new(AssignmentExpression.new(protocols_mexpr, empty_arr))
 
         @builder.into(block, :statement) do
           body.each do |limb|
@@ -793,11 +794,16 @@ module Shin
               ass = AssignmentExpression.new(slot, fn)
               @builder << ExpressionStatement.new(ass)
             when limb.sym?
-              # Ehhhh ignore for now.
-              push = MemberExpression.new(protocols_mexpr, make_ident('push'), false)
-              call = CallExpression.new(push)
-              call.arguments << make_ident(limb.value)
-              @builder << ExpressionStatement.new(call)
+              # listing a protocol the type implements
+
+              # new way
+              begin
+                proto = make_ident(limb.value)
+                protocol_name = MemberExpression.new(proto, make_ident("protocol-name"), false)
+                slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
+                ass = AssignmentExpression.new(slot, make_literal(true))
+                @builder << ass
+              end
 
               # IFn is special, cf. #50
               if limb.value == "IFn"
@@ -1345,7 +1351,7 @@ module Shin
             rest = rest.drop(1)
           end
 
-          property = Identifier.new(propname)
+          property = Identifier.new(mangle(propname))
           object = as_expr(rest[0])
           @builder << MemberExpression.new(object, property, false)
         when name == '..'
@@ -1360,7 +1366,7 @@ module Shin
             rest = rest.drop(1)
           end
 
-          property = Identifier.new(propname)
+          property = Identifier.new(mangle(propname))
           object = as_expr(rest[0])
           mexp = MemberExpression.new(object, property, false)
 
