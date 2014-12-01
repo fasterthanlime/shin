@@ -19,7 +19,8 @@
 
 (defmacro when [cond & body]
   `(if ~cond
-     (do ~@body)))
+     (do ~@body)
+     nil))
 
 (defmacro when-not [cond & body]
   `(when (not ~cond) ~@body))
@@ -29,7 +30,7 @@
 
 (defmacro when-let [[x y] & body]
   `(let [~x ~y]
-     (if ~x (do ~@body))))
+     (if ~x (do ~@body) nil)))
 
 (defmacro if-let [[x y] & body]
   `(let [~x ~y]
