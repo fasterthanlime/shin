@@ -34,6 +34,10 @@ RSpec.describe "Language", "vector" do
     expect(%Q{ (print (pr-str (conj [1 2 3] 4))) }).to have_output("[1 2 3 4]")
   end
 
+  it "has working conj" do
+    expect(%Q{ (print (pr-str (conj [1] 2 3 4))) }).to have_output("[1 2 3 4]")
+  end
+
   it "has working cons" do
     expect(%Q{ (print (pr-str (cons 1 [2 3 4]))) }).to have_output("(1 2 3 4)")
   end

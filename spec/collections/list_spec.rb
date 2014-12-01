@@ -14,6 +14,14 @@ RSpec.describe "Language", "list" do
     end
   end
 
+  it "has working cons" do
+    expect(%Q{ (print (pr-str (cons 1 (cons 2 (cons 3 (cons 4)))))) }).to have_output("(1 2 3 4)")
+  end
+  
+  it "has working conj" do
+    expect(%Q{ (print (pr-str (conj '(4) 3 2 1))) }).to have_output("(1 2 3 4)")
+  end
+
   it "has working count" do
     expect(%Q{ (print (count '(1 2 3))) }).to have_output("3")
   end
