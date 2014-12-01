@@ -56,6 +56,9 @@ module Shin
         puts "Compiled #{file || "<stdin>"}" if opts[:output]
       rescue SyntaxError => e
         puts "\n[ERROR] #{e.message}"
+        if ENV['DEBUG']
+          puts e.backtrace
+        end
       end
     end
   end

@@ -103,6 +103,8 @@ module Shin
       attr_reader :operator
 
       def initialize(left, right, operator = '=')
+        raise "Expected JST node, got #{left.inspect}" unless Node === left
+        raise "Expected JST node, got #{right.inspect}" unless Node === right
         @type = "AssignmentExpression"
         @left = left
         @right = right
@@ -169,6 +171,7 @@ module Shin
       attr_reader :arguments
 
       def initialize(callee, arguments = [])
+        raise "Expected JST node, got #{callee.inspect}" unless Node === callee
         raise "CallExpression requires an array of arguments or nil" unless Array === arguments
         @type = "CallExpression"
         @callee = callee
@@ -193,6 +196,8 @@ module Shin
       attr_reader :computed
 
       def initialize(object, property, computed)
+        raise "Expected JST node, got #{object.inspect}" unless Node === object
+        raise "Expected JST node, got #{property.inspect}" unless Node === property
         @type = "MemberExpression"
         @object = object
         @property = property

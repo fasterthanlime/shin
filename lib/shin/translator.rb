@@ -526,7 +526,10 @@ module Shin
 
         t = cond.token
         fi = Shin::AST::Symbol.new(t, "if")
-        inner = Hamster.vector(fi, cond, form, unwrap_cond(list))
+        inner = Hamster.vector(fi, cond, form)
+        if rec = unwrap_cond(list)
+          inner <<= rec
+        end
         Shin::AST::List.new(t, inner)
       else
         nil
@@ -813,7 +816,114 @@ module Shin
       nil
     end
 
+    def variadic_args?(args)
+      args.inner.any? { |x| x.sym?('&') }
+    end
+
+    def translate_variadic_fn_inner(args, body, name: nil)
+      t = args.inner.first.token
+
+      fixed_args    = args.inner.take_while { |x| !x.sym?('&') }
+      variadic_args = args.inner.drop(fixed_args.count + 1)
+      ser!("Internal error: Invalid variadic state", body) unless variadic_args.count == 1
+      variadic_arg = variadic_args.first
+
+      fn_sym = AST::Symbol.new(t, "fn")
+      let_sym = AST::Symbol.new(t, "let")
+
+      arg_vec = Hamster.vector
+      arg_names = []
+      fixed_args.each do |arg|
+        name = if arg.sym?
+                 arg.value
+               else
+                 fresh("darg")
+               end
+        arg_names << name
+        arg_vec <<= arg
+      end
+      variadic_name = if variadic_arg.sym?
+                        variadic_arg.value
+                      else
+                        fresh("varg")
+                      end
+      variadic_sym = AST::Symbol.new(t, variadic_name)
+
+      arg_vec <<= variadic_sym
+      inner_fn_args = AST::Vector.new(t, arg_vec)
+      inner_fn_vec = Hamster.vector(fn_sym, inner_fn_args)
+      body.each do |child|
+        inner_fn_vec <<= child
+      end
+      inner_fn = AST::List.new(t, inner_fn_vec)
+
+      outer_arg_vec = Hamster.vector
+      arg_names.each do |name|
+        outer_arg_vec <<= AST::Symbol.new(t, name)
+      end
+      outer_args = AST::Vector.new(t, outer_arg_vec)
+
+      # only prepare varargs if given more than fixed args
+      if_sym = AST::Symbol.new(t, "if")
+      nil_sym = AST::Symbol.new(t, "nil")
+
+      num_fixed_args = AST::Number.new(t, fixed_args.length)
+
+      gt_sym = AST::Symbol.new(t, ">")
+      arglen_vec = Hamster.vector(AST::Symbol.new(t, ".-length"),
+                                  AST::Symbol.new(t, "arguments"))
+      arglen = AST::List.new(t, arglen_vec)
+      arg_comp_vec = Hamster.vector(gt_sym, arglen, num_fixed_args)
+      arg_comp = AST::List.new(t, arg_comp_vec)
+
+      proto_vec = Hamster.vector(AST::Symbol.new(t, ".-prototype"),
+                                 AST::Symbol.new(t, "Array"))
+      proto = AST::List.new(t, proto_vec)
+      slice_fn_vec = Hamster.vector(AST::Symbol.new(t, ".-slice"), proto)
+      slice_fn = AST::List.new(t, slice_fn_vec)
+      rest_of_args_vec = Hamster.vector(AST::Symbol.new(t, ".call"),
+                                        slice_fn,
+                                        AST::Symbol.new(t, "arguments"),
+                                        num_fixed_args)
+      rest_of_args = AST::List.new(t, rest_of_args_vec)
+
+      vector_apply_vec = Hamster.vector(AST::Symbol.new(t, ".apply"),
+                                        AST::Symbol.new(t, "vector"),
+                                        nil_sym,
+                                        rest_of_args)
+      vector_apply = AST::List.new(t, vector_apply_vec)
+
+      if_enough_args_vec = Hamster.vector(if_sym, arg_comp, vector_apply, nil_sym)
+      if_enough_args = AST::List.new(t, if_enough_args_vec)
+      varargs_prepared = if_enough_args
+
+      inner_sym = AST::Symbol.new(t, "inner")
+      bindings_vec = Hamster.vector(inner_sym, inner_fn, variadic_sym, varargs_prepared)
+      bindings = AST::Vector.new(t, bindings_vec)
+
+      inner_call_vec = Hamster.vector(inner_sym)
+      arg_names.each do |name|
+        inner_call_vec <<= AST::Symbol.new(t, name)
+      end
+      inner_call_vec <<= variadic_sym
+      inner_call = AST::List.new(t, inner_call_vec)
+      let_vec = Hamster.vector(let_sym, bindings, inner_call)
+      outer_body = AST::List.new(t, let_vec)
+
+      if DEBUG
+        debug "=========================================================="
+        debug "Original: \n\n(fn #{args} #{body.join(" ")})\n\n"
+        debug "Wrapped:\n\n(fn #{outer_args} #{outer_body}\n\n"
+      end
+
+      return translate_fn_inner(outer_args, [outer_body], :name => name)
+    end
+
     def translate_fn_inner(args, body, name: nil)
+      if variadic_args?(args)
+        return translate_variadic_fn_inner(args, body, :name => name)
+      end
+
       fn = FunctionExpression.new(name ? make_ident(name) : nil)
 
       scope = Scope.new

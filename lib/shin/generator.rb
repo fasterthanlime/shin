@@ -33,6 +33,10 @@ module Shin
       unless defined? @@context
         @@context = Shin::JsContext.new
         @@context.load("escodegen")
+
+        @@context.context['debug'] = lambda do |_, *args|
+          puts "[gen debug] #{args.join(" ")}"
+        end
       end
       @@context
     end

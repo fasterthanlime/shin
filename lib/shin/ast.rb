@@ -16,6 +16,10 @@ module Shin
         compute_linecol
       end
 
+      def self.dummy
+        Token.new("<dummy>", 0)
+      end
+
       def length
         @end - @start
       end
@@ -41,6 +45,7 @@ module Shin
       attr_reader :token
 
       def initialize(token)
+        raise "Expected token, got #{token}" unless Token === token
         @token = token
       end
 
@@ -83,6 +88,10 @@ module Shin
       def initialize(token, inner = Hamster.vector)
         super(token)
         raise "Sequence needs immutable vector" unless Hamster::Vector === inner
+        inner.each do |child|
+          raise "Non-node in AST: #{child}" unless Node === child
+        end
+
         @inner = inner
         self.freeze
       end
@@ -94,7 +103,13 @@ module Shin
       end
 
       def to_s
-        "(#{inner.map(&:to_s).join(" ")})"
+        if ENV['PRETTY_SEXP']
+          "\n(#{inner.map(&:to_s).join("\n")})".split("\n").map do |x|
+            "  " + x
+          end.join("\n")
+        else
+          "(#{inner.map(&:to_s).join(" ")})"
+        end
       end
     end
 

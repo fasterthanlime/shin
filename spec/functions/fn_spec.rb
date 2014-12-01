@@ -76,6 +76,15 @@ RSpec.describe "Language", "fn" do
                 (if (< x 5) (recur (inc x)))) 1)
              }).to have_output("1 2 3 4 5")
     end
+
+    it "works with variadic functions" do
+      expect(%Q{
+             ((fn [x & xs]
+                (when xs
+                  (print x)
+                  (recur (first xs) (rest xs)))) 1 2 3 4 5)
+             }).to have_output("1 2 3 4 5")
+    end
   end
 end
 
