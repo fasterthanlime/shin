@@ -528,6 +528,9 @@ for ki, and to Nicolas Goy, Meine Goy, Fabrice Truillot de Chambrier, Ulrich
 Fischer, Dimiter Petrov, Jens Nockert, Romain Ruetschi, Arnaud Bénard, for
 all the support.
 
+And of course, to the whole [ClojureScript][cljs] team for leading the way
+with this whole "Clojure to JavaScript" thing!
+
 ## License
 
 Shin is released under the MIT license. See `LICENSE.txt` for the complete text.
