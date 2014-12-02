@@ -44,9 +44,9 @@ module Shin
 
       program = Program.new
       load_shim = FunctionExpression.new
-      load_shim.params << make_ident('root');
-      load_shim.params << make_ident('factory')
-      define_call = CallExpression.new(make_ident('define'))
+      load_shim.params << ident('root');
+      load_shim.params << ident('factory')
+      define_call = CallExpression.new(ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
         next if req.macro? && !@mod.macro?
@@ -55,15 +55,15 @@ module Shin
       define_call.arguments << require_arr
 
       bound_factory = CallExpression.new(
-        MemberExpression.new(make_ident('factory'), make_ident('bind'), false),
-        [make_ident('this')])
+        MemberExpression.new(ident('factory'), ident('bind'), false),
+        [ident('this')])
       define_call.arguments << bound_factory
       load_shim.body << ExpressionStatement.new(define_call)
 
       factory = FunctionExpression.new
       requires.each do |req|
         next if req.macro? && !@mod.macro?
-        factory.params << make_ident(req.as_sym)
+        factory.params << make_ident(req.slug)
       end
 
       shim_call = CallExpression.new(load_shim)
@@ -73,73 +73,71 @@ module Shin
 
       body = factory.body
 
+      requires.each do |req|
+        next if req.macro? && !@mod.macro?
+        body << make_decl(make_ident(req.as_sym), make_ident(req.slug))
+      end
+
+      top_scope = CompositeScope.new
+
       @mod.requires.each do |req|
         next if req.macro? && !@mod.macro?
         if req.all?
           unless req.js?
             dep = @compiler.modules[req]
             raise Shin::Error, "Couldn't find req #{req.slug}" unless dep
-            defs = dep.defs
-            dep_id = make_ident(req.as_sym)
-
-            decl = VariableDeclaration.new
-            defs.each_key do |d|
-              id = make_ident(d)
-              mexpr = MemberExpression.new(dep_id, id, false)
-              decl.declarations << VariableDeclarator.new(id, mexpr)
-            end
-
-            body << decl unless decl.declarations.empty?
+            top_scope.attach(dep.scope)
           end
         elsif !req.refer.empty?
-          dep_id = make_ident(req.as)
-          decl = VariableDeclaration.new
-
+          ref_scope = Scope.new
           req.refer.each do |d|
-            id = make_ident(d)
-            mexpr = MemberExpression.new(dep_id, id, false)
-            decl.declarations << VariableDeclarator.new(id, mexpr)
+            ref_scope[d] = "#{req.ns}/#{d}"
           end
-
-          body << decl unless decl.declarations.empty?
+          top_scope.attach!(ref_scope)
         end
       end
 
-      @builder.into(body, :statement) do
-        ast.each do |node|
-          case node
-          when AST::List
-            first = node.inner.first
-            if first && first.sym?
-              rest = node.inner.drop(1)
-              case first.value
-              when "def"
-                translate_def(rest)
-              when "declare"
-                translate_declare(rest)
-              when "defn"
-                translate_defn(rest)
-              when "defn-"
-                translate_defn(rest, :export => false)
-              when "defmacro"
-                ser!("Macro in a non-macro module", node) unless @mod.macro?
-                translate_defn(rest)
-              when "defprotocol"
-                translate_defprotocol(rest)
-              when "deftype"
-                translate_deftype(rest)
-              else
-                tr(node)
-              end
-            else
-              tr(node)
-            end
-          else
-          end
+      @builder.with_scope(top_scope) do
+        @builder.into(body, :statement) do
+          trmain(ast)
         end
       end
 
       @mod.jst = program
+    end
+
+    def trmain(ast)
+      ast.each do |node|
+        case node
+        when AST::List
+          first = node.inner.first
+          if first && first.sym?
+            rest = node.inner.drop(1)
+            case first.value
+            when "def"
+              translate_def(rest)
+            when "declare"
+              translate_declare(rest)
+            when "defn"
+              translate_defn(rest)
+            when "defn-"
+              translate_defn(rest, :export => false)
+            when "defmacro"
+              ser!("Macro in a non-macro module", node) unless @mod.macro?
+              translate_defn(rest)
+            when "defprotocol"
+              translate_defprotocol(rest)
+            when "deftype"
+              translate_deftype(rest)
+            else
+              tr(node)
+            end
+          else
+            tr(node)
+          end
+        else
+        end
+      end
     end
 
     protected
@@ -189,7 +187,7 @@ module Shin
       rhs_memo = fresh("rhsmemo")
       @builder << make_decl(rhs_memo, rhs)
       rhs_sym = AST::Symbol.new(rhs.token, rhs_memo)
-      rhs_id = make_ident(rhs_memo)
+      rhs_id = ident(rhs_memo)
 
       i = 0
       until list.empty?
@@ -212,11 +210,11 @@ module Shin
             done = true
             list = list.drop(1)
             if rest = list.first
-              part = CallExpression.new(make_ident('nthnext'), [rhs_id, make_literal(i)])
+              part = CallExpression.new(ident('nthnext'), [rhs_id, make_literal(i)])
               @builder << make_decl(rest.value, part)
             end
           else
-            part = CallExpression.new(make_ident('nth'), [rhs_id, make_literal(i)])
+            part = CallExpression.new(ident('nth'), [rhs_id, make_literal(i)])
             if name.sym?
               @builder << make_decl(name.value, part)
             else
@@ -236,7 +234,7 @@ module Shin
       rhs_memo = fresh("rhsmemo")
       @builder << make_decl(rhs_memo, rhs)
       rhs_sym = AST::Symbol.new(rhs.token, rhs_memo)
-      rhs_id = make_ident(rhs_memo)
+      rhs_id = ident(rhs_memo)
 
       # filter out 'or', store in alt_map
       pairs = []
@@ -282,7 +280,7 @@ module Shin
             ser!("Unknown directive in map destructuring - :#{name.value}", name)
           end
         else
-          part = CallExpression.new(make_ident('get'), [rhs_id, as_expr(map_key)])
+          part = CallExpression.new(ident('get'), [rhs_id, as_expr(map_key)])
           if name.sym?
             if alt = alt_map[name.value]
               part.arguments << as_expr(alt)
@@ -579,7 +577,7 @@ module Shin
 
       scope = Scope.new
 
-      tmp = make_ident(fresh(aka.value))
+      tmp = ident(fresh(aka.value))
       @builder << make_decl(tmp, Identifier.new("this"))
       scope[aka.value] = tmp.name
 
@@ -663,11 +661,11 @@ module Shin
       matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
         protocol_obj = ObjectExpression.new
         fullname = mangle("#{@mod.ns}/#{name.value}")
-        fullname_property = Property.new(make_ident("protocol-name"), make_literal(fullname))
+        fullname_property = Property.new(ident("protocol-name"), make_literal(fullname))
         protocol_obj.properties << fullname_property
 
         protocol_name = name.value
-        ex = make_ident("exports/#{protocol_name}")
+        ex = ident("exports/#{protocol_name}")
         ass = AssignmentExpression.new(ex, protocol_obj)
         @builder << make_decl(Identifier.new(protocol_name), ass)
 
@@ -684,7 +682,7 @@ module Shin
                else
                  translate_protocol_multi_fun(protocol_name, meth_name, arg_lists)
                end
-          ex = make_ident("exports/#{meth_name}")
+          ex = ident("exports/#{meth_name}")
           ass = AssignmentExpression.new(ex, fn)
           @builder << make_decl(make_ident(meth_name.value), ass)
         end
@@ -694,12 +692,12 @@ module Shin
     def translate_protocol_simple_fun(protocol_name, name, arg_list)
       arity = arg_list.inner.length
       fn = FunctionExpression.new(nil)
-      arguments = make_ident('arguments')
+      arguments = ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
       slot_aware_name = "#{name.value}$arity#{arg_list.inner.length}"
 
-      meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
+      meth_acc = MemberExpression.new(this_access, ident(slot_aware_name), false)
       
       # err if not implemented
       # TODO: remove code duplication with translate_protocol_multi_fun
@@ -711,11 +709,11 @@ module Shin
       fn.body << if_notimpl
 
       # TODO: don't always use apply, just relay args if non-variadic
-      apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+      apply_acc = MemberExpression.new(meth_acc, ident('apply'), false)
       first_arg = MemberExpression.new(arguments, make_literal(0), true)
       meth_call = CallExpression.new(apply_acc)
       meth_call.arguments << first_arg
-      meth_call.arguments << make_ident('arguments')
+      meth_call.arguments << ident('arguments')
       fn.body << ReturnStatement.new(meth_call)
 
       return fn
@@ -723,10 +721,10 @@ module Shin
 
     def translate_protocol_multi_fun(protocol_name, name, arg_lists)
       fn = FunctionExpression.new(nil)
-      arguments = make_ident('arguments')
+      arguments = ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
-      numargs = MemberExpression.new(arguments, make_ident('length'), false)
+      numargs = MemberExpression.new(arguments, ident('length'), false)
       sw = SwitchStatement.new(numargs)
       fn << sw
 
@@ -737,7 +735,7 @@ module Shin
         caze = SwitchCase.new(variadic_args?(arg_list) ?  nil : make_literal(arity))
         sw.cases << caze
 
-        slot_id = make_ident(slot_aware_name)
+        slot_id = ident(slot_aware_name)
         meth_acc = MemberExpression.new(this_access, slot_id, false)
 
         # err if not implemented
@@ -750,11 +748,11 @@ module Shin
         caze << if_notimpl
 
         # TODO: don't always use apply, just relay args if non-variadic
-        apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+        apply_acc = MemberExpression.new(meth_acc, ident('apply'), false)
         first_arg = MemberExpression.new(arguments, make_literal(0), true)
         meth_call = CallExpression.new(apply_acc)
         meth_call.arguments << first_arg
-        meth_call.arguments << make_ident('arguments')
+        meth_call.arguments << ident('arguments')
         caze << ReturnStatement.new(meth_call)
       end
 
@@ -775,13 +773,15 @@ module Shin
         # TODO: members / params
         ctor = FunctionExpression.new
 
+        this_id = make_ident("this")
         fields.inner.each do |field|
           next if field.meta?  # FIXME: woooooooooo #28
 
           fname = field.value
-          ctor.params << make_ident(fname)
-          slot = make_ident("this/#{fname}")
-          ass = AssignmentExpression.new(slot, make_ident(fname))
+          fname_id = make_ident(fname)
+          ctor.params << fname_id
+          slot = MemberExpression.new(this_id, fname_id, false)
+          ass = AssignmentExpression.new(slot, fname_id)
           ctor.body << ExpressionStatement.new(ass)
         end if fields
 
@@ -834,22 +834,22 @@ module Shin
                 end or ser!("Invalid fn form in deftype: #{limb}", list)
 
                 self_decl = VariableDeclaration.new
-                self_dtor = VariableDeclarator.new(make_ident(self_name), make_ident("this"))
+                self_dtor = VariableDeclarator.new(ident(self_name), ident("this"))
                 self_decl.declarations << self_dtor
                 fn.body.body.unshift(self_decl)
               end
 
               raise "Internal error" if args_len == -1
               arity_aware_slot_name = naked ? id.value : "#{id.value}$arity#{args_len}"
-              slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
+              slot = MemberExpression.new(prototype_mexpr, ident(arity_aware_slot_name), false)
               ass = AssignmentExpression.new(slot, fn)
               @builder << ExpressionStatement.new(ass)
             when limb.sym?
               # listing a protocol the type implements
 
               # new way
-              proto = make_ident(limb.value)
-              protocol_name = MemberExpression.new(proto, make_ident("protocol-name"), false)
+              proto = ident(limb.value)
+              protocol_name = MemberExpression.new(proto, ident("protocol-name"), false)
               slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
               ass = AssignmentExpression.new(slot, make_literal(true))
               @builder << ass
@@ -864,7 +864,7 @@ module Shin
               # IFn is special, cf. #50
               if limb.value == "IFn"
                 fn = FunctionExpression.new(nil)
-                invoke_apply = MemberExpression.new(make_ident("-invoke"), Identifier.new("apply"), false)
+                invoke_apply = MemberExpression.new(ident("-invoke"), Identifier.new("apply"), false)
                 arguments = Identifier.new("arguments")
                 this_id = Identifier.new("this")
                 array_proto = MemberExpression.new(Identifier.new("Array"), Identifier.new("prototype"), false)
@@ -891,9 +891,9 @@ module Shin
         end
 
         # return our new type.
-        block.body << ReturnStatement.new(make_ident(name.value))
+        block.body << ReturnStatement.new(ident(name.value))
 
-        ex = make_ident("exports/#{name}")
+        ex = ident("exports/#{name}")
         dtor.init = AssignmentExpression.new(ex, dtor.init)
         decl.declarations << dtor
 
@@ -905,9 +905,9 @@ module Shin
       list.each do |el|
         next if el.meta?
         ser!("Expected symbol in declare", el) unless el.sym?
-        ex = make_ident("exports/#{el.value}")
+        ex = ident("exports/#{el.value}")
         ass = AssignmentExpression.new(ex, Identifier.new("null"))
-        @builder << make_decl(make_ident(el.value), ass)
+        @builder << make_decl(ident(el.value), ass)
       end
     end
 
@@ -930,7 +930,7 @@ module Shin
           ser!("Invalid def form", list)
         end
 
-        ex = make_ident("exports/#{name}")
+        ex = ident("exports/#{name}")
         ass = AssignmentExpression.new(ex, init)
         @builder << make_decl(make_ident(name.value), ass)
       end or ser!("Invalid def form", list)
@@ -951,9 +951,9 @@ module Shin
         f = translate_fn_inner_multi(variants, :name => name.value)
       end or ser!("Invalid defn form", list)
 
-      lhs = make_ident(_name.value)
+      lhs = Identifier.new(mangle(_name.value))
       rhs = if export
-              ex = make_ident("exports/#{_name}")
+              ex = ident("exports/#{_name}")
               AssignmentExpression.new(ex, f)
             else
               f
@@ -1075,7 +1075,7 @@ module Shin
         return translate_variadic_fn_inner(args, body, :name => name)
       end
 
-      fn = FunctionExpression.new(name ? make_ident(name) : nil)
+      fn = FunctionExpression.new(nil)
 
       scope = Scope.new
       scope[name] = name if name
@@ -1094,7 +1094,8 @@ module Shin
           end
         else
           args.inner.each do |arg|
-           fn.params << make_ident(arg.value)
+            scope[arg.value] = arg.value
+            fn.params << make_ident(arg.value)
           end
         end
 
@@ -1123,89 +1124,94 @@ module Shin
     end
 
     def translate_fn_inner_multi(variants, name: nil)
-      fn = FunctionExpression.new(name ? make_ident(name) : nil)
+      fn = FunctionExpression.new(nil)
       arity_cache = {}
       variadic_arity = -1
 
       max_arity = 0
       name_candidate = nil
 
-      @builder.into(fn, :statement) do
-        variants.each do |variant|
-          matches?(variant.inner, FN_PATTERN) do |_, args, body|
-            ifn = translate_fn_inner(args, body)
+      scope = Scope.new
+      scope[name] = name if name
 
-            arity = if args.inner.any? { |x| x.sym?('&') }
-                      variadic_arity = args.inner.take_while { |x| !x.sym?('&') }.count
-                      -1
-                    else
-                      args.inner.length
-                    end
+      @builder.with_scope(scope) do
+        @builder.into(fn, :statement) do
+          variants.each do |variant|
+            matches?(variant.inner, FN_PATTERN) do |_, args, body|
+              ifn = translate_fn_inner(args, body)
 
-            if arity > max_arity
-              name_candidate = args.inner
+              arity = if args.inner.any? { |x| x.sym?('&') }
+                        variadic_arity = args.inner.take_while { |x| !x.sym?('&') }.count
+                        -1
+                      else
+                        args.inner.length
+                      end
+
+              if arity > max_arity
+                name_candidate = args.inner
+              end
+              tmp = fresh(name ? name : "anon")
+              ser!("Can't redefine arity #{arity}", variant) if arity_cache.has_key?(arity)
+              arity_cache[arity] = tmp
+              decl = make_decl(tmp, ifn)
+              @builder << decl
+            end or ser!("Invalid function variant", variant)
+          end
+
+          numargs = MemberExpression.new(make_ident('arguments'), make_ident('length'), false)
+          sw = SwitchStatement.new(numargs)
+
+          arg_names = []
+          if name_candidate
+            name_candidate.take_while { |x| !x.sym?('&') }.each do |x|
+              arg_names << (x.sym? ? x.value : fresh('p'))
             end
-            tmp = fresh(name ? name : "anon")
-            ser!("Can't redefine arity #{arity}", variant) if arity_cache.has_key?(arity)
-            arity_cache[arity] = tmp
-            decl = make_decl(tmp, ifn)
-            @builder << decl
-          end or ser!("Invalid function variant", variant)
-        end
-
-        numargs = MemberExpression.new(make_ident('arguments'), make_ident('length'), false)
-        sw = SwitchStatement.new(numargs)
-
-        arg_names = []
-        if name_candidate
-          name_candidate.take_while { |x| !x.sym?('&') }.each do |x|
-            arg_names << (x.sym? ? x.value : fresh('p'))
+          elsif max_arity > 0
+            raise "No name candidate!"
           end
-        elsif max_arity > 0
-          raise "No name candidate!"
-        end
 
-        if variadic_arity >= 0
-          arg_names << 'var_args'
+          if variadic_arity >= 0
+            arg_names << 'var_args'
 
-          max_arity = arity_cache.keys.max
-          if max_arity > variadic_arity
-            ser!("Can't have fixed arity #{max_arity} more than variadic arity #{variadic_arity}", variants)
-          end
-        end
-
-        arg_names.each do |arg_name|
-          id = make_ident(arg_name)
-          fn.params << id 
-        end
-
-        arity_cache.each do |arity, tmp|
-          caze = SwitchCase.new(arity == -1 ? nil : make_literal(arity))
-
-          if arity == -1
-            mexp = MemberExpression.new(make_ident(tmp), Identifier.new('apply'), false)
-            call = CallExpression.new(mexp)
-            call << Identifier.new('this')
-            call << Identifier.new('arguments')
-          else
-            mexp = MemberExpression.new(make_ident(tmp), Identifier.new('call'), false)
-            call = CallExpression.new(mexp)
-            call << Identifier.new('this')
-            (0...arity).each do |i|
-              call << make_ident(arg_names[i])
+            max_arity = arity_cache.keys.max
+            if max_arity > variadic_arity
+              ser!("Can't have fixed arity #{max_arity} more than variadic arity #{variadic_arity}", variants)
             end
           end
-          caze << ReturnStatement.new(call)
-          sw << caze
+
+          arg_names.each do |arg_name|
+            id = make_ident(arg_name)
+            fn.params << id 
+          end
+
+          arity_cache.each do |arity, tmp|
+            caze = SwitchCase.new(arity == -1 ? nil : make_literal(arity))
+
+            if arity == -1
+              mexp = MemberExpression.new(make_ident(tmp), make_ident('apply'), false)
+              call = CallExpression.new(mexp)
+              call << make_ident('this')
+              call << make_ident('arguments')
+            else
+              mexp = MemberExpression.new(make_ident(tmp), make_ident('call'), false)
+              call = CallExpression.new(mexp)
+              call << make_ident('this')
+              (0...arity).each do |i|
+                call << make_ident(arg_names[i])
+              end
+            end
+            caze << ReturnStatement.new(call)
+            sw << caze
+          end
+
+          @builder << sw
+
+          text = make_literal("Invalid arity: ")
+
+          msg = BinaryExpression.new('+', text, numargs)
+          thr = ThrowStatement.new(msg)
+          @builder << thr
         end
-
-        @builder << sw
-
-        text = make_literal("Invalid arity: ")
-
-        msg = BinaryExpression.new('+', text, numargs)
-        thr = ThrowStatement.new(msg)
-        @builder << thr
       end
 
       return fn
@@ -1264,21 +1270,21 @@ module Shin
       when AST::Symbol
         if @quoting
           lit = make_literal(expr.value)
-          @builder << CallExpression.new(make_ident("symbol"), [lit])
+          @builder << CallExpression.new(ident("symbol"), [lit])
         else
           if expr.value == 'nil'
             @builder << make_literal(nil)
           else
-            @builder << make_ident(expr.value)
+            @builder << ident(expr.value)
           end
         end
         nil
       when AST::RegExp
         lit = make_literal(expr.value)
         if @quoting
-          @builder << CallExpression.new(make_ident('--quoted-re'), [lit])
+          @builder << CallExpression.new(ident('--quoted-re'), [lit])
         else
-          @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
+          @builder << NewExpression.new(ident("js/RegExp"), [lit])
         end
         nil
       when AST::Literal
@@ -1305,13 +1311,13 @@ module Shin
             treach(expr.inner.drop(1))
           end
         else
-          @builder.into!(CallExpression.new(make_ident('vector'))) do
+          @builder.into!(CallExpression.new(ident('vector'))) do
             treach(expr.inner)
           end
         end
         nil
       when AST::Set
-        @builder.into!(CallExpression.new(make_ident('hash-set'))) do
+        @builder.into!(CallExpression.new(ident('hash-set'))) do
           treach(expr.inner)
         end
         nil
@@ -1334,21 +1340,21 @@ module Shin
           unless expr.inner.count.even?
             ser!("Map literal requires even number of forms", expr)
           end
-          @builder.into!(CallExpression.new(make_ident('hash-map'))) do
+          @builder.into!(CallExpression.new(ident('hash-map'))) do
             treach(expr.inner)
           end
         end
         nil
       when AST::Keyword
         lit = make_literal(expr.value)
-        @builder << CallExpression.new(make_ident('keyword'), [lit])
+        @builder << CallExpression.new(ident('keyword'), [lit])
         nil
       when AST::List
         if @quoting
           if expr.inner.empty?
-            @builder << MemberExpression.new(make_ident("List"), Identifier.new("EMPTY"), false)
+            @builder << MemberExpression.new(ident("List"), Identifier.new("EMPTY"), false)
           else
-            call = CallExpression.new(make_ident("list"))
+            call = CallExpression.new(ident("list"))
             @builder.into(call, :expression) do
               treach(expr.inner)
             end
@@ -1360,7 +1366,7 @@ module Shin
         end
       when AST::Unquote
         ser!("Invalid usage of unquoting outside of a quote: #{expr}", expr) unless @quoting
-        call = CallExpression.new(make_ident('--unquote'))
+        call = CallExpression.new(ident('--unquote'))
 
         @builder.into(call, :expression) do
           spliced = false
@@ -1393,7 +1399,7 @@ module Shin
       first = list.first
 
       unless first
-        @builder << MemberExpression.new(make_ident("List"), Identifier.new("EMPTY"), false)
+        @builder << MemberExpression.new(ident("List"), Identifier.new("EMPTY"), false)
         return
       end
 
@@ -1415,7 +1421,7 @@ module Shin
             rest = rest.drop(1)
           end
 
-          property = Identifier.new(mangle(propname))
+          property = make_ident(propname)
           object = as_expr(rest[0])
           @builder << MemberExpression.new(object, property, false)
         when name == '..'
@@ -1440,7 +1446,7 @@ module Shin
         when name.end_with?('.')
           # instanciation
           type_name = name[0..-2]
-          inst = NewExpression.new(make_ident(type_name))
+          inst = NewExpression.new(ident(type_name))
           @builder.into!(inst) do
             treach(list.drop(1))
           end
@@ -1572,7 +1578,7 @@ module Shin
       # if we reached here, it's not a special form,
       # just a regular function call
       ifn = as_expr(first)
-      mexp = MemberExpression.new(ifn, make_ident('call'), false)
+      mexp = MemberExpression.new(ifn, ident('call'), false)
       @builder.into!(CallExpression.new(mexp)) do
         @builder << make_literal(nil)
         treach(list.drop(1))
@@ -1594,7 +1600,7 @@ module Shin
         @builder.declare(lhs.value, tmp)
         @builder << make_decl(tmp, rhs)
       when :assign
-        @builder << AssignmentExpression.new(make_ident(lhs.value), rhs)
+        @builder << AssignmentExpression.new(ident(lhs.value), rhs)
       else raise "Invalid mode: #{mode}"
       end
     end
@@ -1641,29 +1647,36 @@ module Shin
       Literal.new(id)
     end
 
-    def make_ident(id)
-      matches = /^([^\/]+)[\/](.*)?$/.match(id)
+    def qualified?(name)
+      /^([^\/]+)[\/](.*)?$/.match(name)
+    end
+
+    def make_ident(name)
+      matches = qualified?(name)
       if matches
-        ns, name = matches.to_a.drop(1)
+        ns, member = matches.to_a.drop(1)
         case ns
         when "js"
-          Identifier.new(name)
+          # only case where identifiers aren't mangled.
+          Identifier.new(member)
         else
-          MemberExpression.new(make_ident(ns), make_ident(name), false)
+          MemberExpression.new(Identifier.new(mangle(ns)),
+                               Identifier.new(mangle(member)),
+                               false)
         end
       else
-        aka = @builder.lookup(id)
-        if aka
-          # debug "Resolved #{id} => #{aka}"
-          matches = /^([^\/]+)\/(.*)?$/.match(aka)
-          if matches
-            obj, prop = matches.to_a.drop(1)
-            MemberExpression.new(make_ident(obj), Identifier.new(mangle(prop)), false)
-          else
-            Identifier.new(mangle(aka))
-          end
+        Identifier.new(mangle(name))
+      end
+    end
+
+    def ident(name)
+      if qualified?(name)
+        make_ident(name)
+      else
+        if symbol = @builder.lookup(name)
+          make_ident(symbol)
         else
-          Identifier.new(mangle(id))
+          make_ident(name)
         end
       end
     end

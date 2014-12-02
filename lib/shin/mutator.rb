@@ -90,23 +90,22 @@ module Shin
       @mod.requires.each do |req|
         next unless req.macro?
 
-        macros = @compiler.modules[req]
+        dep = @compiler.modules[req]
 
         # compile macro code if needed
-        unless macros.code
-          Shin::NsParser.new(macros).parse
-          Shin::Mutator.new(@compiler, macros).mutate
-          Shin::Translator.new(@compiler, macros).translate
-          Shin::Generator.new(macros).generate
-          @compiler.modules << macros
-          # debug "Generated macro code from #{macros.slug}"
+        unless dep.code
+          Shin::NsParser.new(dep).parse
+          Shin::Mutator.new(@compiler, dep).mutate
+          Shin::Translator.new(@compiler, dep).translate
+          Shin::Generator.new(dep).generate
+          @compiler.modules << dep
+          # debug "Generated macro code from #{dep.slug}"
         end
 
-        defs = macros.defs
-        res = defs[name]
+        res = dep.scope.form_for(name)
         if res
-          # debug "Found '#{name}' in #{macros.slug}, which has defs #{defs.keys.join(", ")}" if DEBUG
-          return {:macro => res, :module => macros}
+          # debug "Found '#{name}' in #{dep.slug}, which has defs #{defs.keys.join(", ")}" if DEBUG
+          return {:macro => res, :module => dep}
         end
       end
 
@@ -133,9 +132,11 @@ module Shin
       eval_ast = List.new(t, Hamster.vector(_yield, List.new(t, Hamster.vector(pr_str, eval_node))))
       eval_mod.ast = eval_mod.ast2 = [eval_ast]
 
-      info_ns = info[:module].ns
-      req = Shin::Require.new(info_ns, :macro => true, :refer => :all)
-      eval_mod.requires << req
+      unless info[:module].core?
+        info_ns = info[:module].ns
+        req = Shin::Require.new(info_ns, :macro => true, :refer => :all)
+        eval_mod.requires << req
+      end
 
       eval_mod.source = @mod.source
       t1 = 1000 * Benchmark.realtime do

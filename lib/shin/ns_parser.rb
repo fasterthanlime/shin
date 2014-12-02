@@ -18,23 +18,25 @@ module Shin
       return if mod.ns
 
       nsdef = mod.ast[0]
+      specs = []
 
       if nsdef && nsdef.list?
-        matches?(nsdef.inner, "ns :sym :expr*") do |_, name, specs|
+        matches?(nsdef.inner, "ns :sym :expr*") do |_, name, _specs|
           # get rid of nsdef (don't translate it)
           # FIXME: it's probably not good for NsParser to mutate the AST.
           # Maybe translator could be a champ and just ignore it?
           mod.ast = mod.ast.drop(1)
-
           mod.ns = name.value
-          specs.each { |spec| translate_spec(spec) }
+          specs = _specs
         end
       end
 
-      mod.ns ||= "anonymous#{fresh}"
       add_core_requires(mod)
+      specs.each { |spec| translate_spec(spec) }
+      parse_defs(mod.ast)
 
-      #raise "Uhhhhhhhhh...." if mod.slug.end_with?('8')
+      mod.ns ||= "anonymous#{fresh}"
+
       debug "Requires for #{mod.slug}:\n#{mod.requires.join("\n")}"
     end
 
@@ -136,6 +138,43 @@ module Shin
       end
     end
 
+    ########################
+    # Def parsing
+
+    def parse_defs(nodes)
+      scope = NsScope.new(@mod.slug)
+
+      nodes.each do |node|
+        next unless node.list? || node.inner.empty?
+        first = node.inner.first
+
+        # a non-private def
+        if first.sym? &&
+            first.value.start_with?("def") &&
+            !first.value.end_with?("-")
+          raise "Invalid def: #{node}" unless node.inner.length >= 2
+          name = node.inner[1].value
+          scope[name] = node
+
+          # protocols define some methods that are top-level symbols too cf. #70
+          if first.value == "defprotocol"
+            gather_defprotocol_defs(scope, node.inner.drop(2))
+          end
+        end
+      end
+
+      @mod.scope = scope.freeze
+    end
+
+    def gather_defprotocol_defs(scope, decls)
+      decls.each do |decl|
+        raise "Invalid protocol function decl" unless decl.list?
+        first = decl.inner.first
+        raise "Invalid protocol function decl" unless first.sym?
+        scope[first.value] = decl
+      end
+    end
+
     def fresh
       @@seed += 1
     end
@@ -180,7 +219,7 @@ module Shin
     end
 
     def slug
-      "#{ns}#{macro ? '..macro' : ''}"
+      "#{ns}#{macro ? '__macro' : ''}"
     end
 
     def as_sym

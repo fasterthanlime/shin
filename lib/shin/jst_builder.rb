@@ -2,6 +2,7 @@
 require 'shin/jst'
 require 'shin/utils/hamster'
 require 'hamster/deque'
+require 'set'
 
 module Shin
   # Keeps track of things like scoping, context, etc.
@@ -183,13 +184,61 @@ module Shin
     end
 
     def []=(x, v)
-      raise "Overwriting #{x} in scope #{self}" if @defs.has_key?(x)
+      puts "Overwriting #{x} in scope #{self}" if @defs.has_key?(x)
       @defs[x] = v
     end
 
     def to_s
       inner = @defs.map { |k, v| "#{k} => #{v}" }.join(", ")
       "(#{inner})"
+    end
+  end
+
+  class NsScope
+    def initialize(ns)
+      @ns = ns
+      @defs = {}
+    end
+
+    def []=(x, y)
+      @defs[x] = y
+    end
+
+    def [](x)
+      return "#{@ns}/#{x}" if @defs.include?(x)
+      nil
+    end
+
+    def form_for(x)
+      @defs[x]
+    end
+  end
+
+  class CompositeScope < Scope
+    def initialize
+      super
+      @referred = []
+    end
+
+    def attach(referred)
+      @referred << referred
+    end
+
+    def [](x)
+      ours = @defs[x]
+      return ours if ours
+
+      # more recent requires shadow the others
+      @referred.reverse_each do |ref|
+        theirs = ref[x]
+        return theirs if theirs
+      end
+      
+      nil
+    end
+
+    def to_s
+      "(CompositeScope with #{@referred.length} referred)"
     end
   end
 
