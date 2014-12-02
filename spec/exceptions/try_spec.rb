@@ -49,7 +49,7 @@ RSpec.describe "Language", "exceptions" do
   describe "various modes" do
     it "works as expression" do
       expect(%Q{
-             (print (try "Try"))
+             (print (try "Try" (catch js/Object e nil)))
              (print (try
                       (throw (js/Error. "Woops."))
                       (catch js/Object e "Catch")))
@@ -58,7 +58,7 @@ RSpec.describe "Language", "exceptions" do
 
     it "works as return" do
       expect(%Q{
-             (print (#(try "Try")))
+             (print (#(try "Try" (catch js/Object e nil))))
              (print (#(try
                       (throw (js/Error. "Woops."))
                       (catch js/Object e "Catch"))))
@@ -67,7 +67,9 @@ RSpec.describe "Language", "exceptions" do
 
     it "works as statement" do
       expect(%Q{
-             (try (print "Try"))
+             (try
+               (print "Try")
+               (catch js/Object e nil))
              (try
                (throw (js/Error. "Woops."))
                (catch js/Object e

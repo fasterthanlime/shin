@@ -411,6 +411,10 @@ module Shin
       else
         ser!("Expected only one finally form", rest)
       end
+
+      if final.nil? && clauses.empty?
+        ser!("Try block needs at least one catch clause or a finally", list)
+      end
       
       mode = @builder.mode
       support = case mode
@@ -432,44 +436,46 @@ module Shin
         end
       end
 
-      exarg = Identifier.new(fresh('ex'))
-      pitch = CatchClause.new(exarg)
-      trie.handlers << pitch
+      unless clauses.empty?
+        exarg = Identifier.new(fresh('ex'))
+        pitch = CatchClause.new(exarg)
+        trie.handlers << pitch
 
-      t = list.first.token
-      exsym = AST::Symbol.new(t, exarg.name)
-      condp_sym = AST::Symbol.new(t, "condp")
-      inst_sym = AST::Symbol.new(t, "instance?")
-      condp_vec = Hamster.vector(condp_sym, inst_sym, exsym)
+        t = list.first.token
+        exsym = AST::Symbol.new(t, exarg.name)
+        condp_sym = AST::Symbol.new(t, "condp")
+        inst_sym = AST::Symbol.new(t, "instance?")
+        condp_vec = Hamster.vector(condp_sym, inst_sym, exsym)
 
-      clauses.each do |clause|
-        t = clause.token
+        clauses.each do |clause|
+          t = clause.token
 
-        args = clause.inner.drop(1)
-        etype = args.first; args = args.drop(1)
-        param = args.first; args = args.drop(1)
-        cbody = args.first
+          args = clause.inner.drop(1)
+          etype = args.first; args = args.drop(1)
+          param = args.first; args = args.drop(1)
+          cbody = args.first
 
-        condp_vec <<= etype
+          condp_vec <<= etype
 
-        binds_vec = Hamster.vector(param, exsym)
-        let_binds = AST::Vector.new(t, binds_vec)
+          binds_vec = Hamster.vector(param, exsym)
+          let_binds = AST::Vector.new(t, binds_vec)
 
-        let_sym = AST::Symbol.new(t, "let")
-        let_vec = Hamster.vector(let_sym, let_binds, cbody)
-        condp_vec <<= AST::List.new(t, let_vec)
-      end
-
-      condp = AST::List.new(t, condp_vec)
-
-      case mode
-      when :expression, :return
-        @builder.into(pitch, :return) do
-          tr(condp)
+          let_sym = AST::Symbol.new(t, "let")
+          let_vec = Hamster.vector(let_sym, let_binds, cbody)
+          condp_vec <<= AST::List.new(t, let_vec)
         end
-      when :statement
-        @builder.into(pitch, :statement) do
-          tr(condp)
+
+        condp = AST::List.new(t, condp_vec)
+
+        case mode
+        when :expression, :return
+          @builder.into(pitch, :return) do
+            tr(condp)
+          end
+        when :statement
+          @builder.into(pitch, :statement) do
+            tr(condp)
+          end
         end
       end
 
@@ -1428,6 +1434,9 @@ module Shin
         when "catch"
           # it's normalled all handled in translate_try
           ser!("Unexpected 'catch'", expr)
+        when "finally"
+          # it's normalled all handled in translate_try
+          ser!("Unexpected 'finally'", expr)
         when "cond"
           translate_cond(rest)
         when "condp"
