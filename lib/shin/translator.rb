@@ -27,6 +27,13 @@ module Shin
     end
 
     def translate
+      t = 1000 * Benchmark.realtime { translate_real }
+      # if @compiler.opts[:profile]
+      #   puts "Translated #{@mod.slug.center(30)} in #{t.round(0).to_s.+("ms").center(20)}"
+      # end
+    end
+
+    def translate_real
       ast = @mod.ast2
 
       requires = [Shin::Require.new('exports')]

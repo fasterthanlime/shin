@@ -46,51 +46,45 @@ module Shin
       puts "Parsing\t#{parse_time}" if @opts[:profile]
 
       all_mods = collect_deps(main)
-      mutate_skips = []
       mutate_time = Benchmark.measure do
         all_mods.each do |slug, mod|
           if mod.ast2
-            mutate_skips << slug
             next
           end
           Shin::Mutator.new(self, mod).mutate
         end
       end
-      puts "Mutating\t#{mutate_time} (skips: #{mutate_skips.join(" ")})" if @opts[:profile]
+      puts "Mutating\t#{mutate_time}" if @opts[:profile]
 
       if opts[:ast2]
         puts main.ast2.join("\n")
         exit 0
       end
 
-      translate_skips = []
       translate_time = Benchmark.measure do
         all_mods.each do |slug, mod|
           if mod.jst
-            translate_skips << slug
             next
           end
           Shin::Translator.new(self, mod).translate
         end
       end
-      puts "Translating\t#{translate_time} (skips: #{translate_skips.join(" ")})" if @opts[:profile]
+      puts "Translating\t#{translate_time}" if @opts[:profile]
 
       if opts[:jst]
         puts Oj.dump(main.jst, :mode => :object, :indent => 2)
         exit 0
       end
 
-      generate_skips = []
       generate_time = Benchmark.measure do
         all_mods.each do |slug, mod|
           if mod.code
-            generate_skips << slug
             next
           end
           Shin::Generator.new(mod).generate
         end
       end
-      puts "Generation\t#{generate_time} (skips: #{generate_skips.join(" ")})" if @opts[:profile]
+      puts "Generation\t#{generate_time}" if @opts[:profile]
 
       if opts[:js]
         puts main.code

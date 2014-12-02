@@ -6,6 +6,27 @@ require 'benchmark'
 require 'shin'
 require 'shin/compiler'
 
+class String
+  def black;          "\033[30m#{self}\033[0m" end
+  def red;            "\033[31m#{self}\033[0m" end
+  def green;          "\033[32m#{self}\033[0m" end
+  def brown;          "\033[33m#{self}\033[0m" end
+  def blue;           "\033[34m#{self}\033[0m" end
+  def magenta;        "\033[35m#{self}\033[0m" end
+  def cyan;           "\033[36m#{self}\033[0m" end
+  def gray;           "\033[37m#{self}\033[0m" end
+  def bg_black;       "\033[40m#{self}\033[0m" end
+  def bg_red;         "\033[41m#{self}\033[0m" end
+  def bg_green;       "\033[42m#{self}\033[0m" end
+  def bg_brown;       "\033[43m#{self}\033[0m" end
+  def bg_blue;        "\033[44m#{self}\033[0m" end
+  def bg_magenta;     "\033[45m#{self}\033[0m" end
+  def bg_cyan;        "\033[46m#{self}\033[0m" end
+  def bg_gray;        "\033[47m#{self}\033[0m" end
+  def bold;           "\033[1m#{self}\033[22m" end
+  def reverse_color;  "\033[7m#{self}\033[27m" end
+end
+
 module Shin
   class CLI
     def initialize
@@ -48,16 +69,14 @@ module Shin
 
       begin
         compiler = Shin::Compiler.new(opts)
-        compile_time = Benchmark.measure do
+        compile_time = 1000 * Benchmark.realtime do
           compiler.compile(source, :file => file)
         end
-        puts "Total\t#{compile_time}"
-
-        puts "Compiled #{file || "<stdin>"}" if opts[:output]
+        puts "Compiled #{file || "<stdin>"} in #{compile_time.round(0)}ms".green if opts[:output]
       rescue SyntaxError => e
-        puts "\n[ERROR] #{e.message}"
+        puts "\n[ERROR] #{e.message}".red
         if ENV['DEBUG']
-          puts e.backtrace
+          puts e.backtrace.to_s.red
         end
       end
     end
