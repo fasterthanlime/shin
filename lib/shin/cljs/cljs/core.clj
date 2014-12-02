@@ -79,6 +79,10 @@
   `(let [~x ~y]
      (if ~x (do ~@body) nil)))
 
+(defmacro when-some [[x y] & body]
+  `(let [~x ~y]
+     (if (nil? ~x) nil (do ~@body))))
+
 (defmacro if-let [[x y] & body]
   `(let [~x ~y]
      (if ~x ~@body)))

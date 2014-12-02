@@ -25,6 +25,13 @@ RSpec.describe "Language", "builtins" do
            }).to have_output(%w(1 1))
   end
 
+  it "has working when-some" do
+    expect(%Q{
+           (when-some [s "1"] (print s))
+           (when-some [s nil] (print s))
+           }).to have_output(%w(1))
+  end
+
   it "has working if-let" do
     expect(%Q{
            (if-let [s "s"] (print 1 s) (print 2))
