@@ -16,12 +16,14 @@
 
 (defmacro binding
   ([bindings & body]
-   (let [syms (take-nth 2 bindings)
-         vals (take-nth 2 (drop 1 bindings))
-         pairs (interleave syms vals)]
-     (map
-       (fn [[sym val]] `(set! ~sym ~val))
-       pairs))))
+   (let [pairs (partition 2 bindings)
+         quads (map #(list* (gensym "save") (gensym "conf") %) pairs)]
+     `(do
+        ~@(map (fn [[save conf sym val]] `(set! ~save ~sym)) quads)
+        ~@(map (fn [[save conf sym val]] `(set! ~conf ~val)) quads)
+        ~@(map (fn [[save conf sym val]] `(set! ~sym ~conf)) quads)
+        ~@body                        
+        ~@(map (fn [[save conf sym val]] `(set! ~sym ~save)) quads)))))
 
 (defmacro ->
   ([x]
