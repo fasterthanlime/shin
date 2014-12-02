@@ -38,7 +38,14 @@ module Shin
     end
 
     def into(recipient, mode = :expression, &block)
-      with_vase(:into => recipient, :mode => mode, &block)
+      vase = Vase.new(recipient, mode)
+      old_vases = @vases
+      begin
+        @vases = @vases.unshift(vase)
+        block.call
+      ensure
+        @vases = old_vases
+      end
       recipient
     end
 
@@ -47,25 +54,6 @@ module Shin
     end
 
     REQUIRED_VASE_ARGS = %i(into mode)
-
-    def with_vase(opts, &block)
-      old_vases = @vases
-
-      vase = case opts
-             when Vase
-               opts
-             else
-               raise unless REQUIRED_VASE_ARGS.all? { |x| opts.has_key?(x) }
-               Vase.new(opts[:into], opts[:mode])
-             end
-
-      begin
-        @vases = @vases.unshift(vase)
-        block.call
-      ensure
-        @vases = old_vases
-      end
-    end
 
     def anchor
       raise "Trying to get anchor in anchorless builder" if @anchors.empty?

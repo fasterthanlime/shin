@@ -37,19 +37,7 @@ RSpec.describe "Infrastructure", "JstBuilder" do
     end
   end
 
-  describe "with_vase" do
-    it "uses supplied vase" do
-      sentinel = Shin::JST::Literal.new(nil)
-
-      vase = Shin::Vase.new([], :expression)
-      expect(vase).to receive(:<<).with(sentinel)
-
-      builder = Shin::JstBuilder.new
-      builder.with_vase(vase) do
-        builder << sentinel
-      end
-    end
-
+  describe "into" do
     it "creates vase as needed" do
       sentinel = Shin::JST::Literal.new(nil)
 
@@ -57,7 +45,7 @@ RSpec.describe "Infrastructure", "JstBuilder" do
       expect(recipient).to receive(:<<).with(sentinel)
 
       builder = Shin::JstBuilder.new
-      builder.with_vase(:into => recipient, :mode => :expression) do
+      builder.into(recipient, :expression) do
         builder << sentinel
       end
     end
