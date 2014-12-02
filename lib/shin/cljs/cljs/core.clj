@@ -102,3 +102,6 @@
          ~@body
          (recur (inc ~sym))))))
 
+(defmacro js-delete [obj prop]
+  `(*js-uop delete (aget ~obj ~prop)))
+
