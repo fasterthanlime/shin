@@ -115,5 +115,25 @@ RSpec.describe "Language", "defprotocol and deftype" do
              (d 1 2))
            }).to have_output(['Arity 1', 'Arity 2', 'Arity 3'])
   end
+  
+  it "1-arity " do
+    expect(%Q{
+           (defprotocol IKalamazoo
+             (-kalamazoo [o]))
+           (deftype Tester [sentinel]
+             Object
+             (llanfair [o]
+               (print (.-sentinel o))
+               (print (alength arguments)))
+
+             IKalamazoo
+             (-kalamazoo [o]
+               (print (.-sentinel o))
+               (print (alength arguments))))
+           (let [t (Tester. "cookie")]
+             (.llanfair t)
+             (-kalamazoo t))
+           }).to have_output(%w(cookie 0 cookie 1))
+  end
 end
 

@@ -806,7 +806,24 @@ module Shin
                 fn = nil
                 matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
                   args_len = args.inner.length
-                  fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+
+                  if naked
+                    t = id.token
+                    do_vec = Hamster.vector(AST::Symbol.new(t, "do"))
+                    body.each do |child|
+                      do_vec <<= child
+                    end
+                    do_block = AST::List.new(t, do_vec)
+                    this_as_vec = Hamster.vector(AST::Symbol.new(t, "this-as"),
+                                                 args.inner.first,
+                                                 do_block)
+                    this_as = AST::List.new(t, this_as_vec)
+
+                    remaining_args = AST::Vector.new(t, args.inner.drop(1))
+                    fn = translate_fn_inner(remaining_args, [this_as], :name => (name ? name.value : nil))
+                  else
+                    fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+                  end
                 end or ser!("Invalid fn form in deftype: #{limb}", list)
 
                 self_decl = VariableDeclaration.new
