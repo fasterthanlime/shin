@@ -221,7 +221,7 @@ module Shin
       @referred = []
     end
 
-    def attach(referred)
+    def attach!(referred)
       @referred << referred
     end
 

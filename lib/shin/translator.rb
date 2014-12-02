@@ -86,7 +86,7 @@ module Shin
           unless req.js?
             dep = @compiler.modules[req]
             raise Shin::Error, "Couldn't find req #{req.slug}" unless dep
-            top_scope.attach(dep.scope)
+            top_scope.attach!(dep.scope)
           end
         elsif !req.refer.empty?
           ref_scope = Scope.new
