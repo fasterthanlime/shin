@@ -2,6 +2,18 @@
 
 (def *assert* true)
 
+(defmacro or
+  ([] nil)
+  ([x] x)
+  ([x & rest]
+   `(let [x# ~x] (if x# x# (or ~@rest)))))
+
+(defmacro and
+  ([] true)
+  ([x] x)
+  ([x & rest]
+   `(let [x# ~x] (if (not x#) x# (and ~@rest)))))
+
 (defmacro ->
   ([x]
    x)
