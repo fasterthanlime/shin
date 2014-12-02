@@ -1512,6 +1512,12 @@ module Shin
         when "*js-bop"
           op, l, r = rest
           @builder << BinaryExpression.new(op.value, as_expr(l), as_expr(r))
+        when "*js-call"
+          fn = rest.first
+          args = rest.drop(1)
+          @builder.into!(CallExpression.new(as_expr(fn))) do
+            treach(args)
+          end
         else
           if name == "fn" && !rest.empty?
             translate_fn(rest)
