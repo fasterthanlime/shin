@@ -44,9 +44,9 @@ module Shin
 
       program = Program.new
       load_shim = FunctionExpression.new
-      load_shim.params << ident('root');
-      load_shim.params << ident('factory')
-      define_call = CallExpression.new(ident('define'))
+      load_shim.params << make_ident('root');
+      load_shim.params << make_ident('factory')
+      define_call = CallExpression.new(make_ident('define'))
       require_arr = ArrayExpression.new
       requires.each do |req|
         next if req.macro? && !@mod.macro?
@@ -55,8 +55,8 @@ module Shin
       define_call.arguments << require_arr
 
       bound_factory = CallExpression.new(
-        MemberExpression.new(ident('factory'), ident('bind'), false),
-        [ident('this')])
+        MemberExpression.new(make_ident('factory'), make_ident('bind'), false),
+        [make_ident('this')])
       define_call.arguments << bound_factory
       load_shim.body << ExpressionStatement.new(define_call)
 
@@ -670,7 +670,7 @@ module Shin
         @builder << make_decl(Identifier.new(protocol_name), ass)
 
         sigs.each do |sig|
-          meth_name = sig.inner.first
+          meth_name = sig.inner.first.value
 
           arg_lists = sig.inner.drop(1)
           arg_lists.each do |arg_list|
@@ -684,20 +684,19 @@ module Shin
                end
           ex = ident("exports/#{meth_name}")
           ass = AssignmentExpression.new(ex, fn)
-          @builder << make_decl(make_ident(meth_name.value), ass)
+          @builder << make_decl(make_ident(meth_name), ass)
         end
       end or ser!("Invalid defprotocol form", list)
     end
 
     def translate_protocol_simple_fun(protocol_name, name, arg_list)
       arity = arg_list.inner.length
-      fn = FunctionExpression.new(nil)
-      arguments = ident('arguments')
+      fn = FunctionExpression.new(name ? make_ident(name) : nil)
+      arguments = make_ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
-      slot_aware_name = "#{name.value}$arity#{arg_list.inner.length}"
-
-      meth_acc = MemberExpression.new(this_access, ident(slot_aware_name), false)
+      slot_aware_name = "#{name}$arity#{arg_list.inner.length}"
+      meth_acc = MemberExpression.new(this_access, make_ident(slot_aware_name), false)
       
       # err if not implemented
       # TODO: remove code duplication with translate_protocol_multi_fun
@@ -709,28 +708,28 @@ module Shin
       fn.body << if_notimpl
 
       # TODO: don't always use apply, just relay args if non-variadic
-      apply_acc = MemberExpression.new(meth_acc, ident('apply'), false)
+      apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
       first_arg = MemberExpression.new(arguments, make_literal(0), true)
       meth_call = CallExpression.new(apply_acc)
       meth_call.arguments << first_arg
-      meth_call.arguments << ident('arguments')
+      meth_call.arguments << make_ident('arguments')
       fn.body << ReturnStatement.new(meth_call)
 
       return fn
     end
 
     def translate_protocol_multi_fun(protocol_name, name, arg_lists)
-      fn = FunctionExpression.new(nil)
-      arguments = ident('arguments')
+      fn = FunctionExpression.new(name ? make_ident(name) : nil)
+      arguments = make_ident('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
-      numargs = MemberExpression.new(arguments, ident('length'), false)
+      numargs = MemberExpression.new(arguments, make_ident('length'), false)
       sw = SwitchStatement.new(numargs)
       fn << sw
 
       arg_lists.each do |arg_list|
         arity = arg_list.inner.length
-        slot_aware_name = "#{name.value}$arity#{arity}"
+        slot_aware_name = "#{name}$arity#{arity}"
 
         caze = SwitchCase.new(variadic_args?(arg_list) ?  nil : make_literal(arity))
         sw.cases << caze
@@ -748,11 +747,11 @@ module Shin
         caze << if_notimpl
 
         # TODO: don't always use apply, just relay args if non-variadic
-        apply_acc = MemberExpression.new(meth_acc, ident('apply'), false)
+        apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
         first_arg = MemberExpression.new(arguments, make_literal(0), true)
         meth_call = CallExpression.new(apply_acc)
         meth_call.arguments << first_arg
-        meth_call.arguments << ident('arguments')
+        meth_call.arguments << make_ident('arguments')
         caze << ReturnStatement.new(meth_call)
       end
 
@@ -841,7 +840,7 @@ module Shin
 
               raise "Internal error" if args_len == -1
               arity_aware_slot_name = naked ? id.value : "#{id.value}$arity#{args_len}"
-              slot = MemberExpression.new(prototype_mexpr, ident(arity_aware_slot_name), false)
+              slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
               ass = AssignmentExpression.new(slot, fn)
               @builder << ExpressionStatement.new(ass)
             when limb.sym?
@@ -1075,7 +1074,7 @@ module Shin
         return translate_variadic_fn_inner(args, body, :name => name)
       end
 
-      fn = FunctionExpression.new(nil)
+      fn = FunctionExpression.new(name ? make_ident(name) : nil)
 
       scope = Scope.new
       scope[name] = name if name
@@ -1284,7 +1283,7 @@ module Shin
         if @quoting
           @builder << CallExpression.new(ident('--quoted-re'), [lit])
         else
-          @builder << NewExpression.new(ident("js/RegExp"), [lit])
+          @builder << NewExpression.new(make_ident("js/RegExp"), [lit])
         end
         nil
       when AST::Literal

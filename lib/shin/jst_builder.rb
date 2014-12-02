@@ -184,7 +184,8 @@ module Shin
     end
 
     def []=(x, v)
-      puts "Overwriting #{x} in scope #{self}" if @defs.has_key?(x)
+      # TODO: investigate...
+      # puts "Overwriting #{x} in scope #{self}" if @defs.has_key?(x)
       @defs[x] = v
     end
 

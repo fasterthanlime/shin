@@ -145,14 +145,14 @@ module Shin
       scope = NsScope.new(@mod.slug)
 
       nodes.each do |node|
-        next unless node.list? || node.inner.empty?
+        next unless node.list? && !node.inner.empty?
         first = node.inner.first
 
         # a non-private def
         if first.sym? &&
             first.value.start_with?("def") &&
             !first.value.end_with?("-")
-          raise "Invalid def: #{node}" unless node.inner.length >= 2
+          raise Shin::SyntaxError, "Invalid def: #{node}" unless node.inner.length >= 2
           name = node.inner[1].value
           scope[name] = node
 
