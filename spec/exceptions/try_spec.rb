@@ -27,6 +27,23 @@ RSpec.describe "Language", "exceptions" do
               (eek [$ "bleep"])
              }).to have_output(%w(Before Object Before Array))
     end
+
+    it "does work (finally)" do
+      expect(%Q{
+             (defn eek [up]
+               (try
+                 (print "Before")
+                 (throw up)
+                 (catch js/Array e
+                   (print "Array"))
+                 (catch js/Object e
+                   (print "Object"))
+                 (finally
+                   (print "After"))))
+              (eek #"blup")
+              (eek [$ "bleep"])
+             }).to have_output(%w(Before Object After Before Array After))
+    end
   end
 
   describe "various modes" do

@@ -18,12 +18,13 @@
   ([bindings & body]
    (let [pairs (partition 2 bindings)
          quads (map #(list* (gensym "save") (gensym "conf") %) pairs)]
-     `(do
-        ~@(map (fn [[save conf sym val]] `(set! ~save ~sym)) quads)
-        ~@(map (fn [[save conf sym val]] `(set! ~conf ~val)) quads)
+     `(try
+        ~@(map (fn [[save conf sym val]] `(declare-and-set! ~save ~sym)) quads)
+        ~@(map (fn [[save conf sym val]] `(declare-and-set! ~conf ~val)) quads)
         ~@(map (fn [[save conf sym val]] `(set! ~sym ~conf)) quads)
         ~@body                        
-        ~@(map (fn [[save conf sym val]] `(set! ~sym ~save)) quads)))))
+        (finally
+          ~@(map (fn [[save conf sym val]] `(set! ~sym ~save)) quads))))))
 
 (defmacro ->
   ([x]

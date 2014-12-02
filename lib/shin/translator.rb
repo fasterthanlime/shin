@@ -392,13 +392,25 @@ module Shin
       node.list? && node.inner.first && node.inner.first.sym?("catch")
     end
 
-    def translate_try(list)
-      exprs   = list.take_while { |x| !is_catch?(x) }
-      clauses = list.drop_while { |x| !is_catch?(x) }
-      ser!("All 'catch' clauses must be at the end of a try form.", list) unless clauses.all? { |x| is_catch?(x) }
+    def is_finally?(node)
+      node.list? && node.inner.first && node.inner.first.sym?("finally")
+    end
 
-      # TODO: support finally
-      # TODO: support expression mode
+    def translate_try(list)
+      exprs   = list.take_while { |x| !is_catch?(x) && !is_finally?(x) }
+      clauses = list.drop(exprs.count).take_while { |x| is_catch?(x) }
+      rest    = list.drop(exprs.count + clauses.count)
+      final   = nil
+
+      case rest.length
+      when 0
+        # all good
+      when 1
+        final = rest.first
+        ser!("Expected finally form", final) unless is_finally?(final)
+      else
+        ser!("Expected only one finally form", rest)
+      end
       
       mode = @builder.mode
       support = case mode
@@ -459,6 +471,21 @@ module Shin
         @builder.into(pitch, :statement) do
           tr(condp)
         end
+      end
+
+      # handle finally
+      if final
+        final_block = BlockStatement.new;
+        final_body = final.inner.drop(1)
+        case mode
+        when :expression, :return
+          trbody(final_body, final_block)
+        when :statement
+          @builder.into(final_block, :statement) do
+            treach(final_body)
+          end
+        end
+        trie.finalizer = final_block
       end
 
       support << trie
@@ -1449,6 +1476,9 @@ module Shin
         when "set!"
           property, val = rest
           @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
+        when "declare-and-set!"
+          property, val = rest
+          @builder << make_decl(as_expr(property), as_expr(val))
         when "aset"
           object = rest.first
           props = rest.drop(1)
