@@ -1,5 +1,7 @@
 (ns cljs.core)
 
+(def *assert* true)
+
 (defmacro ->
   ([x]
    x)
