@@ -477,13 +477,8 @@ module Shin
       if final
         final_block = BlockStatement.new;
         final_body = final.inner.drop(1)
-        case mode
-        when :expression, :return
-          trbody(final_body, final_block)
-        when :statement
-          @builder.into(final_block, :statement) do
-            treach(final_body)
-          end
+        @builder.into(final_block, :statement) do
+          treach(final_body)
         end
         trie.finalizer = final_block
       end
