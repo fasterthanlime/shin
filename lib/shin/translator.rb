@@ -1267,7 +1267,12 @@ module Shin
           props = []
           list.each_slice(2) do |pair|
             key, val = pair
-            props << Property.new(as_expr(key), as_expr(val))
+            k = if key.kw?
+                  Literal.new(key.value)
+                else
+                  as_expr(key)
+                end
+            props << Property.new(k, as_expr(val))
           end
           @builder << ObjectExpression.new(props)
         else
