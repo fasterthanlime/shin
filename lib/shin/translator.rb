@@ -1647,13 +1647,12 @@ module Shin
     end
 
     def qualified?(name)
-      /^([^\/]+)[\/](.*)?$/.match(name)
+      name.include?("/") && name.size > 1
     end
 
     def make_ident(name)
-      matches = qualified?(name)
-      if matches
-        ns, member = matches.to_a.drop(1)
+      if qualified?(name)
+        ns, member = name.split("/", 2)
         case ns
         when "js"
           # only case where identifiers aren't mangled.
