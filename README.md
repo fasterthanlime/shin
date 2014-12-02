@@ -11,6 +11,52 @@ It's heavily inspired by:
   - [ClojureScript][cljs]
   - The [ki language][ki]
 
+## How to play with it
+
+Before we get into details, here's how you can get shin up and running to
+play around with it.
+
+  - Make sure you have a recent Ruby (2.1 is recommended) & rubygems
+  - Clone `shin` in a directory
+  - Make another directory alongside it, say `shin-playground`
+  - Create `shin-playground/Gemfile` and populate it with:
+
+```ruby
+source "https://rubygems.org"
+
+gem "shin", :path => "../shin"
+```
+
+  - Run `bundle install` in `shin-playground`
+  - You can now run `bundle exec shin` to run shin.
+
+Ultimately, there'll be releases of shin and installing will be as easy
+as `gem install shin` but since, so far, things are moving quite quickly,
+it's just easier to have people playing with master.
+
+### Basic command line usage
+
+Eval one-liners:
+
+```
+$ bundle exec shin -e "(println (reduce + (map #(* % 2) (take 10 (range)))))"
+90
+```
+
+(Note: the return value is ignored, so use `print` / `println` to get your
+results back.)
+
+Compile a project with libraries
+
+```
+$ bundle exec shin -o public/js -L app/js -I app -I vendor/reagent-shin/src app/my-cool-app/app.cljs
+```
+
+Will output all needed .js files in `public/js`.
+
+`-I` is the search path for .cljs files, `-L` is the search path for .js files.
+Tested in the browser with Require.js.
+
 ## Rationale
 
 ClojureScript is great, but, for the time being, the tooling is [a bit
