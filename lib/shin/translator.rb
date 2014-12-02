@@ -980,7 +980,7 @@ module Shin
                       end
       variadic_sym = AST::Symbol.new(t, variadic_name)
 
-      arg_vec <<= variadic_sym
+      arg_vec <<= variadic_arg
       inner_fn_args = AST::Vector.new(t, arg_vec)
       inner_fn_vec = Hamster.vector(fn_sym, inner_fn_args)
       body.each do |child|
@@ -1011,6 +1011,14 @@ module Shin
                                         AST::Symbol.new(t, "arguments"),
                                         num_fixed_args)
       rest_of_args = AST::List.new(t, rest_of_args_vec)
+
+      if variadic_arg.map?
+        # make a map out of them (last-pos keyword args)
+        map_make_vec = Hamster.vector(AST::Symbol.new(t, "apply"),
+                                      AST::Symbol.new(t, "hash-map"),
+                                      rest_of_args)
+        rest_of_args = AST::List.new(t, map_make_vec)
+      end
 
       if_enough_args_vec = Hamster.vector(if_sym, arg_comp, rest_of_args, nil_sym)
       if_enough_args = AST::List.new(t, if_enough_args_vec)

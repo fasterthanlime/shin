@@ -113,6 +113,13 @@ RSpec.describe "Language", "destructuring" do
              }).to have_output("1 2 3 4 5 6")
     end
 
+    it "works with defn (complex case)" do
+      expect(%Q{
+             (defn foobar [a b c & {:keys [d e f]}] (print a b c d e f))
+             (foobar 1 2 3 :d 4 :e 5 :f 6)
+             }).to have_output("1 2 3 4 5 6")
+    end
+
     it "works with defmacro too" do
       expect(
         :macros => %Q{(defmacro foobar [[a b] c [[d] e [f]]] `(print ~a ~b ~c ~d ~e ~f))},
