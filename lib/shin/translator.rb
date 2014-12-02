@@ -538,6 +538,17 @@ module Shin
       tr(unwrap_cond(list))
     end
 
+    def translate_this_as(list)
+      aka = list.first
+      body = list.drop(1)
+
+      scope = Scope.new
+      scope[aka.value] = "this"
+      @builder.with_scope(scope) do
+        treach(body)
+      end
+    end
+
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
@@ -1393,6 +1404,8 @@ module Shin
           translate_condp(rest)
         when "loop"
           translate_loop(rest)
+        when "this-as"
+          translate_this_as(rest)
         when "recur"
           anchor = nil
           begin
