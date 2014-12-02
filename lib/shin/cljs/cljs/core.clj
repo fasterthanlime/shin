@@ -95,3 +95,10 @@
 (defmacro lazy-seq [& body]
   `(LazySeq. (fn [] ~@body) nil))
 
+(defmacro dotimes [[sym max] & body]
+  `(loop [~sym 0]
+     (if (< ~sym ~max)
+       (do
+         ~@body
+         (recur (inc ~sym))))))
+
