@@ -565,7 +565,11 @@ module Shin
       body = list.drop(1)
 
       scope = Scope.new
-      scope[aka.value] = "this"
+
+      tmp = make_ident(fresh(aka.value))
+      @builder << make_decl(tmp, Identifier.new("this"))
+      scope[aka.value] = tmp.name
+
       @builder.with_scope(scope) do
         treach(body)
       end
