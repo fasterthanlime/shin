@@ -1093,8 +1093,12 @@ module Shin
         sw = SwitchStatement.new(numargs)
 
         arg_names = []
-        name_candidate.take_while { |x| !x.sym?('&') }.each do |x|
-          arg_names << (x.sym? ? x.value : fresh('p'))
+        if name_candidate
+          name_candidate.take_while { |x| !x.sym?('&') }.each do |x|
+            arg_names << (x.sym? ? x.value : fresh('p'))
+          end
+        elsif max_arity > 0
+          raise "No name candidate!"
         end
 
         if variadic_arity >= 0

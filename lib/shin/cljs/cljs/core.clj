@@ -14,6 +14,15 @@
   ([x & rest]
    `(let [x# ~x] (if (not x#) x# (and ~@rest)))))
 
+(defmacro binding
+  ([bindings & body]
+   (let [syms (take-nth 2 bindings)
+         vals (take-nth 2 (drop 1 bindings))
+         pairs (interleave syms vals)]
+     (map
+       (fn [[sym val]] `(set! ~sym ~val))
+       pairs))))
+
 (defmacro ->
   ([x]
    x)

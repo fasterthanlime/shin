@@ -55,5 +55,21 @@ RSpec.describe "Language" do
              }).to have_output("true")
     end
   end
+
+  describe "take-nth" do
+    it "works" do
+      expect(%Q{
+             (print (= '(0 2 4) (take-nth 2 (take 6 (range)))))
+             }).to have_output("true")
+    end
+  end
+
+  describe "partition" do
+    it "works" do
+      expect(%Q{
+             (print (= '([0 1] [2 3] [4 5]) (partition 2 (take 6 (range)))))
+             }).to have_output("true")
+    end
+  end
 end
 
