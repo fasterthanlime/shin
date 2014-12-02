@@ -39,7 +39,7 @@ RSpec.describe "Language" do
   describe "update-in" do
     it "works (0 args)" do
       expect(%Q{
-             (print (= {:a {:b {:c 42}}} (update-in {:a {:b {:c 21}}} [:a :b :c] inc)))
+             (print (= {:a {:b {:c 42}}} (update-in {:a {:b {:c 41}}} [:a :b :c] inc)))
              }).to have_output("true")
     end 
 
@@ -59,7 +59,7 @@ RSpec.describe "Language" do
   describe "update" do
     it "works (0 args)" do
       expect(%Q{
-             (print (= {:a 42} (update {:a 21} :a inc)))
+             (print (= {:a 42} (update {:a 41} :a inc)))
              }).to have_output("true")
     end 
 
