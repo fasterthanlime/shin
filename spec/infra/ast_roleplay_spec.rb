@@ -156,6 +156,28 @@ RSpec.describe "Infrastructure", "AST roleplay" do
       end
     end
 
+    describe "IEquiv" do
+      it "satisfies IEquiv" do
+        expect_satisfies?(:IEquiv, sample_list).to be_truthy
+      end
+
+      it "can be compared with a list (as lhs)" do
+        s = js_call %Q{
+          var rhs = core.list(1, 2, 3, 4, 5, 6);
+          return core.#{mangle('=')}(lhs, rhs);
+        }, :lhs => numeric_list
+        expect(s).to be_truthy
+      end
+
+      it "can be compared with a list (as rhs)" do
+        s = js_call %Q{
+          var lhs = core.list(1, 2, 3, 4, 5, 6);
+          return core.#{mangle('=')}(lhs, rhs);
+        }, :rhs => numeric_list
+        expect(s).to be_truthy
+      end
+    end
+
     describe "IReduce" do
       it "satisfies IReduce" do
         expect_satisfies?(:IReduce, sample_list).to be_truthy

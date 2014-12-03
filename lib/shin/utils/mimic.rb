@@ -17,7 +17,7 @@ module Shin
         end
 
         def method_sym(name, arity)
-          mangle("#{name}$arity#{arity}").to_sym
+          mangle("#{name}$arity#{arity}")
         end
 
         def defn(name, &block)

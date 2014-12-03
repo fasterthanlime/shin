@@ -154,7 +154,12 @@ module Shin
       implement :ISequential
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          raise "stub"
+          eq = other[method_sym('-equiv', 2)]
+          if eq
+            eq.methodcall(other, other, self)
+          else
+            false
+          end
         end
       end
 
