@@ -306,6 +306,13 @@ module Shin
       def to_s
         ":#{value}"
       end
+
+      # ClojureScript protocols
+
+      include Shin::Utils::Mimic
+
+      implement :IKeyword
+
     end
 
     class MetaData < Node

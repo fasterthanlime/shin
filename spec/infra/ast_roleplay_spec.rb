@@ -16,6 +16,18 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     @ctx.load("cljs.core")
   end
 
+  describe "AST::Keyword" do
+    describe "IKeyword" do
+      it "satisfies IKeyword" do
+        expect_satisfies?(:IKeyword, sample_kw).to be_truthy
+      end
+
+      it "truthful by keyword?" do
+        expect_pred?(:keyword?, sample_kw).to be_truthy
+      end
+    end
+  end
+
   describe "AST::List" do
     describe "IList" do
       it "satisfies IList" do
@@ -291,8 +303,16 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     Shin::AST::Symbol.new(sample_token, name)
   end
 
+  def kw(name)
+    Shin::AST::Keyword.new(sample_token, name)
+  end
+
   def literal(value)
     Shin::AST::Literal.new(sample_token, value)
+  end
+
+  def sample_kw
+    kw("neverland")
   end
 
   def sample_list
