@@ -166,10 +166,17 @@ module Shin
 
       implement :IReduce do
         defn '-reduce' do |s, f|
-          raise "stub"
+          zero = f.call(inner[0], inner[1])
+          invoke('-reduce', invoke('-rest', self), f, zero)
         end
         defn '-reduce' do |s, f, start|
-          raise "stub"
+          v = start
+          xs = inner
+          until xs.empty?
+            v = f.call(v, xs.first)
+            xs = xs.drop(1)
+          end
+          v
         end
       end
 

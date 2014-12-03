@@ -124,6 +124,19 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect_satisfies?(:ISequential, sample_list).to be_truthy
       end
     end
+
+    describe "IReduce" do
+      it "satisfies IReduce" do
+        expect_satisfies?(:IReduce, sample_list).to be_truthy
+      end
+
+#       it "reduces without an initial value" do
+#         s = js_call %Q{
+#           return core.reduce(core.#{mangle('+')}, l);
+#         }, :l => numeric_list
+#         expect(s).to eq(21)
+#       end
+    end
   end
 
   private
@@ -172,6 +185,14 @@ RSpec.describe "Infrastructure", "AST roleplay" do
 
   def sample_list
     inner = Hamster.vector(sym("lloyd"), sym("franken"), sym("algae"))
+    Shin::AST::List.new(sample_token, inner)
+  end
+
+  def numeric_list
+    inner = Hamster.vector()
+    (1..6).each do |n|
+      inner <<= Shin::AST::Literal.new(sample_token, n)
+    end
     Shin::AST::List.new(sample_token, inner)
   end
 
