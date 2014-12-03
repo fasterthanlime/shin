@@ -4,6 +4,7 @@
 # data structures so that they can be manipulated by macros.
 RSpec.describe "Infrastructure", "AST roleplay" do
   include Shin
+  include Shin::Utils::Mangler
 
   before(:all) do
     compiler = Shin::Compiler.new({})
@@ -16,7 +17,25 @@ RSpec.describe "Infrastructure", "AST roleplay" do
   end
 
   describe "AST::List" do
+    describe "IList" do
+      it "satisfies IList" do
+        expect_satisfies?(:IList, sample_list).to be_truthy
+      end
+
+      it "truthful by list?" do
+        expect_pred?(:list?, sample_list).to be_truthy
+      end
+    end
+
     describe "ISeq" do
+      it "satisfies ISeq" do
+        expect_satisfies?(:ISeq, sample_list).to be_truthy
+      end
+
+      it "satisfies ASeq" do
+        expect_satisfies?(:ASeq, sample_list).to be_truthy
+      end
+
       it "can call first" do
         l = sample_list
         s = js_call %Q{
@@ -35,6 +54,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
 
     describe "INext" do
+      it "satisfies INext" do
+        expect_satisfies?(:INext, sample_list).to be_truthy
+      end
+
       it "can call next" do
         s = js_call %Q{
           return core.next(l);
@@ -54,6 +77,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
 
     describe "ICounted" do
+      it "satisfies ICounted" do
+        expect_satisfies?(:ICounted, sample_list).to be_truthy
+      end
+
       it "can call count" do
         s = js_call %Q{
           return core.count(l);
@@ -63,6 +90,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
 
     describe "IStack" do
+      it "satisfies IStack" do
+        expect_satisfies?(:IStack, sample_list).to be_truthy
+      end
+
       it "can call peek" do
         l = sample_list
         s = js_call %Q{
@@ -87,9 +118,29 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s).to eq(l.inner.last)
       end
     end
+
+    describe "ISequential" do
+      it "satisfies ISequential" do
+        expect_satisfies?(:ISequential, sample_list).to be_truthy
+      end
+    end
   end
 
   private
+
+  def expect_pred?(pred, val)
+    s = js_call %Q{
+      return core.#{mangle(pred.to_s)}(val);
+    }, :val => val
+    expect(s)
+  end
+
+  def expect_satisfies?(protocol, val)
+    s = js_call %Q{
+      return core.satisfies$q(core.#{protocol}, val);
+    }, :val => val
+    expect(s)
+  end
 
   def js_call(body, args)
     unless body.include?("return")

@@ -154,7 +154,9 @@ module Shin
         List.new(token, inner.drop(1))
       end
 
-      @@protocols = %w(ISeq ISeqable INext ICounted).map { |x| "cljs$dcore$v#{x}" }
+      @@protocols = %w(IList ISeq ASeq ISeqable INext IStack ICounted ISequential).map do |x|
+        "cljs$dcore$v#{x}"
+      end
 
       def [](x)
         return true if @@protocols.include?(x)
