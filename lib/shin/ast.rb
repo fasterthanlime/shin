@@ -121,7 +121,7 @@ module Shin
       implement :ASeq
       implement :ISeq do
         defn '-first' do |s|
-          inner.first
+          unwrap(inner.first)
         end
 
         defn '-rest' do |s|
@@ -137,7 +137,7 @@ module Shin
 
       implement :IStack do
         defn '-peek' do |s|
-          inner.first
+          unwrap(inner.first)
         end
 
         defn '-pop' do |s|
@@ -166,17 +166,32 @@ module Shin
 
       implement :IReduce do
         defn '-reduce' do |s, f|
-          zero = f.call(inner[0], inner[1])
-          invoke('-reduce', invoke('-rest', self), f, zero)
+          case inner.length
+          when 0
+            f.call
+          when 1
+            inner[1]
+          else
+            a = unwrap(inner[0])
+            b = unwrap(inner[1])
+            zero = f.call(a, b)
+            invoke('-rest').invoke('-rest').invoke('-reduce', f, zero)
+          end
         end
         defn '-reduce' do |s, f, start|
-          v = start
-          xs = inner
-          until xs.empty?
-            v = f.call(v, xs.first)
-            xs = xs.drop(1)
+          case inner.length
+          when 0
+            start
+          else
+            a = start
+            xs = inner
+            until xs.empty?
+              b = unwrap(xs.first)
+              a = f.call(a, b)
+              xs = xs.drop(1)
+            end
+            a
           end
-          v
         end
       end
 

@@ -44,6 +44,13 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s).to be(l.inner.first)
       end
 
+      it "can call first (unwrap)" do
+        s = js_call %Q{
+          return core.first(l) + 41;
+        }, :l => numeric_list
+        expect(s).to eq(42)
+      end
+
       it "can call rest" do
         s = js_call %Q{
           return core.rest(l);
@@ -102,6 +109,13 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s).to eq(l.inner.first)
       end
 
+      it "can call peek (unwrap)" do
+        s = js_call %Q{
+          return core.peek(l) + 41;
+        }, :l => numeric_list
+        expect(s).to eq(42)
+      end
+
       it "can call pop" do
         s = js_call %Q{
           return core.pop(l);
@@ -130,12 +144,19 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect_satisfies?(:IReduce, sample_list).to be_truthy
       end
 
-#       it "reduces without an initial value" do
-#         s = js_call %Q{
-#           return core.reduce(core.#{mangle('+')}, l);
-#         }, :l => numeric_list
-#         expect(s).to eq(21)
-#       end
+      it "reduces without an initial value" do
+        s = js_call %Q{
+          return core.reduce(core.#{mangle('+')}, l);
+        }, :l => numeric_list
+        expect(s).to eq(21)
+      end
+
+      it "reduces with an initial value" do
+        s = js_call %Q{
+          return core.reduce(core.#{mangle('+')}, 21, l);
+        }, :l => numeric_list
+        expect(s).to eq(42)
+      end
     end
   end
 
@@ -181,6 +202,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
 
   def sym(name)
     Shin::AST::Symbol.new(sample_token, name)
+  end
+
+  def literal(value)
+    Shin::AST::Literal.new(sample_token, value)
   end
 
   def sample_list

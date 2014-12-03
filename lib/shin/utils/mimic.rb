@@ -5,6 +5,8 @@ require 'set'
 module Shin
   module Utils
     module Mimic
+      include Shin::Utils::Mangler
+
       module ClassMethod
         include Shin::Utils::Mangler
 
@@ -30,6 +32,20 @@ module Shin
         return true if self.class.protocols.include?(x)
         puts "[#{self.class.name}] does not implement Clojure protocol #{x}"
         nil
+      end
+
+      def invoke(name, *args)
+        sym = mangle("#{name}$arity#{args.length + 1}").to_sym
+        send(sym, *([self].concat(args)))
+      end
+
+      def unwrap(node)
+        case node
+        when Shin::AST::Literal
+          node.value
+        else
+          node
+        end
       end
     end
   end
