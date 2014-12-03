@@ -145,6 +145,12 @@ module Shin
         end
       end
 
+      implement :ICollection do
+        defn '-conj' do |s, o|
+          List.new(token, inner.unshift(wrap(o)))
+        end
+      end
+
       implement :ISequential
       implement :IEquiv do
         defn '-equiv' do |s, other|

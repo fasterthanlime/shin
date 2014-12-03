@@ -133,6 +133,23 @@ RSpec.describe "Infrastructure", "AST roleplay" do
       end
     end
 
+    describe "ICollection" do
+      it "satisfies ICollection" do
+        expect_satisfies?(:ICollection, sample_list).to be_truthy
+      end
+
+      it "can call conj" do
+        l = sample_list
+        s = js_call %Q{
+          return core.conj(l, 42);
+        }, :l => l
+        expect(s).to be_a(Shin::AST::List)
+        first = s.inner.first
+        expect(first).to be_a(Shin::AST::Literal)
+        expect(first.value).to eq(42)
+      end
+    end
+
     describe "ISequential" do
       it "satisfies ISequential" do
         expect_satisfies?(:ISequential, sample_list).to be_truthy

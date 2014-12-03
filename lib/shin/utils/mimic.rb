@@ -44,12 +44,28 @@ module Shin
         send(method_sym(name, args.length + 1), *([self].concat(args)))
       end
 
+      # AST nodes -> ClojureScript data structures
       def unwrap(node)
         case node
         when Shin::AST::Literal
           node.value
-        else
+        when Shin::AST::Sequence, Shin::AST::Keyword, Shin::AST::Symbol
           node
+        else
+          raise "Not sure how to unwrap: #{node.inspect}"
+        end
+      end
+
+      # ClojureScript data structures -> AST nodes
+      def wrap(val)
+        case val
+        when Shin::AST::Node
+          node
+        when Fixnum, Float, String
+          # using our token.. better than muffin!
+          Shin::AST::Literal.new(token, val)
+        else
+          raise "Not sure how to wrap: #{val.inspect} of type #{val.class.name}"
         end
       end
 
