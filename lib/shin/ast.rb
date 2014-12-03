@@ -406,6 +406,10 @@ module Shin
     end
 
     class Map < Sequence
+      def self.from_hash(token, hash)
+        Map.new(token, Hamster::Vector.new(hash.each.to_a.flatten(1)))
+      end
+
       def map?
         true
       end
@@ -413,6 +417,39 @@ module Shin
       def to_s
         "{#{inner.map(&:to_s).join(" ")}}"
       end
+
+      def as_hash
+        @_hash ||= Hamster.hash(inner.each_slice(2))
+      end
+
+      # ClojureScript protocols
+      
+      include Shin::Utils::Mimic
+
+      implement :IAssociative do
+        defn '-assoc' do |s, k, v|
+          Map.from_hash(token, as_hash.store(wrap(k), wrap(v)))
+        end
+      end
+
+      implement :ILookup do
+        defn '-lookup' do |s, k|
+          wk = wrap(k)
+          unwrap(as_hash.get(wk))
+        end
+
+        defn '-lookup' do |s, k, not_found|
+          h = as_hash
+          wk = wrap(k)
+
+          if h.key?(wk)
+            h.get(wk)
+          else
+            not_found
+          end
+        end
+      end
+
     end
 
     class Literal < Node
