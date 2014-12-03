@@ -93,7 +93,6 @@ module Shin
         end
 
         @inner = inner
-        self.freeze
       end
     end
 
@@ -110,6 +109,40 @@ module Shin
         else
           "(#{inner.map(&:to_s).join(" ")})"
         end
+      end
+
+      define_method(:'$_seq$$arity1') do |s|
+        puts "[AST::List] Calling -seq"
+        if inner.empty?
+          nil
+        else
+          self
+        end
+      end
+
+      define_method(:'$_first$$arity1') do |s|
+        puts "[AST::List] Calling first"
+        inner.first
+      end
+
+      define_method(:'$_next$$arity1') do |s|
+        puts "[AST::List] Calling next"
+        if inner.count > 1
+          List.new(token, inner.drop(1))
+        else
+          nil
+        end
+      end
+
+      define_method(:'$_rest$$arity1') do |s|
+        puts "[AST::List] Calling rest"
+        List.new(token, inner.drop(1))
+      end
+
+      def [](x)
+        puts "[AST::List] asking for #{x}"
+        return true if %w(cljs$dcore$vINext cljs$dcore$vISeq cljs$dcore$vISeqable).include?(x)
+        nil
       end
     end
 
@@ -148,8 +181,7 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value.freeze
-        self.freeze
+        @value = value
       end
 
       def literal?
@@ -178,8 +210,7 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value.freeze
-        self.freeze
+        @value = value
       end
 
       def sym?(value = nil)
@@ -197,8 +228,7 @@ module Shin
 
       def initialize(token, value)
         super(token)
-        @value = value.freeze
-        self.freeze
+        @value = value
       end
 
       def kw?(value = nil)
@@ -217,7 +247,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def meta?(value = nil)
@@ -236,7 +265,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def to_s
@@ -250,7 +278,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def to_s
@@ -264,7 +291,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def to_s
@@ -278,7 +304,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def to_s
@@ -292,7 +317,6 @@ module Shin
       def initialize(token, inner)
         super(token)
         @inner = inner
-        self.freeze
       end
 
       def to_s
