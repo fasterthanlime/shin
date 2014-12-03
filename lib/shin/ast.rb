@@ -176,6 +176,30 @@ module Shin
         end
       end
 
+      implement :IIndexed do
+        defn '-nth' do |s, n|
+          unwrap(inner[n])
+        end
+        defn '-nth' do |s, n, not_found|
+          if n >= 0 && n < inner.length
+            unwrap(inner[n])
+          else
+            nil
+          end
+        end
+      end
+
+      implement :ILookup do
+        defn '-lookup' do |s, n|
+          return nil unless Fixnum == n
+          invoke('-nth', n)
+        end
+        defn '-lookup' do |s, n, not_found|
+          return nil unless Fixnum == n
+          invoke('-nth', n, not_found)
+        end
+      end
+
       implement :ICounted do
         defn '-count' do |s|
           inner.count
@@ -233,7 +257,20 @@ module Shin
 
       include Shin::Utils::Mimic
 
-      implement :IVector
+      implement :IVector do
+        defn '-assoc-n' do |s, n, v|
+          Vector.new(token, inner.set(n, wrap(v)))
+        end
+      end
+
+      implement :IAssociative do
+        defn '-assoc' do |s, k, v|
+          unless Number === k
+            raise "Vector's key for assoc must be a number."
+          end
+          Vector.new(token, inner.set(k, wrap(v)))
+        end
+      end
 
       implement :ASeq
       implement :ISeq do
@@ -327,6 +364,27 @@ module Shin
             end
             a
           end
+        end
+      end
+
+      implement :IKVReduce do
+        defn '-kv-reduce' do |s, f, init|
+          v = init
+          i = 0
+          xs = inner
+          until xs.empty?
+            b = unwrap(xs.first)
+            v = f.call(v, i, b)
+            xs = xs.drop(1)
+            i += 1
+          end
+          v
+        end
+      end
+
+      implement :IFn do
+        defn '-invoke' do |s, k|
+          invoke('-nth', k)
         end
       end
 

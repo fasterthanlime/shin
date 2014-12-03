@@ -720,6 +720,13 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s).to eq("[6 5 4 3 2 1]")
       end
     end
+
+    # TODO: specs for IIndexed
+    # TODO: specs for ILookup
+    # TODO: specs for IVector
+    # TODO: specs for IAssociative
+    # TODO: specs for IKVReduce
+    # TODO: specs for IFn
   end
 
   private
