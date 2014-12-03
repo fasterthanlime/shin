@@ -295,6 +295,68 @@ module Shin
       def to_s
         value
       end
+
+      # ClojureScript protocols
+
+      include Shin::Utils::Mimic
+
+      implement :ISymbol
+      
+      implement :INamed do
+        defn '-name' do |s|
+          value
+        end
+      end
+
+      implement :IPrintable do
+        defn '-pr-str' do |s|
+          to_s
+        end
+      end
+
+      implement :IEquiv do
+        defn '-equiv' do |s, other|
+          case other
+          when V8::Object
+            eq = other[method_sym('-equiv', 2)]
+            if eq
+              eq.methodcall(other, other, self)
+            else
+              false
+            end
+          when Symbol
+            value == other.value
+          else
+            false
+          end
+        end
+      end
+
+      implement :IFn do
+        defn '-invoke' do |s, coll|
+          lookup = coll[method_sym('-lookup', 2)]
+          if lookup
+            lookup.methodcall(coll, coll, self)
+          else
+            nil
+          end
+        end
+
+        defn '-invoke' do |s, coll, not_found|
+          lookup = coll[method_sym('-lookup', 3)]
+          if lookup
+            lookup.methodcall(coll, coll, self, not_found)
+          else
+            not_found
+          end
+        end
+      end
+
+      implement :IHashDelegate do
+        defn '-hash-delegate' do |s|
+          value
+        end
+      end
     end
 
     class Keyword < Node

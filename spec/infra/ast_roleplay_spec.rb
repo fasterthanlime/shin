@@ -130,6 +130,120 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
   end
 
+  describe "AST::Symbol" do
+    describe "ISymbol" do
+      it "satisfies ISymbol" do
+        expect_satisfies?(:ISymbol, sample_sym).to be_truthy
+      end
+
+      it "truthful by symbol?" do
+        expect_pred?(:symbol?, sample_sym).to be_truthy
+      end
+    end
+
+    describe "INamed" do
+      it "satisfies INamed" do
+        expect_satisfies?(:INamed, sample_sym).to be_truthy
+      end
+
+      it "can call name" do
+        k = sample_sym
+        s = js_call %Q{
+          return core.name(k);
+        }, :k => k
+        expect(s).to eq(k.value)
+      end
+    end
+
+    describe "IPrintable" do
+      it "satisfies IPrintable" do
+        expect_satisfies?(:IPrintable, sample_sym).to be_truthy
+      end
+
+      it "can call pr-str" do
+        k = sample_sym
+        s = js_call %Q{
+          return core.pr$_str(k);
+        }, :k => k
+        expect(s).to eq(k.to_s)
+      end
+    end
+
+    describe "IEquiv" do
+      it "satisfies IEquiv" do
+        expect_satisfies?(:IEquiv, sample_sym).to be_truthy
+      end
+
+      describe "can be compared with symbol" do
+        it "as lhs" do
+          lhs = sample_sym
+
+          expect(js_call(%Q{
+            var rhs = core.symbol("#{lhs.value}");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_truthy
+
+          expect(js_call(%Q{
+            var rhs = core.symbol("definitely-not-equal");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+
+          expect(js_call(%Q{
+            var rhs = "not even a symbol";
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+        end
+
+        it "as rhs" do
+          rhs = sample_sym
+
+          expect(js_call(%Q{
+            var lhs = core.symbol("#{rhs.value}");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_truthy
+
+          expect(js_call(%Q{
+            var lhs = core.symbol("definitely-not-equal");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+
+          expect(js_call(%Q{
+            var lhs = "not even a symbol";
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+        end
+      end
+    end
+
+    describe "IFn" do
+      it "satisfies IFn" do
+        expect_satisfies?(:IFn, sample_sym).to be_truthy
+      end
+
+      it "is callable" do
+        k = sample_sym
+        s = js_call %Q{
+          var v = core.hash$_map(core.symbol("#{k.value}"), "yellow");
+          return k.call(null, v);
+        }, :k => k
+        expect(s).to eq("yellow")
+      end
+
+      it "is callable (with not-found)" do
+        k = sample_sym
+
+        expect(js_call(%Q{
+          var v = core.hash$_map(core.symbol("#{k.value}"), "yellow");
+          return k.call(null, v);
+        }, :k => k)).to eq("yellow")
+        expect(js_call(%Q{
+          var v = core.hash$_map();
+          return k.call(null, v, "submarine");
+        }, :k => k)).to eq("submarine")
+      end
+    end
+  end
+
   describe "AST::List" do
     describe "IList" do
       it "satisfies IList" do
@@ -415,6 +529,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
 
   def sample_kw
     kw("neverland")
+  end
+
+  def sample_sym
+    sym("oreilly")
   end
 
   def sample_list
