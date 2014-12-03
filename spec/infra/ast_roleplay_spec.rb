@@ -161,20 +161,48 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect_satisfies?(:IEquiv, sample_list).to be_truthy
       end
 
-      it "can be compared with a list (as lhs)" do
-        s = js_call %Q{
-          var rhs = core.list(1, 2, 3, 4, 5, 6);
-          return core.#{mangle('=')}(lhs, rhs);
-        }, :lhs => numeric_list
-        expect(s).to be_truthy
-      end
+      describe "can be compared with a list" do
+        it "as lhs" do
+          lhs = numeric_list
 
-      it "can be compared with a list (as rhs)" do
-        s = js_call %Q{
-          var lhs = core.list(1, 2, 3, 4, 5, 6);
-          return core.#{mangle('=')}(lhs, rhs);
-        }, :rhs => numeric_list
-        expect(s).to be_truthy
+          expect(js_call(%Q{
+            var rhs = core.list(1, 2, 3, 4, 5, 6);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_truthy
+          expect(js_call(%Q{
+            var rhs = core.list(1, 2, 3);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+          expect(js_call(%Q{
+            var rhs = core.list(1, 2, 3, 4, 4, 6);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+          expect(js_call(%Q{
+            var rhs = core.list(1, 2, 3, 4, 5, 6, 7);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+        end
+
+        it "as rhs" do
+          rhs = numeric_list
+
+          expect(js_call(%Q{
+            var lhs = core.list(1, 2, 3, 4, 5, 6);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_truthy
+          expect(js_call(%Q{
+            var lhs = core.list(1, 2, 3);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+          expect(js_call(%Q{
+            var lhs = core.list(1, 2, 3, 4, 4, 6);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+          expect(js_call(%Q{
+            var lhs = core.list(1, 2, 3, 4, 5, 6, 7);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+        end
       end
     end
 
