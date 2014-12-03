@@ -6,7 +6,7 @@ module Shin
     include Shin::Utils::Mangler
     include Shin::Utils::Mimic
 
-    DEBUG = true
+    DEBUG = ENV['FAST_MUTATOR_DEBUG']
 
     def initialize(compiler, mod)
       @compiler = compiler
@@ -76,20 +76,11 @@ module Shin
         type = v8_type(node)
         case type
         when :list
-          acc = []
-          xs = node
-          while xs
-            if V8::Object === xs
-              el = js_invoke(xs, '-first')
-              acc << unquote(el, token)
-              xs = js_invoke(xs, '-next')
-            else
-              el = xs.invoke('-first')
-              acc << unquote(el, token)
-              xs = xs.invoke('-next')
-            end
-          end
+          acc = unquote_seq(node, token)
           Shin::AST::List.new(token, Hamster::Vector.new(acc))
+        when :vector
+          acc = unquote_indexed(node, token)
+          Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
         when :symbol
           Shin::AST::Symbol.new(token, node['_name'])
         when :unquote
@@ -104,6 +95,61 @@ module Shin
     end
     
     private
+
+    def unquote_seq(node, token)
+      acc = []
+      xs = node
+      while xs
+        el = nil
+        
+        case xs
+        when V8::Object
+          el = js_invoke(xs, '-first')
+          xs = js_invoke(xs, '-next')
+        else
+          el = xs.invoke('-first')
+          xs = xs.invoke('-next')
+        end
+        spliceful_append(acc, el, token)
+      end
+      acc
+    end
+
+    def unquote_indexed(node, token)
+      acc = []
+      xs = node
+      count = js_invoke(xs, '-count')
+      (0...count).each do |i|
+        el = js_invoke(xs, '-nth', i)
+        spliceful_append(acc, el, token)
+      end
+      acc
+    end
+
+    def spliceful_append(acc, el, token)
+      if (V8::Object === el) && (v8_type(el) == :unquote) && el['splice']
+        inner = el['inner']
+
+        case inner
+        when V8::Object
+          inner_type = v8_type(inner)
+          case inner_type
+          when :list
+            acc += unquote_seq(inner, token)
+          when :vector
+            acc += unquote_indexed(inner, token)
+          else
+            raise "Invalid use of splice on non-sequence #{type}"
+          end
+        when AST::List, AST::Vector
+          inner.inner.each { |x| acc << x }
+        else
+          raise "Invalid use of splice on non-sequence #{typee}"
+        end
+      else
+        acc << unquote(el, token)
+      end
+    end
 
     def debug(*args)
       puts("[FAST MUTATOR] #{args.join(" ")}") if DEBUG

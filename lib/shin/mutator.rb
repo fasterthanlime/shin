@@ -61,7 +61,6 @@ module Shin
             expanded_ast = nil
 
             if first.value == "fast-mutator-test"
-              puts "Using fast mutator!"
               fm = FastMutator.new(@compiler, @mod)
               expanded_ast = fm.expand(invoc, info, js_context)
             else

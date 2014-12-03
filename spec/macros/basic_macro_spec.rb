@@ -10,7 +10,7 @@ RSpec.describe "Language", "basic macros" do
   it "passes AST into a macro" do
     expect(
       :source => %Q{ (print (my-name fruity-loops)) },
-      :macros => %Q{ (defmacro my-name [s] (.-_name s)) }
+      :macros => %Q{ (defmacro my-name [s] (-name s)) }
     ).to have_output("fruity-loops")
   end
 
