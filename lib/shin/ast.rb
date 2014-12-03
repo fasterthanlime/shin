@@ -111,8 +111,19 @@ module Shin
         end
       end
 
+      # ClojureScript protocols
+
+      # ISeq
+      define_method(:'$_first$$arity1') do |s|
+        inner.first
+      end
+
+      define_method(:'$_rest$$arity1') do |s|
+        List.new(token, inner.drop(1))
+      end
+
+      # ISeqable
       define_method(:'$_seq$$arity1') do |s|
-        puts "[AST::List] Calling -seq"
         if inner.empty?
           nil
         else
@@ -120,13 +131,8 @@ module Shin
         end
       end
 
-      define_method(:'$_first$$arity1') do |s|
-        puts "[AST::List] Calling first"
-        inner.first
-      end
-
+      # INext
       define_method(:'$_next$$arity1') do |s|
-        puts "[AST::List] Calling next"
         if inner.count > 1
           List.new(token, inner.drop(1))
         else
@@ -134,14 +140,25 @@ module Shin
         end
       end
 
-      define_method(:'$_rest$$arity1') do |s|
-        puts "[AST::List] Calling rest"
+      # ICounted
+      define_method(:'$_count$$arity1') do |s|
+        inner.count
+      end
+
+      # IStack
+      define_method(:'$_peek$$arity1') do |s|
+        inner.first
+      end
+
+      define_method(:'$_pop$$arity1') do |s|
         List.new(token, inner.drop(1))
       end
 
+      @@protocols = %w(ISeq ISeqable INext ICounted).map { |x| "cljs$dcore$v#{x}" }
+
       def [](x)
+        return true if @@protocols.include?(x)
         puts "[AST::List] asking for #{x}"
-        return true if %w(cljs$dcore$vINext cljs$dcore$vISeq cljs$dcore$vISeqable).include?(x)
         nil
       end
     end

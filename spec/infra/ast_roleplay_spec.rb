@@ -16,11 +16,76 @@ RSpec.describe "Infrastructure", "AST roleplay" do
   end
 
   describe "AST::List" do
-    it "can call first" do
-      s = js_call %Q{
-        return core.first(input);
-      }, :input => sample_list
-      expect(s).to be_a(Shin::AST::Symbol)
+    describe "ISeq" do
+      it "can call first" do
+        l = sample_list
+        s = js_call %Q{
+          return core.first(l);
+        }, :l => l
+        expect(s).to be(l.inner.first)
+      end
+
+      it "can call rest" do
+        s = js_call %Q{
+          return core.rest(l);
+        }, :l => sample_list
+        expect(s).to be_a(Shin::AST::List)
+        expect(s.inner.count).to eq(2)
+      end
+    end
+
+    describe "INext" do
+      it "can call next" do
+        s = js_call %Q{
+          return core.next(l);
+        }, :l => sample_list
+        expect(s).to be_a(Shin::AST::List)
+        expect(s.inner.count).to eq(2)
+      end
+
+      it "next returns nil eventually" do
+        s = js_call %Q{
+          var res = l;
+          while (res) { res = core.next(res); }
+          return res;
+        }, :l => sample_list
+        expect(s).to be_nil
+      end
+    end
+
+    describe "ICounted" do
+      it "can call count" do
+        s = js_call %Q{
+          return core.count(l);
+        }, :l => sample_list
+        expect(s).to eq(3)
+      end
+    end
+
+    describe "IStack" do
+      it "can call peek" do
+        l = sample_list
+        s = js_call %Q{
+          return core.peek(l);
+        }, :l => l
+        expect(s).to eq(l.inner.first)
+      end
+
+      it "can call pop" do
+        s = js_call %Q{
+          return core.pop(l);
+        }, :l => sample_list
+        expect(s).to be_a(Shin::AST::List)
+        expect(s.inner.count).to eq(2)
+      end
+
+      it "pops from the front" do
+        l = sample_list
+        s = js_call %Q{
+          return core.first(core.pop(core.pop(l)));
+        }, :l => l
+        expect(s).to eq(l.inner.last)
+      end
     end
   end
 
