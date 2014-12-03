@@ -1,6 +1,7 @@
 
 require 'shin/ast'
 require 'shin/js_context'
+require 'shin/fast_mutator'
 
 module Shin
   # Applies transformations to the Shin AST
@@ -61,8 +62,8 @@ module Shin
 
             if first.value == "fast-mutator-test"
               puts "Using fast mutator!"
-              fm = FastMutator.new(compiler, mod)
-              expanded_ast fm.expand(invoc, info)
+              fm = FastMutator.new(@compiler, @mod)
+              expanded_ast = fm.expand(invoc, info, js_context)
             else
               eval_mod = make_macro_module(invoc, info)
               debug "========== [Mutator] ======================="

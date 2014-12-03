@@ -15,7 +15,6 @@ module Shin
 
     attr_reader :opts
     attr_reader :modules
-    attr_accessor :cache
 
     def self.compile_file(path)
       Shin::Compiler.new.compile(File.read(path), :file => path)
@@ -295,6 +294,10 @@ module Shin
     def [](req)
       raise "ModuleCache expecting Require, got : #{req}" unless Shin::Require === req
       @modules[req.slug]
+    end
+
+    def include?(slug)
+      @modules.include?(slug)
     end
 
     def lookup(ns, macro: false)

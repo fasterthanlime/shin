@@ -189,14 +189,14 @@ module Shin
       @context
     end
 
-    private
-
     def parse_spec(spec_input)
       _, text, _, name = /^(text!)?(\.\/)?(.*)$/.match(spec_input).to_a
       Struct.
         new(:input, :name, :exports?, :text?).
         new(spec_input, name, name == 'exports', !!text)
     end
+
+    private
 
     def debug(*args)
       puts("[JS_CONTEXT] #{args.join(" ")}") if DEBUG
