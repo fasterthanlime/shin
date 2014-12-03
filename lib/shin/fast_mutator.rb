@@ -17,7 +17,6 @@ module Shin
       debug "Expanding #{invoc}" if DEBUG
 
       deps = @compiler.collect_deps(info[:module])
-
       all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
       unless all_in_cache
         raise "Not all deps in cache: #{deps.keys}"
@@ -48,7 +47,7 @@ module Shin
       macro_sexp = info[:macro]
       debug "macro_sexp: #{macro_sexp}" if DEBUG
 
-      macro_func = context.context['$kir']['modules'][macro_slug]['exports'][mangle(macro_name)]
+      macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
       unless macro_func
         raise "Could not retrieve macro_func"
       end
