@@ -5,6 +5,8 @@ require 'set'
 module Shin
   module Utils
     module Mimic
+      DEBUG = ENV['MIMIC_DEBUG']
+
       module ClassMethod
         include Shin::Utils::Mangler
 
@@ -13,6 +15,15 @@ module Shin
         def implement(proto, &block)
           @protocols ||= Set.new
           @protocols << "cljs$dcore$v#{proto}"
+
+          if proto == :IFn
+            # IFn is special, cf. #50
+            define_method(:call) do |*args|
+              sym = method_sym('-invoke', args.length)
+              send(sym, *args)
+            end
+          end
+
           block.call if block
         end
 
@@ -32,7 +43,7 @@ module Shin
 
       def [](x)
         return true if self.class.protocols.include?(x)
-        puts "[#{self.class.name}] does not implement Clojure protocol #{x}"
+        puts "[#{self.class.name}] does not implement Clojure protocol #{x}" if DEBUG
         nil
       end
 

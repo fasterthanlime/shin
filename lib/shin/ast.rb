@@ -352,13 +352,27 @@ module Shin
 
       implement :IFn do
         defn '-invoke' do |s, coll|
-          raise "invoke ?"
+          lookup = coll[method_sym('-lookup', 2)]
+          if lookup
+            lookup.methodcall(coll, coll, self)
+          else
+            nil
+          end
+        end
+
+        defn '-invoke' do |s, coll, not_found|
+          lookup = coll[method_sym('-lookup', 3)]
+          if lookup
+            lookup.methodcall(coll, coll, self, not_found)
+          else
+            not_found
+          end
         end
       end
 
-      implement :IHash do
-        defn '-hash' do |s|
-          raise "stub"
+      implement :IHashDelegate do
+        defn '-hash-delegate' do |s|
+          value
         end
       end
 

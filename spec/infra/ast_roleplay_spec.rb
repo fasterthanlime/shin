@@ -102,16 +102,30 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
 
     describe "IFn" do
-      it "satisfies IPrintable" do
-        expect_satisfies?(:IPrintable, sample_kw).to be_truthy
+      it "satisfies IFn" do
+        expect_satisfies?(:IFn, sample_kw).to be_truthy
       end
 
-      it "can call pr-str" do
+      it "is callable" do
         k = sample_kw
         s = js_call %Q{
-          return core.pr$_str(k);
+          var v = core.hash$_map(core.keyword("#{k.value}"), "yellow");
+          return k.call(null, v);
         }, :k => k
-        expect(s).to eq(k.to_s)
+        expect(s).to eq("yellow")
+      end
+
+      it "is callable (with not-found)" do
+        k = sample_kw
+
+        expect(js_call(%Q{
+          var v = core.hash$_map(core.keyword("#{k.value}"), "yellow");
+          return k.call(null, v);
+        }, :k => k)).to eq("yellow")
+        expect(js_call(%Q{
+          var v = core.hash$_map();
+          return k.call(null, v, "submarine");
+        }, :k => k)).to eq("submarine")
       end
     end
   end
