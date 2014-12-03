@@ -1,13 +1,13 @@
 
 require 'shin/jst'
-require 'shin/utils/hamster'
+require 'shin/utils/hamster_tools'
 require 'hamster/deque'
 require 'set'
 
 module Shin
   # Keeps track of things like scoping, context, etc.
   class JstBuilder
-    include Shin::Utils::Hamster
+    include Shin::Utils::HamsterTools
 
     def initialize
       @scopes  = Hamster.deque

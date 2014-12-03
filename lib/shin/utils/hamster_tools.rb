@@ -3,7 +3,7 @@ require 'hamster/deque'
 
 module Shin
   module Utils
-    module Hamster
+    module HamsterTools
       def walk_deque(deq)
         c = deq
         until c.empty?

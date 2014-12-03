@@ -1,5 +1,6 @@
 
 require 'hamster/vector'
+require 'hamster/hash'
 require 'shin/utils/mimic'
 
 module Shin
@@ -112,6 +113,26 @@ module Shin
         end
       end
 
+      def eql?(other)
+        case other
+        when V8::Object
+          eq = other[method_sym('-equiv', 2)]
+          if eq
+            eq.methodcall(other, other, self)
+          else
+            false
+          end
+        when List, Vector
+          inner.eql?(other.inner)
+        else
+          false
+        end
+      end
+
+      def hash
+        inner.hash
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic
@@ -154,19 +175,7 @@ module Shin
       implement :ISequential
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          case other
-          when V8::Object
-            eq = other[method_sym('-equiv', 2)]
-            if eq
-              eq.methodcall(other, other, self)
-            else
-              false
-            end
-          when List, Vector
-            inner == other.inner
-          else
-            false
-          end
+          self.eql?(other)
         end
       end
 
@@ -253,6 +262,26 @@ module Shin
         "[#{inner.map(&:to_s).join(" ")}]"
       end
 
+      def eql?(other)
+        case other
+        when V8::Object
+          eq = other[method_sym('-equiv', 2)]
+          if eq
+            eq.methodcall(other, other, self)
+          else
+            false
+          end
+        when List, Vector
+          inner.eql?(other.inner)
+        else
+          false
+        end
+      end
+
+      def hash
+        inner.hash
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic
@@ -308,19 +337,7 @@ module Shin
       implement :ISequential
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          case other
-          when V8::Object
-            eq = other[method_sym('-equiv', 2)]
-            if eq
-              eq.methodcall(other, other, self)
-            else
-              false
-            end
-          when List, Vector
-            inner == other.inner
-          else
-            false
-          end
+          self.eql?(other)
         end
       end
 
@@ -419,7 +436,22 @@ module Shin
       end
 
       def as_hash
-        @_hash ||= Hamster.hash(inner.each_slice(2))
+        @_hash ||= Hamster::Hash.new(inner.each_slice(2).to_a)
+      end
+
+      def eql?(other)
+        case other
+        when V8::Object
+          raise "comparing AST::Map with V8 object: stub"
+        when Map
+          as_hash.eql?(other.as_hash)
+        else
+          false
+        end
+      end
+
+      def hash
+        inner.hash
       end
 
       # ClojureScript protocols
@@ -467,6 +499,19 @@ module Shin
       def to_s
         value.inspect
       end
+
+      def eql?(other)
+        case other
+        when Literal
+          value.eql?(other.value)
+        else
+          value.eql?(other)
+        end
+      end
+
+      def hash
+        value.hash
+      end
     end
 
     class Number < Literal
@@ -498,6 +543,26 @@ module Shin
         value
       end
 
+      def eql?(other)
+        case other
+        when V8::Object
+          eq = other[method_sym('-equiv', 2)]
+          if eq
+            eq.methodcall(other, other, self)
+          else
+            false
+          end
+        when Symbol
+          value == other.value
+        else
+          false
+        end
+      end
+
+      def hash
+        value.hash
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic
@@ -518,19 +583,7 @@ module Shin
 
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          case other
-          when V8::Object
-            eq = other[method_sym('-equiv', 2)]
-            if eq
-              eq.methodcall(other, other, self)
-            else
-              false
-            end
-          when Symbol
-            value == other.value
-          else
-            false
-          end
+          self.eql?(other)
         end
       end
 
@@ -578,6 +631,26 @@ module Shin
         ":#{value}"
       end
 
+      def eql?(other)
+        case other
+        when V8::Object
+          eq = other[method_sym('-equiv', 2)]
+          if eq
+            eq.methodcall(other, other, self)
+          else
+            false
+          end
+        when Keyword
+          value == other.value
+        else
+          false
+        end
+      end
+
+      def hash
+        value.hash
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic
@@ -598,19 +671,7 @@ module Shin
 
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          case other
-          when V8::Object
-            eq = other[method_sym('-equiv', 2)]
-            if eq
-              eq.methodcall(other, other, self)
-            else
-              false
-            end
-          when Keyword
-            value == other.value
-          else
-            false
-          end
+          self.eql?(other)
         end
       end
 

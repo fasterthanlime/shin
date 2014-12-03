@@ -5,6 +5,7 @@
 RSpec.describe "Infrastructure", "AST roleplay" do
   include Shin
   include Shin::Utils::Mangler
+  include Shin::Utils::AstMaker
 
   before(:all) do
     compiler = Shin::Compiler.new({})
@@ -729,6 +730,30 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     # TODO: specs for IFn
   end
 
+  #####################################
+  # Map specs
+  #####################################
+
+  describe "AST::Map" do
+    describe "IAssociative" do
+      it "satisfies IAssociative" do
+        expect_satisfies?(:IAssociative, empty_map).to be_truthy
+      end
+
+      it "can call assoc" do
+        m = empty_map
+        s = js_call %Q{
+          var k = "hymnos";
+          var v = "domine";
+          return core.assoc(m, k, v);
+        }, :m => m
+        expect(s.inner.length).to eq(2)
+        expect(s.inner[0]).to eql(literal("hymnos"))
+        expect(s.inner[1]).to eql(literal("domine"))
+      end
+    end
+  end
+
   private
 
   def expect_pred?(pred, val)
@@ -763,56 +788,6 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     %Q{
       var core = $kir.modules["cljs.core"].exports;
     }
-  end
-
-  def sample_token
-    Shin::AST::Token.new("dummy", 42)
-  end
-
-  def sym(name)
-    Shin::AST::Symbol.new(sample_token, name)
-  end
-
-  def kw(name)
-    Shin::AST::Keyword.new(sample_token, name)
-  end
-
-  def literal(value)
-    Shin::AST::Literal.new(sample_token, value)
-  end
-
-  def sample_kw
-    kw("neverland")
-  end
-
-  def sample_sym
-    sym("oreilly")
-  end
-
-  def sample_list
-    inner = Hamster.vector(sym("lloyd"), sym("franken"), sym("algae"))
-    Shin::AST::List.new(sample_token, inner)
-  end
-
-  def sample_vec
-    inner = Hamster.vector(kw("these"), kw("arent"), kw("spartae"))
-    Shin::AST::Vector.new(sample_token, inner)
-  end
-
-  def numeric_list
-    inner = Hamster.vector()
-    (1..6).each do |n|
-      inner <<= Shin::AST::Literal.new(sample_token, n)
-    end
-    Shin::AST::List.new(sample_token, inner)
-  end
-
-  def numeric_vec
-    inner = Hamster.vector()
-    (1..6).reverse_each do |n|
-      inner <<= Shin::AST::Literal.new(sample_token, n)
-    end
-    Shin::AST::Vector.new(sample_token, inner)
   end
 
 end
