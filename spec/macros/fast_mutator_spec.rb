@@ -13,5 +13,15 @@ RSpec.describe "Language", "fast mutator" do
       :macros => %Q{ (defmacro fast-mutator-test [a b] `(print ~a ~b)) }
     ).to have_output("hello dolly")
   end
+
+  it "list, bool -> list" do
+    expect(
+      :source => %Q{ (fast-mutator-test false (print "Works") (print "Oh-noes")) },
+      :macros => %Q{
+        (defmacro fast-mutator-test [cond if-false if-true]
+          `(if (not ~cond) ~if-false ~if-true))
+      }
+    ).to have_output("Works")
+  end
 end
 
