@@ -87,5 +87,21 @@ RSpec.describe "Language", "fast mutator" do
       }
     ).to have_output("knock knock knock")
   end
+
+  it "compiles a constructive repeat macro" do
+    expect(
+      :source => %Q{
+        (fast-mutator-test 3 (print "knock"))
+      },
+      :macros => %Q{
+        (defmacro fast-mutator-test [count body]
+          (let [inner (fn rec [count body]
+                         (if (> count 0)
+                             (cons body (rec (- count 1) body))
+                             '()))]
+            `(do ~@(inner count body))))
+      }
+    ).to have_output("knock knock knock")
+  end
 end
 

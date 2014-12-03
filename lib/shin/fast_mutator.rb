@@ -135,9 +135,9 @@ module Shin
           inner_type = v8_type(inner)
           case inner_type
           when :list
-            acc += unquote_seq(inner, token)
+            acc.concat(unquote_seq(inner, token))
           when :vector
-            acc += unquote_indexed(inner, token)
+            acc.concat(unquote_indexed(inner, token))
           else
             raise "Invalid use of splice on non-sequence #{type}"
           end
