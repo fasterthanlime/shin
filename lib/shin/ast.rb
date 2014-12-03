@@ -1,5 +1,6 @@
 
 require 'hamster/vector'
+require 'shin/utils/mimic'
 
 module Shin
   module AST
@@ -113,55 +114,69 @@ module Shin
 
       # ClojureScript protocols
 
-      # ISeq
-      define_method(:'$_first$$arity1') do |s|
-        inner.first
-      end
+      include Shin::Utils::Mimic
 
-      define_method(:'$_rest$$arity1') do |s|
-        List.new(token, inner.drop(1))
-      end
+      implement :IList
 
-      # ISeqable
-      define_method(:'$_seq$$arity1') do |s|
-        if inner.empty?
-          nil
-        else
-          self
+      implement :ASeq
+      implement :ISeq do
+        defn '-first' do |s|
+          inner.first
         end
-      end
 
-      # INext
-      define_method(:'$_next$$arity1') do |s|
-        if inner.count > 1
+        defn '-rest' do |s|
           List.new(token, inner.drop(1))
-        else
-          nil
         end
       end
 
-      # ICounted
-      define_method(:'$_count$$arity1') do |s|
-        inner.count
+      implement :INext do
+        defn '-next' do |s|
+          (inner.count > 1) ? List.new(token, inner.drop(1)) : nil
+        end
       end
 
-      # IStack
-      define_method(:'$_peek$$arity1') do |s|
-        inner.first
+      implement :IStack do
+        defn '-peek' do |s|
+          inner.first
+        end
+
+        defn '-pop' do |s|
+          List.new(token, inner.drop(1))
+        end
       end
 
-      define_method(:'$_pop$$arity1') do |s|
-        List.new(token, inner.drop(1))
+      implement :ISequential
+      implement :IEquiv do
+        defn '-equiv' do |s, other|
+          raise "stub"
+        end
       end
 
-      @@protocols = %w(IList ISeq ASeq ISeqable INext IStack ICounted ISequential).map do |x|
-        "cljs$dcore$v#{x}"
+      implement :ISeqable do
+        defn '-seq' do |s|
+          (inner.empty?) ? nil : self
+        end
       end
 
-      def [](x)
-        return true if @@protocols.include?(x)
-        puts "[AST::List] asking for #{x}"
-        nil
+      implement :ICounted do
+        defn '-count' do |s|
+          inner.count
+        end
+      end
+
+      implement :IReduce do
+        defn '-reduce' do |s, f|
+          raise "stub"
+        end
+        defn '-reduce' do |s, f, start|
+          raise "stub"
+        end
+      end
+
+      implement :IPrintable do
+        defn '-pr-str' do |s|
+          raise "stub"
+        end
       end
     end
 
