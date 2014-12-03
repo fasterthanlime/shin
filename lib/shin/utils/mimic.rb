@@ -122,6 +122,8 @@ module Shin
           :vector
         when val[core_proto_name("IMap")]
           :map
+        when val[core_proto_name("IUnquote")]
+          :unquote
         else
           :unknown
         end

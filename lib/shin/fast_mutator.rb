@@ -14,20 +14,20 @@ module Shin
     end
 
     def expand(invoc, info, context)
-      debug "Should expand #{invoc}"
+      debug "Expanding #{invoc}"
 
       deps = @compiler.collect_deps(info[:module])
-      debug "Got deps: #{deps.keys}"
 
       all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
-      debug "All in cache? #{all_in_cache}"
+      unless all_in_cache
+        raise "Not all deps in cache: #{deps.keys}"
+      end
 
       deps.each do |slug, dep|
         Shin::NsParser.new(dep).parse unless dep.ns
         Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
         Shin::Translator.new(@compiler, dep).translate unless dep.jst
         Shin::Generator.new(dep).generate unless dep.code
-        puts "Compiled dep #{slug}"
       end
 
       deps.each do |slug, dep|
@@ -35,7 +35,9 @@ module Shin
       end
 
       all_loaded = deps.keys.all? { |slug| context.spec_loaded?(context.parse_spec(slug)) }
-      debug "All loaded? #{all_loaded}"
+      unless all_loaded
+        raise "Not all loaded!"
+      end
 
       macro_slug = info[:module].slug
       debug "macro_slug: #{macro_slug}"
@@ -43,7 +45,7 @@ module Shin
       macro_name = invoc.inner.first.value
       debug "macro_name: #{macro_name}"
 
-      macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
+      macro_func = context.context['$kir']['modules'][macro_slug]['exports'][mangle(macro_name)]
       unless macro_func
         raise "Could not retrieve macro_func"
       end
@@ -67,15 +69,31 @@ module Shin
     def unquote(node, token)
       case node
       when Shin::AST::Node
-        debug "TODO: dequote the inside of nodes"
-        # each, unquote, the works.
         node
       when Fixnum, Float, String
         Shin::AST::Literal.new(token, node)
       when V8::Object
         type = v8_type(node)
-        debug "TODO: dequote a V8 object of type #{type}"
-        nil
+        case type
+        when :list
+          acc = []
+          xs = node
+          while xs
+            el = js_invoke(xs, '-first')
+            acc << unquote(el, token)
+            xs = js_invoke(xs, '-next')
+          end
+          Shin::AST::List.new(token, Hamster::Vector.new(acc))
+        when :symbol
+          Shin::AST::Symbol.new(token, node['_name'])
+        when :unquote
+          if node['splice']
+            raise "Dunno how to unquote-splice yet!"
+          end
+          unquote(node['inner'], token)
+        else
+          raise "Dunno how to dequote a V8 object of type #{type}"
+        end
       end
     end
     
