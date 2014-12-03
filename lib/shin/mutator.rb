@@ -57,15 +57,22 @@ module Shin
           invoc = node
           info = resolve_macro(first.value)
           if info
-            eval_mod = make_macro_module(invoc, info)
+            expanded_ast = nil
 
-            debug "=============================================="
-            debug "; Macro :\n#{info[:macro]}\n\n" if DEBUG
+            if first.value == "fast-mutator-test"
+              puts "Using fast mutator!"
+              fm = FastMutator.new(compiler, mod)
+              expanded_ast fm.expand(invoc, info)
+            else
+              eval_mod = make_macro_module(invoc, info)
+              debug "========== [Mutator] ======================="
+              debug "; Macro :\n#{info[:macro]}\n\n" if DEBUG
 
-            debug "; Original AST:\n#{invoc}\n\n" if DEBUG
-            expanded_ast = eval_macro_module(eval_mod)
+              debug "; Original AST:\n#{invoc}\n\n" if DEBUG
+              expanded_ast = eval_macro_module(eval_mod)
+            end
+
             @expands += 1
-
             node = expand(expanded_ast)
           end
         end
