@@ -154,9 +154,16 @@ module Shin
       implement :ISequential
       implement :IEquiv do
         defn '-equiv' do |s, other|
-          eq = other[method_sym('-equiv', 2)]
-          if eq
-            eq.methodcall(other, other, self)
+          case other
+          when V8::Object
+            eq = other[method_sym('-equiv', 2)]
+            if eq
+              eq.methodcall(other, other, self)
+            else
+              false
+            end
+          when List, Vector
+            inner == other.inner
           else
             false
           end
@@ -312,6 +319,48 @@ module Shin
       include Shin::Utils::Mimic
 
       implement :IKeyword
+      
+      implement :INamed do
+        defn '-name' do |s|
+          value
+        end
+      end
+
+      implement :IPrintable do
+        defn '-pr-str' do |s|
+          to_s
+        end
+      end
+
+      implement :IEquiv do
+        defn '-equiv' do |s, other|
+          case other
+          when V8::Object
+            eq = other[method_sym('-equiv', 2)]
+            if eq
+              eq.methodcall(other, other, self)
+            else
+              false
+            end
+          when Keyword
+            value == other.value
+          else
+            false
+          end
+        end
+      end
+
+      implement :IFn do
+        defn '-invoke' do |s, coll|
+          raise "invoke ?"
+        end
+      end
+
+      implement :IHash do
+        defn '-hash' do |s|
+          raise "stub"
+        end
+      end
 
     end
 

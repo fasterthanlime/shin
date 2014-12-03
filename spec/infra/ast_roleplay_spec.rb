@@ -26,6 +26,94 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect_pred?(:keyword?, sample_kw).to be_truthy
       end
     end
+
+    describe "INamed" do
+      it "satisfies INamed" do
+        expect_satisfies?(:INamed, sample_kw).to be_truthy
+      end
+
+      it "can call name" do
+        k = sample_kw
+        s = js_call %Q{
+          return core.name(k);
+        }, :k => k
+        expect(s).to eq(k.value)
+      end
+    end
+
+    describe "IPrintable" do
+      it "satisfies IPrintable" do
+        expect_satisfies?(:IPrintable, sample_kw).to be_truthy
+      end
+
+      it "can call pr-str" do
+        k = sample_kw
+        s = js_call %Q{
+          return core.pr$_str(k);
+        }, :k => k
+        expect(s).to eq(k.to_s)
+      end
+    end
+
+    describe "IEquiv" do
+      it "satisfies IEquiv" do
+        expect_satisfies?(:IEquiv, sample_kw).to be_truthy
+      end
+
+      describe "can be compared with keyword" do
+        it "as lhs" do
+          lhs = sample_kw
+
+          expect(js_call(%Q{
+            var rhs = core.keyword("#{lhs.value}");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_truthy
+
+          expect(js_call(%Q{
+            var rhs = core.keyword("definitely-not-equal");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+
+          expect(js_call(%Q{
+            var rhs = "not even a keyword";
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+        end
+
+        it "as rhs" do
+          rhs = sample_kw
+
+          expect(js_call(%Q{
+            var lhs = core.keyword("#{rhs.value}");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_truthy
+
+          expect(js_call(%Q{
+            var lhs = core.keyword("definitely-not-equal");
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+
+          expect(js_call(%Q{
+            var lhs = "not even a keyword";
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+        end
+      end
+    end
+
+    describe "IFn" do
+      it "satisfies IPrintable" do
+        expect_satisfies?(:IPrintable, sample_kw).to be_truthy
+      end
+
+      it "can call pr-str" do
+        k = sample_kw
+        s = js_call %Q{
+          return core.pr$_str(k);
+        }, :k => k
+        expect(s).to eq(k.to_s)
+      end
+    end
   end
 
   describe "AST::List" do
@@ -118,7 +206,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         s = js_call %Q{
           return core.peek(l);
         }, :l => l
-        expect(s).to eq(l.inner.first)
+        expect(s).to be(l.inner.first)
       end
 
       it "can call peek (unwrap)" do
