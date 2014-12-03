@@ -14,7 +14,7 @@ module Shin
     end
 
     def expand(invoc, info, context)
-      debug "Expanding #{invoc}"
+      debug "Expanding #{invoc}" if DEBUG
 
       deps = @compiler.collect_deps(info[:module])
 
@@ -40,31 +40,31 @@ module Shin
       end
 
       macro_slug = info[:module].slug
-      debug "macro_slug: #{macro_slug}"
+      debug "macro_slug: #{macro_slug}" if DEBUG
 
       macro_name = invoc.inner.first.value
-      debug "macro_name: #{macro_name}"
+      debug "macro_name: #{macro_name}" if DEBUG
 
       macro_sexp = info[:macro]
-      debug "macro_sexp: #{macro_sexp}"
+      debug "macro_sexp: #{macro_sexp}" if DEBUG
 
       macro_func = context.context['$kir']['modules'][macro_slug]['exports'][mangle(macro_name)]
       unless macro_func
         raise "Could not retrieve macro_func"
       end
-      debug "macro_func: #{macro_func}"
+      debug "macro_func: #{macro_func}" if DEBUG
 
       macro_args = invoc.inner.drop(1).to_a
-      debug "macro_args: #{macro_args.join(", ")}"
+      debug "macro_args: #{macro_args.join(", ")}" if DEBUG
 
       macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
-      debug "macro_gifted_args: #{macro_gifted_args.join(", ")}"
+      debug "macro_gifted_args: #{macro_gifted_args.join(", ")}" if DEBUG
 
       macro_ret = macro_func.call(*macro_gifted_args)
-      debug "macro_ret: #{macro_ret}"
+      debug "macro_ret: #{macro_ret}" if DEBUG
 
       macro_ret_unquoted = unquote(macro_ret, invoc.token)
-      debug "unquoted macro_ret: #{macro_ret_unquoted}"
+      debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
 
       macro_ret_unquoted
     end
