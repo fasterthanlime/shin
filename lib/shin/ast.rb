@@ -228,6 +228,113 @@ module Shin
       def to_s
         "[#{inner.map(&:to_s).join(" ")}]"
       end
+
+      # ClojureScript protocols
+
+      include Shin::Utils::Mimic
+
+      implement :IVector
+
+      implement :ASeq
+      implement :ISeq do
+        defn '-first' do |s|
+          unwrap(inner.first)
+        end
+
+        defn '-rest' do |s|
+          Vector.new(token, inner.drop(1))
+        end
+      end
+
+      implement :INext do
+        defn '-next' do |s|
+          (inner.count > 1) ? Vector.new(token, inner.drop(1)) : nil
+        end
+      end
+
+      implement :IStack do
+        defn '-peek' do |s|
+          unwrap(inner.first)
+        end
+
+        defn '-pop' do |s|
+          Vector.new(token, inner.drop(1))
+        end
+      end
+
+      implement :ICollection do
+        defn '-conj' do |s, o|
+          Vector.new(token, inner.push(wrap(o)))
+        end
+      end
+
+      implement :ISequential
+      implement :IEquiv do
+        defn '-equiv' do |s, other|
+          case other
+          when V8::Object
+            eq = other[method_sym('-equiv', 2)]
+            if eq
+              eq.methodcall(other, other, self)
+            else
+              false
+            end
+          when List, Vector
+            inner == other.inner
+          else
+            false
+          end
+        end
+      end
+
+      implement :ISeqable do
+        defn '-seq' do |s|
+          (inner.empty?) ? nil : self
+        end
+      end
+
+      implement :ICounted do
+        defn '-count' do |s|
+          inner.count
+        end
+      end
+
+      implement :IReduce do
+        defn '-reduce' do |s, f|
+          case inner.length
+          when 0
+            f.call
+          when 1
+            inner[1]
+          else
+            a = unwrap(inner[0])
+            b = unwrap(inner[1])
+            zero = f.call(a, b)
+            invoke('-rest').invoke('-rest').invoke('-reduce', f, zero)
+          end
+        end
+        defn '-reduce' do |s, f, start|
+          case inner.length
+          when 0
+            start
+          else
+            a = start
+            xs = inner
+            until xs.empty?
+              b = unwrap(xs.first)
+              a = f.call(a, b)
+              xs = xs.drop(1)
+            end
+            a
+          end
+        end
+      end
+
+      implement :IPrintable do
+        defn '-pr-str' do |s|
+          "[#{inner.map { |x| pr_str(x) }.join(" ")}]"
+        end
+      end
     end
 
     class Set < Sequence

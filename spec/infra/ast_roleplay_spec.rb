@@ -16,6 +16,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     @ctx.load("cljs.core")
   end
 
+  #####################################
+  # Keyword specs
+  #####################################
+
   describe "AST::Keyword" do
     describe "IKeyword" do
       it "satisfies IKeyword" do
@@ -130,6 +134,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
   end
 
+  #####################################
+  # Symbol specs
+  #####################################
+
   describe "AST::Symbol" do
     describe "ISymbol" do
       it "satisfies ISymbol" do
@@ -243,6 +251,10 @@ RSpec.describe "Infrastructure", "AST roleplay" do
       end
     end
   end
+
+  #####################################
+  # List specs
+  #####################################
 
   describe "AST::List" do
     describe "IList" do
@@ -475,6 +487,241 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     end
   end
 
+  #####################################
+  # Vector specs
+  #####################################
+
+  describe "AST::Vector" do
+    describe "IVector" do
+      it "satisfies IVector" do
+        expect_satisfies?(:IVector, sample_vec).to be_truthy
+      end
+
+      it "truthful by vector?" do
+        expect_pred?(:vector?, sample_vec).to be_truthy
+      end
+    end
+
+    describe "ISeq" do
+      it "satisfies ISeq" do
+        expect_satisfies?(:ISeq, sample_vec).to be_truthy
+      end
+
+      it "satisfies ASeq" do
+        expect_satisfies?(:ASeq, sample_vec).to be_truthy
+      end
+
+      it "can call first" do
+        l = sample_vec
+        s = js_call %Q{
+          return core.first(l);
+        }, :l => l
+        expect(s).to be(l.inner.first)
+      end
+
+      it "can call first (unwrap)" do
+        s = js_call %Q{
+          return core.first(l) + 36;
+        }, :l => numeric_vec
+        expect(s).to eq(42)
+      end
+
+      it "can call rest" do
+        s = js_call %Q{
+          return core.rest(l);
+        }, :l => sample_vec
+        expect(s).to be_a(Shin::AST::Vector)
+        expect(s.inner.count).to eq(2)
+      end
+    end
+
+    describe "INext" do
+      it "satisfies INext" do
+        expect_satisfies?(:INext, sample_vec).to be_truthy
+      end
+
+      it "can call next" do
+        s = js_call %Q{
+          return core.next(l);
+        }, :l => sample_vec
+        expect(s).to be_a(Shin::AST::Vector)
+        expect(s.inner.count).to eq(2)
+      end
+
+      it "next returns nil eventually" do
+        s = js_call %Q{
+          var res = l;
+          while (res) { res = core.next(res); }
+          return res;
+        }, :l => sample_vec
+        expect(s).to be_nil
+      end
+    end
+
+    describe "ICounted" do
+      it "satisfies ICounted" do
+        expect_satisfies?(:ICounted, sample_vec).to be_truthy
+      end
+
+      it "can call count" do
+        s = js_call %Q{
+          return core.count(l);
+        }, :l => sample_vec
+        expect(s).to eq(3)
+      end
+    end
+
+    describe "IStack" do
+      it "satisfies IStack" do
+        expect_satisfies?(:IStack, sample_vec).to be_truthy
+      end
+
+      it "can call peek" do
+        l = sample_vec
+        s = js_call %Q{
+          return core.peek(l);
+        }, :l => l
+        expect(s).to be(l.inner.first)
+      end
+
+      it "can call peek (unwrap)" do
+        s = js_call %Q{
+          return core.peek(l) + 36;
+        }, :l => numeric_vec
+        expect(s).to eq(42)
+      end
+
+      it "can call pop" do
+        s = js_call %Q{
+          return core.pop(l);
+        }, :l => sample_vec
+        expect(s).to be_a(Shin::AST::Vector)
+        expect(s.inner.count).to eq(2)
+      end
+
+      it "pops from the front" do
+        l = sample_vec
+        s = js_call %Q{
+          return core.first(core.pop(core.pop(l)));
+        }, :l => l
+        expect(s).to eq(l.inner.last)
+      end
+    end
+
+    describe "ICollection" do
+      it "satisfies ICollection" do
+        expect_satisfies?(:ICollection, sample_vec).to be_truthy
+      end
+
+      it "can call conj" do
+        l = sample_vec
+        s = js_call %Q{
+          return core.conj(l, 42);
+        }, :l => l
+        expect(s).to be_a(Shin::AST::Vector)
+        last = s.inner.last
+        expect(last).to be_a(Shin::AST::Literal)
+        expect(last.value).to eq(42)
+      end
+    end
+
+    describe "ISequential" do
+      it "satisfies ISequential" do
+        expect_satisfies?(:ISequential, sample_vec).to be_truthy
+      end
+    end
+
+    describe "IEquiv" do
+      it "satisfies IEquiv" do
+        expect_satisfies?(:IEquiv, sample_vec).to be_truthy
+      end
+
+      describe "can be compared with a vector" do
+        it "as lhs" do
+          lhs = numeric_vec
+
+          expect(js_call(%Q{
+            var rhs = core.vector(6, 5, 4, 3, 2, 1);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_truthy
+          expect(js_call(%Q{
+            var rhs = core.vector(6, 5, 4);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+          expect(js_call(%Q{
+            var rhs = core.vector(6, 5, 4, 4, 2, 1);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+          expect(js_call(%Q{
+            var rhs = core.vector(6, 5, 4, 3, 2, 1, 0);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :lhs => lhs)).to be_falsey
+        end
+
+        it "as rhs" do
+          rhs = numeric_vec
+
+          expect(js_call(%Q{
+            var lhs = core.vector(6, 5, 4, 3, 2, 1);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_truthy
+          expect(js_call(%Q{
+            var lhs = core.vector(6, 5, 4);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+          expect(js_call(%Q{
+            var lhs = core.vector(6, 5, 4, 4, 2, 1);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+          expect(js_call(%Q{
+            var lhs = core.vector(6, 5, 4, 3, 2, 1, 0);
+            return core.#{mangle('=')}(lhs, rhs);
+          }, :rhs => rhs)).to be_falsey
+        end
+      end
+    end
+
+    describe "IReduce" do
+      it "satisfies IReduce" do
+        expect_satisfies?(:IReduce, sample_vec).to be_truthy
+      end
+
+      it "reduces without an initial value" do
+        s = js_call %Q{
+          return core.reduce(core.#{mangle('+')}, l);
+        }, :l => numeric_vec
+        expect(s).to eq(21)
+      end
+
+      it "reduces with an initial value" do
+        s = js_call %Q{
+          return core.reduce(core.#{mangle('+')}, 21, l);
+        }, :l => numeric_vec
+        expect(s).to eq(42)
+      end
+    end
+
+    describe "IPrintable" do
+      it "satisfies IPrintable" do
+        expect_satisfies?(:IPrintable, sample_vec).to be_truthy
+      end
+
+      it "has a working pr-str (symbols)" do
+        s = js_call %Q{
+           return core.pr$_str(l);
+        }, :l => sample_vec
+        expect(s).to eq("[:these :arent :spartae]")
+      end
+
+      it "has a working pr-str (numbers)" do
+        s = js_call %Q{
+           return core.pr$_str(l);
+        }, :l => numeric_vec
+        expect(s).to eq("[6 5 4 3 2 1]")
+      end
+    end
+  end
+
   private
 
   def expect_pred?(pred, val)
@@ -540,12 +787,25 @@ RSpec.describe "Infrastructure", "AST roleplay" do
     Shin::AST::List.new(sample_token, inner)
   end
 
+  def sample_vec
+    inner = Hamster.vector(kw("these"), kw("arent"), kw("spartae"))
+    Shin::AST::Vector.new(sample_token, inner)
+  end
+
   def numeric_list
     inner = Hamster.vector()
     (1..6).each do |n|
       inner <<= Shin::AST::Literal.new(sample_token, n)
     end
     Shin::AST::List.new(sample_token, inner)
+  end
+
+  def numeric_vec
+    inner = Hamster.vector()
+    (1..6).reverse_each do |n|
+      inner <<= Shin::AST::Literal.new(sample_token, n)
+    end
+    Shin::AST::Vector.new(sample_token, inner)
   end
 
 end
