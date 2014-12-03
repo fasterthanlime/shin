@@ -158,6 +158,26 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s).to eq(42)
       end
     end
+
+    describe "IPrintable" do
+      it "satisfies IPrintable" do
+        expect_satisfies?(:IPrintable, sample_list).to be_truthy
+      end
+
+      it "has a working pr-str (symbols)" do
+        s = js_call %Q{
+           return core.pr$_str(l);
+        }, :l => sample_list
+        expect(s).to eq("(lloyd franken algae)")
+      end
+
+      it "has a working pr-str (numbers)" do
+        s = js_call %Q{
+           return core.pr$_str(l);
+        }, :l => numeric_list
+        expect(s).to eq("(1 2 3 4 5 6)")
+      end
+    end
   end
 
   private

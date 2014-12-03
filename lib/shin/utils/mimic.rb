@@ -5,8 +5,6 @@ require 'set'
 module Shin
   module Utils
     module Mimic
-      include Shin::Utils::Mangler
-
       module ClassMethod
         include Shin::Utils::Mangler
 
@@ -18,8 +16,12 @@ module Shin
           block.call if block
         end
 
+        def method_sym(name, arity)
+          mangle("#{name}$arity#{arity}").to_sym
+        end
+
         def defn(name, &block)
-          sym = mangle("#{name}$arity#{block.arity}").to_sym
+          sym = self.method_sym(name, block.arity)
           define_method(sym, &block)
         end
       end
@@ -34,9 +36,12 @@ module Shin
         nil
       end
 
+      def method_sym(name, arity)
+        self.class.method_sym(name, arity)
+      end
+
       def invoke(name, *args)
-        sym = mangle("#{name}$arity#{args.length + 1}").to_sym
-        send(sym, *([self].concat(args)))
+        send(method_sym(name, args.length + 1), *([self].concat(args)))
       end
 
       def unwrap(node)
@@ -45,6 +50,15 @@ module Shin
           node.value
         else
           node
+        end
+      end
+
+      def pr_str(val)
+        _pr_str = method_sym("-pr-str", 1)
+        if val.respond_to?(_pr_str)
+          val.send(_pr_str, val)
+        else
+          val.to_s
         end
       end
     end

@@ -197,7 +197,7 @@ module Shin
 
       implement :IPrintable do
         defn '-pr-str' do |s|
-          raise "stub"
+          "(#{inner.map { |x| pr_str(x) }.join(" ")})"
         end
       end
     end
