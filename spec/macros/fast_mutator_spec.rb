@@ -23,5 +23,15 @@ RSpec.describe "Language", "fast mutator" do
       }
     ).to have_output("Works")
   end
+
+  it "list -> list" do
+    expect(
+      :source => %Q{ (fast-mutator-test ("Works" "well")) },
+      :macros => %Q{
+        (defmacro fast-mutator-test [form]
+          (cons 'print form))
+      }
+    ).to have_output("Works well")
+  end
 end
 

@@ -79,9 +79,15 @@ module Shin
           acc = []
           xs = node
           while xs
-            el = js_invoke(xs, '-first')
-            acc << unquote(el, token)
-            xs = js_invoke(xs, '-next')
+            if V8::Object === xs
+              el = js_invoke(xs, '-first')
+              acc << unquote(el, token)
+              xs = js_invoke(xs, '-next')
+            else
+              el = xs.invoke('-first')
+              acc << unquote(el, token)
+              xs = xs.invoke('-next')
+            end
           end
           Shin::AST::List.new(token, Hamster::Vector.new(acc))
         when :symbol
