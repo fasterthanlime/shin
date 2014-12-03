@@ -70,7 +70,7 @@ module Shin
       case node
       when Shin::AST::Node
         node
-      when Fixnum, Float, String
+      when Fixnum, Float, String, nil
         Shin::AST::Literal.new(token, node)
       when V8::Object
         type = v8_type(node)
