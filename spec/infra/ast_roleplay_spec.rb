@@ -752,6 +752,21 @@ RSpec.describe "Infrastructure", "AST roleplay" do
         expect(s.inner[1]).to eql(literal("domine"))
       end
     end
+
+    describe "ILookup" do
+      it "satisfies ILookup" do
+        expect_satisfies?(:ILookup, empty_map).to be_truthy
+      end
+
+      it "can call get" do
+        m = sample_map
+        s = js_call %Q{
+          var k = core.keyword("a");
+          return core.get(m, k);
+        }, :m => m
+        expect(s).to eql(kw("A"))
+      end
+    end
   end
 
   private

@@ -12,9 +12,13 @@ module Shin
 
         attr_reader :protocols
 
+        def core_proto_name(proto)
+          "cljs$dcore$v#{proto}"
+        end
+
         def implement(proto, &block)
           @protocols ||= Set.new
-          @protocols << "cljs$dcore$v#{proto}"
+          @protocols << core_proto_name(proto)
 
           if proto == :IFn
             # IFn is special, cf. #50
@@ -51,8 +55,22 @@ module Shin
         self.class.method_sym(name, arity)
       end
 
+      def core_proto_name(name)
+        self.class.core_proto_name(name)
+      end
+
       def invoke(name, *args)
         send(method_sym(name, args.length + 1), *([self].concat(args)))
+      end
+
+      def js_invoke(val, name, *args)
+        name = method_sym(name, args.length + 1)
+        f = val[name]
+        if f
+          f.methodcall(val, val, *args)
+        else
+          raise "Can't invoke #{name} on JS object #{val}"
+        end
       end
 
       # AST nodes -> ClojureScript data structures
@@ -75,8 +93,37 @@ module Shin
         when Fixnum, Float, String
           # using our token.. better than muffin!
           Shin::AST::Literal.new(token, val)
+        when V8::Object
+          type = v8_type(val)
+          case type
+          when :keyword
+            name = js_invoke(val, "-name")
+            Shin::AST::Keyword.new(Token.dummy, name)
+          when :symbol
+            name = js_invoke(val, "-name")
+            Shin::AST::Symbol.new(Token.dummy, name)
+          else
+            raise "Unknown V8 type: #{type}"
+          end
         else
-          raise "Not sure how to wrap: #{val.inspect} of type #{val.class.name}"
+          raise "Not sure how to wrap: #{val} of type #{val.class.name}"
+        end
+      end
+
+      def v8_type(val)
+        case true
+        when val[core_proto_name("IKeyword")]
+          :keyword
+        when val[core_proto_name("ISymbol")]
+          :symbol
+        when val[core_proto_name("IList")]
+          :list
+        when val[core_proto_name("IVector")]
+          :vector
+        when val[core_proto_name("IMap")]
+          :map
+        else
+          :unknown
         end
       end
 
