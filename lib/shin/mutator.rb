@@ -60,7 +60,8 @@ module Shin
           if info
             expanded_ast = nil
 
-            if first.value == "fast-mutator-test"
+            # if first.value == "fast-mutator-test"
+            if true
               fm = FastMutator.new(@compiler, @mod)
               expanded_ast = fm.expand(invoc, info, js_context)
             else
@@ -82,6 +83,7 @@ module Shin
         inner = node.inner
         inner.each_with_index do |child, i|
           poster_child = expand(child)
+          raise "Got nil when expanding #{child}" if poster_child.nil?
           inner = inner.set(i, poster_child) if poster_child != child
         end
 

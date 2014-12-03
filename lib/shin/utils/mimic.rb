@@ -116,10 +116,10 @@ module Shin
           :keyword
         when val[core_proto_name("ISymbol")]
           :symbol
-        when val[core_proto_name("IList")]
-          :list
         when val[core_proto_name("IVector")]
           :vector
+        when val[core_proto_name("ISeq")]
+          :list
         when val[core_proto_name("IMap")]
           :map
         when val[core_proto_name("IUnquote")]

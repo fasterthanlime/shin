@@ -45,6 +45,9 @@ module Shin
       macro_name = invoc.inner.first.value
       debug "macro_name: #{macro_name}"
 
+      macro_sexp = info[:macro]
+      debug "macro_sexp: #{macro_sexp}"
+
       macro_func = context.context['$kir']['modules'][macro_slug]['exports'][mangle(macro_name)]
       unless macro_func
         raise "Could not retrieve macro_func"
@@ -68,10 +71,10 @@ module Shin
 
     def unquote(node, token)
       case node
+      when Fixnum, Float, String, true, false, nil
+        Shin::AST::Literal.new(token, node)
       when Shin::AST::Node
         node
-      when Fixnum, Float, String, nil
-        Shin::AST::Literal.new(token, node)
       when V8::Object
         type = v8_type(node)
         case type
@@ -85,7 +88,7 @@ module Shin
           Shin::AST::Symbol.new(token, node['_name'])
         when :unquote
           if node['splice']
-            raise "Dunno how to unquote-splice yet!"
+            raise "Invalid usage of splice outside a collection"
           end
           unquote(node['inner'], token)
         else
@@ -131,6 +134,8 @@ module Shin
         inner = el['inner']
 
         case inner
+        when nil
+          # well that's good, just don't append anything.
         when V8::Object
           inner_type = v8_type(inner)
           case inner_type
@@ -139,12 +144,12 @@ module Shin
           when :vector
             acc.concat(unquote_indexed(inner, token))
           else
-            raise "Invalid use of splice on non-sequence #{type}"
+            raise "Invalid use of splice on non-sequence V8 object #{inner_type} #{inner['toString'].methodcall(inner)}"
           end
         when AST::List, AST::Vector
           inner.inner.each { |x| acc << x }
         else
-          raise "Invalid use of splice on non-sequence #{typee}"
+          raise "Invalid use of splice on non-sequence #{inner.inspect}"
         end
       else
         acc << unquote(el, token)
