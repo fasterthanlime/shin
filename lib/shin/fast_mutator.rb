@@ -85,10 +85,10 @@ module Shin
         macro_ret_unquoted = unquote(macro_ret, invoc.token)
         debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
       end
-      puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
-      puts "Total call:    #{(1000 * @@total_call).round(0)}ms"
-      puts "Total unquote: #{(1000 * @@total_unquote).round(0)}ms"
-      puts "Total        : #{(1000 * (@@total_prep + @@total_call + @@total_unquote)).round(0)}ms"
+      # puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
+      # puts "Total call:    #{(1000 * @@total_call).round(0)}ms"
+      # puts "Total unquote: #{(1000 * @@total_unquote).round(0)}ms"
+      # puts "Total        : #{(1000 * (@@total_prep + @@total_call + @@total_unquote)).round(0)}ms"
 
       macro_ret_unquoted
     end
@@ -109,12 +109,12 @@ module Shin
           acc = unquote_coll(node, token)
           Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
         when :symbol
-          Shin::AST::Symbol.new(token, node._name)
+          Shin::AST::Symbol.new(token, node['_name'])
         when :unquote
-          if node.splice
+          if node['splice']
             raise "Invalid usage of splice outside a collection"
           end
-          unquote(node.inner, token)
+          unquote(node['inner'], token)
         else
           raise "Dunno how to dequote a V8 object of type #{type}"
         end

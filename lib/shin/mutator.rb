@@ -69,7 +69,7 @@ module Shin
                 expanded_ast = eval_macro_module(eval_mod)
               end
             end
-            puts "Total time spent expanding: #{(@@total_expand * 1000).round(0)}ms"
+            # puts "Total time spent expanding: #{(@@total_expand * 1000).round(0)}ms"
 
             @expands += 1
             node = expand(expanded_ast)
