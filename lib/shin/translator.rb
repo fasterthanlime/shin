@@ -987,10 +987,12 @@ module Shin
     FN_PATTERN = ":sym? [:expr*] :expr*".freeze
 
     def translate_fn(list)
-      matches?(list, FN_PATTERN) do |name, args, body|
-        fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
-        @builder << fn
-      end or ser!("Invalid fn form: #{list.join(" ")}", list)
+      matches = matches?(list, FN_PATTERN)
+      ser!("Invalid fn form: #{list.join(" ")}", list) unless matches
+
+      name, args, body = matches
+      fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+      @builder << fn
       nil
     end
 
