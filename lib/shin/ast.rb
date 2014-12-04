@@ -133,6 +133,14 @@ module Shin
         inner.hash
       end
 
+      def first
+        inner.first
+      end
+
+      def next
+        List.new(token, inner.drop(1))
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic

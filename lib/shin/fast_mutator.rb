@@ -106,8 +106,8 @@ module Shin
           el = js_invoke(xs, '-first')
           xs = js_invoke(xs, '-next')
         else
-          el = xs.invoke('-first')
-          xs = xs.invoke('-next')
+          el = xs.first
+          xs = xs.next
         end
         spliceful_append(acc, el, token)
       end
@@ -116,11 +116,19 @@ module Shin
 
     def unquote_indexed(node, token)
       acc = []
-      xs = node
-      count = js_invoke(xs, '-count')
-      (0...count).each do |i|
-        el = js_invoke(xs, '-nth', i)
-        spliceful_append(acc, el, token)
+
+      case node
+      when V8::Object
+        xs = node
+        count = js_invoke(xs, '-count')
+        (0...count).each do |i|
+          el = js_invoke(xs, '-nth', i)
+          spliceful_append(acc, el, token)
+        end
+      else
+        node.inner.each do |el|
+          spliceful_append(acc, el, token)
+        end
       end
       acc
     end
