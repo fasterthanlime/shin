@@ -8,13 +8,16 @@ module Shin
 
     DEBUG = ENV['FAST_MUTATOR_DEBUG']
 
-    def initialize(compiler, mod)
+    attr_reader :context
+
+    def initialize(compiler, mod, context)
       @compiler = compiler
       @mod = mod
       @expands = 0
+      @context = context
     end
 
-    def expand(invoc, info, context)
+    def expand(invoc, info)
       debug "Expanding #{invoc}" if DEBUG
 
       deps = @compiler.collect_deps(info[:module])
@@ -35,6 +38,9 @@ module Shin
           context.load(slug)
         end
       end
+
+      @to_array = context.eval("$kir.modules['cljs.core'].exports.to$_array")
+      raise "to-array blerg" unless V8::Function === @to_array
 
       macro_slug = info[:module].slug
       debug "macro_slug: #{macro_slug}" if DEBUG
@@ -76,15 +82,15 @@ module Shin
         type = v8_type(node)
         case type
         when :list
-          acc = unquote_seq(node, token)
+          acc = unquote_coll(node, token)
           Shin::AST::List.new(token, Hamster::Vector.new(acc))
         when :vector
-          acc = unquote_indexed(node, token)
+          acc = unquote_coll(node, token)
           Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
         when :symbol
-          Shin::AST::Symbol.new(token, node['_name'])
+          Shin::AST::Symbol.new(token, node._name)
         when :unquote
-          if node['splice']
+          if node.splice
             raise "Invalid usage of splice outside a collection"
           end
           unquote(node['inner'], token)
@@ -96,40 +102,10 @@ module Shin
     
     private
 
-    def unquote_seq(node, token)
+    def unquote_coll(node, token)
       acc = []
-      xs = node
-      while xs
-        el = nil
-        
-        case xs
-        when V8::Object
-          el = js_invoke(xs, '-first')
-          xs = js_invoke(xs, '-next')
-        else
-          el = xs.first
-          xs = xs.next
-        end
+      @to_array.call(node).each do |el|
         spliceful_append(acc, el, token)
-      end
-      acc
-    end
-
-    def unquote_indexed(node, token)
-      acc = []
-
-      case node
-      when V8::Object
-        xs = node
-        count = js_invoke(xs, '-count')
-        (0...count).each do |i|
-          el = js_invoke(xs, '-nth', i)
-          spliceful_append(acc, el, token)
-        end
-      else
-        node.inner.each do |el|
-          spliceful_append(acc, el, token)
-        end
       end
       acc
     end
@@ -144,10 +120,8 @@ module Shin
         when V8::Object
           inner_type = v8_type(inner)
           case inner_type
-          when :list
-            acc.concat(unquote_seq(inner, token))
-          when :vector
-            acc.concat(unquote_indexed(inner, token))
+          when :list, :vector
+            acc.concat(unquote_coll(inner, token))
           else
             raise "Invalid use of splice on non-sequence V8 object #{inner_type} #{inner['toString'].methodcall(inner)}"
           end
