@@ -80,10 +80,11 @@ module Shin
 
       if Sequence === node
         inner = node.inner
-        inner.each_with_index do |child, i|
+        index = 0
+        inner.each do |child|
           poster_child = expand(child)
-          raise "Got nil when expanding #{child}" if poster_child.nil?
-          inner = inner.set(i, poster_child) if poster_child != child
+          inner = inner.set(index, poster_child) if poster_child != child
+          index += 1
         end
 
         if inner != node.inner
@@ -219,24 +220,26 @@ module Shin
         inner = node.inner
 
         offset = 0
-        inner.each_with_index do |child, i|
+        index = 0
+        inner.each do |child|
           poster_child = dequote(child)
           if poster_child != child
             case poster_child
             when Hamster::Vector
-              inner = inner.delete_at(i + offset)
+              inner = inner.delete_at(index + offset)
               offset -= 1
               poster_child.each do |el|
                 offset += 1
-                inner = inner.insert(i + offset, el)
+                inner = inner.insert(index + offset, el)
               end
             when nil
-              inner = inner.delete_at(i + offset)
+              inner = inner.delete_at(index + offset)
               offset -= 1
             else
-              inner = inner.set(i + offset, poster_child)
+              inner = inner.set(index + offset, poster_child)
             end
           end
+          index += 1
         end
 
         if node.inner == inner
