@@ -26,7 +26,7 @@ module Shin
         "'" => '$u',
       }
       UNMANGLE_MAP = MANGLE_MAP.invert
-      raise "Mangle map has overlaps (#{MANGLE_MAP.count} vs #{UNMANGLE_MAP.count})" unless MANGLE_MAP.count == UNMANGLE_MAP.count
+      raise "Mangle map has overlaps (#{MANGLE_MAP.length} vs #{UNMANGLE_MAP.length})" unless MANGLE_MAP.length == UNMANGLE_MAP.length
 
       def mangle(id)
         id.gsub(MANGLE_REGEXP, MANGLE_MAP)

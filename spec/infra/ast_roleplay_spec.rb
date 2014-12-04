@@ -297,7 +297,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.rest(l);
         }, :l => sample_list
         expect(s).to be_a(Shin::AST::List)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
     end
 
@@ -311,7 +311,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.next(l);
         }, :l => sample_list
         expect(s).to be_a(Shin::AST::List)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
 
       it "next returns nil eventually" do
@@ -362,7 +362,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.pop(l);
         }, :l => sample_list
         expect(s).to be_a(Shin::AST::List)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
 
       it "pops from the front" do
@@ -532,7 +532,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.rest(l);
         }, :l => sample_vec
         expect(s).to be_a(Shin::AST::Vector)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
     end
 
@@ -546,7 +546,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.next(l);
         }, :l => sample_vec
         expect(s).to be_a(Shin::AST::Vector)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
 
       it "next returns nil eventually" do
@@ -597,7 +597,7 @@ RSpec.describe "Infrastructure", "AST roleplay" do
           return core.pop(l);
         }, :l => sample_vec
         expect(s).to be_a(Shin::AST::Vector)
-        expect(s.inner.count).to eq(2)
+        expect(s.inner.length).to eq(2)
       end
 
       it "pops from the front" do

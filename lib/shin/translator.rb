@@ -403,8 +403,8 @@ module Shin
 
     def translate_try(list)
       exprs   = list.take_while { |x| !is_catch?(x) && !is_finally?(x) }
-      clauses = list.drop(exprs.count).take_while { |x| is_catch?(x) }
-      rest    = list.drop(exprs.count + clauses.count)
+      clauses = list.drop(exprs.length).take_while { |x| is_catch?(x) }
+      rest    = list.drop(exprs.length + clauses.length)
       final   = nil
 
       case rest.length
@@ -978,8 +978,8 @@ module Shin
       t = args.inner.first.token
 
       fixed_args    = args.inner.take_while { |x| !x.sym?('&') }
-      variadic_args = args.inner.drop(fixed_args.count + 1)
-      ser!("Internal error: Invalid variadic state", body) unless variadic_args.count == 1
+      variadic_args = args.inner.drop(fixed_args.length + 1)
+      ser!("Internal error: Invalid variadic state", body) unless variadic_args.length == 1
       variadic_arg = variadic_args.first
 
       fn_sym = AST::Symbol.new(t, "fn")
@@ -1140,7 +1140,11 @@ module Shin
               ifn = translate_fn_inner(args, body)
 
               arity = if args.inner.any? { |x| x.sym?('&') }
-                        variadic_arity = args.inner.take_while { |x| !x.sym?('&') }.count
+                        variadic_arity = 0
+                        args.inner.each do |arg|
+                          break if arg.sym?('&')
+                          variadic_arity += 1
+                        end
                         -1
                       else
                         args.inner.length
@@ -1336,7 +1340,7 @@ module Shin
           end
           @builder << ObjectExpression.new(props)
         else
-          unless expr.inner.count.even?
+          unless expr.inner.length.even?
             ser!("Map literal requires even number of forms", expr)
           end
           @builder.into!(CallExpression.new(ident('hash-map'))) do

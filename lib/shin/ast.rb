@@ -160,7 +160,7 @@ module Shin
 
       implement :INext do
         defn '-next' do |s|
-          (inner.count > 1) ? List.new(token, inner.drop(1)) : nil
+          (inner.length > 1) ? List.new(token, inner.drop(1)) : nil
         end
       end
 
@@ -219,7 +219,7 @@ module Shin
 
       implement :ICounted do
         defn '-count' do |s|
-          inner.count
+          inner.length
         end
       end
 
@@ -322,7 +322,7 @@ module Shin
 
       implement :INext do
         defn '-next' do |s|
-          (inner.count > 1) ? Vector.new(token, inner.drop(1)) : nil
+          (inner.length > 1) ? Vector.new(token, inner.drop(1)) : nil
         end
       end
 
@@ -357,7 +357,7 @@ module Shin
 
       implement :ICounted do
         defn '-count' do |s|
-          inner.count
+          inner.length
         end
       end
 
