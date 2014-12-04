@@ -1162,29 +1162,31 @@ module Shin
       @builder.with_scope(scope) do
         @builder.into(fn, :statement) do
           variants.each do |variant|
-            matches?(variant.inner, FN_PATTERN) do |_, args, body|
-              ifn = translate_fn_inner(args, body)
+            matches = matches?(variant.inner, FN_PATTERN)
+            ser!("Invalid function variant", variant) unless matches
 
-              arity = if args.inner.any? { |x| x.sym?('&') }
-                        variadic_arity = 0
-                        args.inner.each do |arg|
-                          break if arg.sym?('&')
-                          variadic_arity += 1
-                        end
-                        -1
-                      else
-                        args.inner.length
+            _, args, body = matches
+            ifn = translate_fn_inner(args, body)
+
+            arity = if args.inner.any? { |x| x.sym?('&') }
+                      variadic_arity = 0
+                      args.inner.each do |arg|
+                        break if arg.sym?('&')
+                        variadic_arity += 1
                       end
+                      -1
+                    else
+                      args.inner.length
+                    end
 
-              if arity > max_arity
-                name_candidate = args.inner
-              end
-              tmp = fresh(name ? name : "anon")
-              ser!("Can't redefine arity #{arity}", variant) if arity_cache.has_key?(arity)
-              arity_cache[arity] = tmp
-              decl = make_decl(tmp, ifn)
-              @builder << decl
-            end or ser!("Invalid function variant", variant)
+            if arity > max_arity
+              name_candidate = args.inner
+            end
+            tmp = fresh(name ? name : "anon")
+            ser!("Can't redefine arity #{arity}", variant) if arity_cache.has_key?(arity)
+            arity_cache[arity] = tmp
+            decl = make_decl(tmp, ifn)
+            @builder << decl
           end
 
           numargs = MemberExpression.new(make_ident('arguments'), make_ident('length'), false)
