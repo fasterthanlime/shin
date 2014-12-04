@@ -671,7 +671,7 @@ module Shin
       protocol_obj.properties << fullname_property
 
       protocol_name = name.value
-      ex = ident("exports/#{protocol_name}")
+      ex = make_ident("exports/#{protocol_name}")
       ass = AssignmentExpression.new(ex, protocol_obj)
       @builder << make_decl(Identifier.new(protocol_name), ass)
 
@@ -688,7 +688,7 @@ module Shin
               else
                 translate_protocol_multi_fun(protocol_name, meth_name, arg_lists)
               end
-        ex = ident("exports/#{meth_name}")
+        ex = make_ident("exports/#{meth_name}")
         ass = AssignmentExpression.new(ex, fn)
         @builder << make_decl(make_ident(meth_name), ass)
       end
@@ -882,7 +882,7 @@ module Shin
       # return our new type.
       block.body << ReturnStatement.new(ident(name.value))
 
-      ex = ident("exports/#{name}")
+      ex = make_ident("exports/#{name}")
       dtor.init = AssignmentExpression.new(ex, dtor.init)
       decl.declarations << dtor
 
@@ -918,7 +918,7 @@ module Shin
       list.each do |el|
         next if el.meta?
         ser!("Expected symbol in declare", el) unless el.sym?
-        ex = ident("exports/#{el.value}")
+        ex = make_ident("exports/#{el.value}")
         ass = AssignmentExpression.new(ex, Identifier.new("null"))
         @builder << make_decl(ident(el.value), ass)
       end
@@ -946,7 +946,7 @@ module Shin
         ser!("Invalid def form", list)
       end
 
-      ex = ident("exports/#{name}")
+      ex = make_ident("exports/#{name}")
       ass = AssignmentExpression.new(ex, init)
       @builder << make_decl(make_ident(name.value), ass)
     end
@@ -968,7 +968,7 @@ module Shin
 
       lhs = Identifier.new(mangle(_name.value))
       rhs = if export
-              ex = ident("exports/#{_name}")
+              ex = make_ident("exports/#{_name}")
               AssignmentExpression.new(ex, f)
             else
               f
