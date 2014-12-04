@@ -205,10 +205,6 @@ module Shin
     def js_context
       unless @js_context
         js = @js_context = Shin::JsContext.new
-        js.context['fresh_sym'] = lambda do |_|
-          return Mutator.fresh_sym
-        end
-
         js.context['debug'] = lambda do |_, *args|
           debug "[from JS] #{args.join(" ")}"
         end

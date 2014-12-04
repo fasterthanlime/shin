@@ -71,12 +71,12 @@ module Shin
         debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
       end
 
-#       puts "#{t0.round(2)}," +
-#         "#{t1.round(2)}," +
-#         "#{t2.round(2)}," +
-#         "#{@expands += 1}," +
-#         "#{invoc}," +
-#         "#{macro_sexp}"
+      # puts "#{t0.round(2)}," +
+      #   "#{t1.round(2)}," +
+      #   "#{t2.round(2)}," +
+      #   "#{@expands += 1}," +
+      #   "#{invoc}," +
+      #   "#{macro_sexp}"
 
       macro_ret_unquoted
     end
