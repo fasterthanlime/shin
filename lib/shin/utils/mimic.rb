@@ -17,8 +17,8 @@ module Shin
         end
 
         def implement(proto, &block)
-          @protocols ||= Set.new
-          @protocols << core_proto_name(proto)
+          name = core_proto_name(proto)
+          define_method(name) { true }
 
           if proto == :IFn
             # IFn is special, cf. #50
@@ -37,6 +37,10 @@ module Shin
 
         def defn(name, &block)
           sym = self.method_sym(name, block.arity)
+          # define_method(sym) do |*args|
+          #   puts name
+          #   self.instance_exec(*args, &block)
+          # end
           define_method(sym, &block)
         end
       end
@@ -45,11 +49,11 @@ module Shin
         base.extend(ClassMethod)
       end
 
-      def [](x)
-        return true if self.class.protocols.include?(x)
-        puts "[#{self.class.name}] does not implement Clojure protocol #{x}" if DEBUG
-        nil
-      end
+#       def [](x)
+#         return true if self.class.protocols.include?(x)
+#         puts "[#{self.class.name}] does not implement Clojure protocol #{x}" if DEBUG
+#         nil
+#       end
 
       def method_sym(name, arity)
         self.class.method_sym(name, arity)
@@ -112,14 +116,14 @@ module Shin
 
       def v8_type(val)
         case true
-        when val[core_proto_name("IKeyword")]
-          :keyword
-        when val[core_proto_name("ISymbol")]
-          :symbol
         when val[core_proto_name("IVector")]
           :vector
         when val[core_proto_name("ISeq")]
           :list
+        when val[core_proto_name("ISymbol")]
+          :symbol
+        when val[core_proto_name("IKeyword")]
+          :keyword
         when val[core_proto_name("IMap")]
           :map
         when val[core_proto_name("IUnquote")]

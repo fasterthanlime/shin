@@ -99,6 +99,7 @@ module Shin
     end
 
     class List < Sequence
+  
       def list?
         true
       end
@@ -138,7 +139,7 @@ module Shin
       end
 
       def next
-        List.new(token, inner.drop(1))
+        (inner.length > 1) ? List.new(token, inner.drop(1)) : nil
       end
 
       # ClojureScript protocols
