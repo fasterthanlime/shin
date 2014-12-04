@@ -317,9 +317,11 @@ module Shin
       when Sequence
         _trail = trail + [node]
         inner = node.inner
-        inner.each_with_index do |child, i|
+        index = 0
+        inner.each do |child|
           poster_child = handle_auto_gensym(child, _trail)
-          inner = inner.set(i, poster_child) if poster_child != child
+          inner = inner.set(index, poster_child) if poster_child != child
+          index += 1
         end
 
         if inner == node.inner
@@ -377,9 +379,11 @@ module Shin
       case node
       when Sequence
         inner = node.inner
-        inner.each_with_index do |child, i|
+        index = 0
+        inner.each do |child|
           poster_child = desugar_closure(child)
-          inner = inner.set(i, poster_child) if poster_child != child
+          inner = inner.set(index, poster_child) if poster_child != child
+          index += 1
         end
 
         if inner == node.inner
@@ -417,9 +421,11 @@ module Shin
       case node
       when Sequence
         inner = node.inner
-        inner.each_with_index do |child, i|
+        index = 0
+        inner.each do |child|
           poster_child = desugar_closure_inner(child, arg_map)
-          inner = inner.set(i, poster_child) if poster_child != child
+          inner = inner.set(index, poster_child) if poster_child != child
+          index += 1
         end
 
         if inner == node.inner
