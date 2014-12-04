@@ -958,13 +958,21 @@ module Shin
       f = nil
       _name = nil
 
-      matches?(list, DEFN_PATTERN) do |name, doc, args, body|
+      simple_matches = matches?(list, DEFN_PATTERN)
+      if simple_matches
+        name, doc, args, body = simple_matches
         _name = name
         f = translate_fn_inner(args, body, :name => name.value)
-      end or matches?(list, DEFN_MULTI_PATTERN) do |name, doc, variants|
-        _name = name
-        f = translate_fn_inner_multi(variants, :name => name.value)
-      end or ser!("Invalid defn form", list)
+      else
+        multi_matches = matches?(list, DEFN_MULTI_PATTERN)
+        if multi_matches
+          name, doc, variants = multi_matches
+          _name = name
+          f = translate_fn_inner_multi(variants, :name => name.value)
+        else
+          ser!("Invalid defn form", list)
+        end
+      end
 
       lhs = Identifier.new(mangle(_name.value))
       rhs = if export
