@@ -61,7 +61,6 @@ module Shin
           if info
             expanded_ast = nil
 
-            # if first.value == "fast-mutator-test"
             if true
               expanded_ast = @fast_mutator.expand(invoc, info, js_context)
             else

@@ -2,6 +2,7 @@
 require 'shin/ast'
 require 'shin/mutator'
 require 'shin/utils'
+require 'hamster/list'
 
 module Shin
   class Parser
@@ -77,8 +78,8 @@ module Shin
 
     def parse
       nodes = []
-      heap  = Hamster.deque(nodes)
-      state = Hamster.deque(:expr)
+      heap  = Hamster.list(nodes)
+      state = Hamster.list(:expr)
 
       @pos = 0
       @input.each_char do |c|
@@ -88,192 +89,193 @@ module Shin
           puts
         end
 
-        case state.last
+        case state.head
         when :expr, :expr_one
-          state = state.pop if state.last == :expr_one
+          state = state.tail if state.head == :expr_one
 
           case c
           when ' ', "\t", "\n", ','
             # muffin
           when '@'
-            heap   = heap  << Deref       << token     << []
-            state  = state << :close_one  << :expr_one
+            heap = heap.cons(Deref).cons(token).cons([])
+            state = state.cons(:close_one).cons(:expr_one)
           when '`'
-            heap   = heap  << SyntaxQuote << token     << []
-            state  = state << :close_one  << :expr_one
+            heap = heap.cons(SyntaxQuote).cons(token).cons([])
+            state = state.cons(:close_one).cons(:expr_one)
           when "'"
-            heap   = heap  << Quote       << token     << []
-            state  = state << :close_one  << :expr_one
+            heap = heap.cons(Quote).cons(token).cons([])
+            state = state.cons(:close_one).cons(:expr_one)
           when "~"
-            heap   = heap  << Unquote     << token     << []
-            state  = state << :close_one  << :expr_one
+            heap = heap.cons(Unquote).cons(token).cons([])
+            state = state.cons(:close_one).cons(:expr_one)
           when "^"
-            heap   = heap  << MetaData    << token     << []
-            state  = state << :close_one  << :expr_one
+            heap = heap.cons(MetaData).cons(token).cons([])
+            state = state.cons(:close_one).cons(:expr_one)
           when ';'
-            state <<= :comment
+            state = state.cons(:comment)
           when '#'
-            state <<= :sharp
+            state = state.cons(:sharp)
           when ':'
-            state = state << :keyword
-            heap  = heap  << token    << ""
+            heap = heap.cons(token).cons("")
+            state = state.cons(:keyword)
           when '"'
-            state = state << :string
-            heap  = heap  << token   << ""
+            heap = heap.cons(token).cons("")
+            state = state.cons(:string)
           when '(', '[', '{'
-            heap  = heap  << OPEN_MAP[c] << token << []
-            state = state << :expr
+            heap = heap.cons(OPEN_MAP[c]).cons(token).cons([])
+            state = state.cons(:expr)
           when ')', ']', '}'
-            state = state.pop # expr
-            els  = heap.last; heap = heap.pop
-            tok  = heap.last; heap = heap.pop
-            type = heap.last; heap = heap.pop
+            state = state.tail # discard :expr
+            els  = heap.head; heap = heap.tail
+            tok  = heap.head; heap = heap.tail
+            type = heap.head; heap = heap.tail
 
             ex = CLOS_REV_MAP[type]
             unless c === ex
               ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
             end
-            heap.last << type.new(tok.extend!(@pos), Hamster::Vector.new(els))
+            heap.head << type.new(tok.extend!(@pos), Hamster::Vector.new(els))
           when SYM_START_REGEXP
-            state = state << :symbol
-            heap  = heap  << token   << ""
+            state = state.cons(:symbol)
+            heap = heap.cons(token).cons("")
             redo
           when NUMBER_RE
-            state = state << :number
-            heap  = heap  << token   << ""
+            state = state.cons(:number)
+            heap = heap.cons(token).cons("")
             redo
           when "\\"
-            state = state << :named_escape
-            heap  = heap  << token   << ""
+            state = state.cons(:named_escape)
+            heap = heap.cons(token).cons("")
           else
             ser!("Unexpected char: #{c}")
           end
         when :close_one
-          inner = heap.last; heap = heap.pop
-          tok   = heap.last; heap = heap.pop
-          type  = heap.last; heap = heap.pop
+          inner = heap.head; heap = heap.tail
+          tok   = heap.head; heap = heap.tail
+          type  = heap.head; heap = heap.tail
 
           raise "Internal error" if inner.length != 1
-          heap.last << type.new(tok.extend!(@pos), inner[0])
-          state = state.pop
+          heap.head << type.new(tok.extend!(@pos), inner[0])
+          state = state.tail
           redo
         when :comment
-          state = state.pop if c == "\n"
+          state = state.tail if c == "\n"
         when :sharp
-          state = state.pop
+          state = state.tail
           case c
           when '('
-            heap  = heap  << Closure    << token << [] << List << token << []
-            state = state << :close_one << :expr
+            t = token
+            heap = heap.cons(Closure).cons(t).cons([]).cons(List).cons(t).cons([])
+            state = state.cons(:close_one).cons(:expr)
           when '{'
-            heap  = heap  << Set        << token << []
-            state = state << :expr
+            heap = heap.cons(Set).cons(token).cons([])
+            state = state.cons(:expr)
           when '"'
-            heap  = heap  << token      << ""
-            state = state << :regexp
+            heap = heap.cons(token).cons("")
+            state = state.cons(:regexp)
           else
             ser!("Unexpected char after #: #{c}")
           end
         when :named_escape
           case c
           when /[a-z]/
-            heap.last << c
+            heap.head << c
           else
-            value = heap.last; heap = heap.pop
-            tok   = heap.last; heap = heap.pop
-            state = state.pop
+            value = heap.head; heap = heap.tail
+            tok   = heap.head; heap = heap.tail
+            state = state.tail
 
             real_value = NAMED_ESCAPES[value]
             ser!("Unknown named escape: \\#{value}") unless real_value
-            heap.last << String.new(tok.extend!(@pos), real_value)
+            heap.head << String.new(tok.extend!(@pos), real_value)
             redo
           end
         when :escape_sequence
           real_value = ESCAPES[c]
           if real_value
-            heap.last << real_value
+            heap.head << real_value
           else
-            heap.last << "\\#{c}"
+            heap.head << "\\#{c}"
           end
-          state = state.pop
+          state = state.tail
         when :string, :regexp
           case c
           when "\\"
-            state = state << :escape_sequence
+            state = state.cons(:escape_sequence)
           when '"'
-            value = heap.last; heap = heap.pop
-            tok   = heap.last; heap = heap.pop
-            case state.last
+            value = heap.head; heap = heap.tail
+            tok   = heap.head; heap = heap.tail
+            case state.head
             when :string
-              heap.last << String.new(tok.extend!(@pos), value)
+              heap.head << String.new(tok.extend!(@pos), value)
             when :regexp
-              heap.last << RegExp.new(tok.extend!(@pos), value)
+              heap.head << RegExp.new(tok.extend!(@pos), value)
             else
               raise "Internal error"
             end
-            state = state.pop
+            state = state.tail
           else
-            heap.last << c
+            heap.head << c
           end
         when :number
           case c
           when NUMBER_RE
-            heap.last << c
+            heap.head << c
           else
-            value = heap.last; heap = heap.pop
-            tok   = heap.last; heap = heap.pop
-            heap.last << Number.new(tok.extend!(@pos), value.to_f)
-            state = state.pop
+            value = heap.head; heap = heap.tail
+            tok   = heap.head; heap = heap.tail
+            heap.head << Number.new(tok.extend!(@pos), value.to_f)
+            state = state.tail
             redo
           end
         when :symbol
           case c
           when SYM_INNER_REGEXP
-            heap.last << c
+            heap.head << c
           else
-            value = heap.last; heap = heap.pop
-            tok   = heap.last; heap = heap.pop
-            heap.last << Symbol.new(tok.extend!(@pos), value)
-            state = state.pop
+            value = heap.head; heap = heap.tail
+            tok   = heap.head; heap = heap.tail
+            heap.head << Symbol.new(tok.extend!(@pos), value)
+            state = state.tail
             redo
           end
         when :keyword
           case c
           when SYM_INNER_REGEXP
-            heap.last << c
+            heap.head << c
           else
-            value = heap.last; heap = heap.pop
-            tok   = heap.last; heap = heap.pop
-            heap.last << Keyword.new(tok.extend!(@pos), value)
-            state = state.pop
+            value = heap.head; heap = heap.tail
+            tok   = heap.head; heap = heap.tail
+            heap.head << Keyword.new(tok.extend!(@pos), value)
+            state = state.tail
             redo
           end
         else
-          raise "Inconsistent state: #{state.last}"
+          raise "Inconsistent state: #{state.head}"
         end # case state
         @pos += 1
       end # each_char
 
-      case state.last
+      case state.head
       when :number
-        value = heap.last; heap = heap.pop
-        tok   = heap.last; heap = heap.pop
-        heap.last << Number.new(tok.extend!(@pos), value.to_f)
+        value = heap.head; heap = heap.tail
+        tok   = heap.head; heap = heap.tail
+        heap.head << Number.new(tok.extend!(@pos), value.to_f)
       when :keyword
-        value = heap.last; heap = heap.pop
-        tok   = heap.last; heap = heap.pop
-        heap.last << Keyword.new(tok.extend!(@pos), value)
+        value = heap.head; heap = heap.tail
+        tok   = heap.head; heap = heap.tail
+        heap.head << Keyword.new(tok.extend!(@pos), value)
       when :symbol
-        value = heap.last; heap = heap.pop
-        tok   = heap.last; heap = heap.pop
-        heap.last << Symbol.new(tok.extend!(@pos), value)
+        value = heap.head; heap = heap.tail
+        tok   = heap.head; heap = heap.tail
+        heap.head << Symbol.new(tok.extend!(@pos), value)
       end
 
       if heap.length > 1
         until heap.empty?
-          type = heap.last; heap = heap.pop
+          type = heap.head; heap = heap.tail
           if Class === type
-            ser!("Unclosed #{type.name.split('::').last}")
+            ser!("Unclosed #{type.name.split('::')[0]}")
             break
           end
         end
@@ -399,7 +401,7 @@ module Shin
         body = desugar_closure_inner(node.inner, arg_map)
 
         num_args = arg_map.keys.max || 0
-        args = Hamster.vector()
+        args = Hamster.vector
         (0..num_args).map do |index|
           name = arg_map[index] || "aarg#{Shin::Mutator.fresh_sym}#{index}-"
           args <<= Shin::AST::Symbol.new(t, name)
