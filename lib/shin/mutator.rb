@@ -11,6 +11,7 @@ module Shin
   #   - Optimizations
   class Mutator
     DEBUG = ENV['MUTATOR_DEBUG']
+    USE_FAST = ENV['LEGACY_MUTATOR'] != "1"
 
     include Shin::AST
 
@@ -61,7 +62,7 @@ module Shin
           if info
             expanded_ast = nil
 
-            if true
+            if USE_FAST
               expanded_ast = @fast_mutator.expand(invoc, info, js_context)
             else
               eval_mod = make_macro_module(invoc, info)

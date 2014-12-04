@@ -925,28 +925,30 @@ module Shin
     end
 
     DEF_PATTERN             = ":sym :expr*".freeze
-    DEF_WITH_DOC_PATTERN    = ":str :expr".freeze
-    DEF_WITHOUT_DOC_PATTERN = ":expr".freeze
 
     def translate_def(list)
-      matches?(list, DEF_PATTERN) do |name, rest|
-        init = nil
+      matches = matches?(list, DEF_PATTERN)
+      ser!("Invalid def form", list) unless matches
 
-        case
-        when matches?(rest, DEF_WITH_DOC_PATTERN)
-          doc, expr = rest
-          init = as_expr(expr)
-        when matches?(rest, DEF_WITHOUT_DOC_PATTERN)
-          expr = rest.first
-          init = as_expr(expr)
-        else
+      name, rest = matches
+      init = nil
+
+      case rest.length
+      when 1
+        init = as_expr(rest[0])
+      when 2
+        doc = rest[0]
+        unless AST::String === doc
           ser!("Invalid def form", list)
         end
+        init = as_expr(rest[1])
+      else
+        ser!("Invalid def form", list)
+      end
 
-        ex = ident("exports/#{name}")
-        ass = AssignmentExpression.new(ex, init)
-        @builder << make_decl(make_ident(name.value), ass)
-      end or ser!("Invalid def form", list)
+      ex = ident("exports/#{name}")
+      ass = AssignmentExpression.new(ex, init)
+      @builder << make_decl(make_ident(name.value), ass)
     end
 
     DEFN_PATTERN       = ":sym :str? [:expr*] :expr*".freeze
