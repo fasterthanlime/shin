@@ -21,7 +21,10 @@ module Shin
       specs = []
 
       if nsdef && nsdef.list?
-        matches?(nsdef.inner, "ns :sym :expr*") do |_, name, _specs|
+        matches = matches?(nsdef.inner, "ns :sym :expr*")
+        if matches
+          _, name, _specs = matches
+
           # get rid of nsdef (don't translate it)
           # FIXME: it's probably not good for NsParser to mutate the AST.
           # Maybe translator could be a champ and just ignore it?

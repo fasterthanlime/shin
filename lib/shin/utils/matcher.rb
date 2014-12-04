@@ -21,12 +21,8 @@ module Shin
 
       @@ast_cache = {}
 
-      def matches?(ast, pattern, &block)
+      def matches?(ast, pattern)
         specs = lazy_parse(pattern)
-
-        if block && specs.length != block.arity
-          raise PatternError.new("Wrong arity for matches?, got #{block.arity}, expected #{specs.length}")
-        end
 
         unless ast.respond_to?(:to_ary)
           ast = [ast]
@@ -103,7 +99,6 @@ module Shin
 
         if list.empty?
           # matched everything, woo!
-          block.call(*matches) if block
           matches
         else
           # didn't match everything.
