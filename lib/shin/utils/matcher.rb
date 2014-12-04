@@ -101,12 +101,14 @@ module Shin
           end
         end
 
-        unless list.empty?
-          return false
+        if list.empty?
+          # matched everything, woo!
+          block.call(*matches) if block
+          matches
+        else
+          # didn't match everything.
+          nil
         end
-
-        block.call(*matches) if block
-        true
       end
 
       def lazy_parse(pattern)

@@ -325,51 +325,52 @@ module Shin
     end
 
     def translate_let(list)
-      matches?(list, LET_PATTERN) do |bindings, body|
-        unless bindings.inner.length.even?
-          ser!("Invalid let form: odd number of binding forms", list)
+      matches = matches?(list, LET_PATTERN)
+      ser!("Invalid let form", list) unless matches
+
+      bindings, body = matches
+      unless bindings.inner.length.even?
+        ser!("Invalid let form: odd number of binding forms", list)
+      end
+
+      scope = Scope.new
+      vase = case @builder.mode
+             when :expression
+               fn = FunctionExpression.new
+               @builder << CallExpression.new(fn)
+               fn
+             when :statement, :return
+               block = BlockStatement.new
+               @builder << block
+               block
+             else
+               raise "let in unknown builder mode: #{@builder.mode}"
+             end
+
+      @builder.with_scope(scope) do
+        @builder.into(vase, :statement) do
+          bindings.inner.each_slice(2) do |binding|
+            lhs, rhs = binding
+            destructure(lhs, rhs)
+          end
         end
 
-        scope = Scope.new
-        vase = case @builder.mode
-               when :expression
-                 fn = FunctionExpression.new
-                 @builder << CallExpression.new(fn)
-                 fn
-               when :statement, :return
-                 block = BlockStatement.new
-                 @builder << block
-                 block
-               else
-                 raise "let in unknown builder mode: #{@builder.mode}"
-               end
-
-        @builder.with_scope(scope) do
+        case @builder.mode
+        when :expression
+          # return, we made a return-friendly vase (anon fn)
+          trbody(body, vase)
+        when :statement
+          # only statements, don't care about return value
           @builder.into(vase, :statement) do
-            bindings.inner.each_slice(2) do |binding|
-              lhs, rhs = binding
-              destructure(lhs, rhs)
-            end
+            treach(body)
           end
-
-          case @builder.mode
-          when :expression
-            # return, we made a return-friendly vase (anon fn)
-            trbody(body, vase)
-          when :statement
-            # only statements, don't care about return value
-            @builder.into(vase, :statement) do
-              treach(body)
-            end
-          when :return
-            # return at the end, we're in a return-friendly vase
-            trbody(body, vase)
-          else
-            raise "let in unknown builder mode: #{@builder.mode}"
-          end
+        when :return
+          # return at the end, we're in a return-friendly vase
+          trbody(body, vase)
+        else
+          raise "let in unknown builder mode: #{@builder.mode}"
         end
-
-      end or ser!("Invalid let form", list)
+      end
       nil
     end
 
@@ -589,9 +590,11 @@ module Shin
     LOOP_PATTERN            = "[:expr*] :expr*"
 
     def translate_loop(list)
-      matches?(list, LOOP_PATTERN) do |bindings, body|
-        translate_loop_inner(bindings.inner, body)
-      end or ser!("Invalid loop form", list)
+      matches = matches?(list, LOOP_PATTERN)
+      ser!("Invalid loop form", list) unless matches
+     
+      bindings, body = matches
+      translate_loop_inner(bindings.inner, body)
       nil
     end
 
@@ -658,35 +661,37 @@ module Shin
     DEFPROTOCOL_PATTERN     = ":sym :str? :list*".freeze
 
     def translate_defprotocol(list)
-      matches?(list, DEFPROTOCOL_PATTERN) do |name, doc, sigs|
-        protocol_obj = ObjectExpression.new
-        fullname = mangle("#{@mod.ns}/#{name.value}")
-        fullname_property = Property.new(ident("protocol-name"), make_literal(fullname))
-        protocol_obj.properties << fullname_property
+      matches = matches?(list, DEFPROTOCOL_PATTERN)
+      ser!("Invalid defprotocol form", list) unless matches
 
-        protocol_name = name.value
-        ex = ident("exports/#{protocol_name}")
-        ass = AssignmentExpression.new(ex, protocol_obj)
-        @builder << make_decl(Identifier.new(protocol_name), ass)
+      name, doc, sigs = matches
+      protocol_obj = ObjectExpression.new
+      fullname = mangle("#{@mod.ns}/#{name.value}")
+      fullname_property = Property.new(ident("protocol-name"), make_literal(fullname))
+      protocol_obj.properties << fullname_property
 
-        sigs.each do |sig|
-          meth_name = sig.inner.first.value
+      protocol_name = name.value
+      ex = ident("exports/#{protocol_name}")
+      ass = AssignmentExpression.new(ex, protocol_obj)
+      @builder << make_decl(Identifier.new(protocol_name), ass)
 
-          arg_lists = sig.inner.drop(1)
-          arg_lists.each do |arg_list|
-            res!("Expected argument list", arg_list) unless arg_list.vector?
-          end
+      sigs.each do |sig|
+        meth_name = sig.inner.first.value
 
-          fn = if arg_lists.length == 1
-                 translate_protocol_simple_fun(protocol_name, meth_name, arg_lists.first)
-               else
-                 translate_protocol_multi_fun(protocol_name, meth_name, arg_lists)
-               end
-          ex = ident("exports/#{meth_name}")
-          ass = AssignmentExpression.new(ex, fn)
-          @builder << make_decl(make_ident(meth_name), ass)
+        arg_lists = sig.inner.drop(1)
+        arg_lists.each do |arg_list|
+          res!("Expected argument list", arg_list) unless arg_list.vector?
         end
-      end or ser!("Invalid defprotocol form", list)
+
+        fn = if arg_lists.length == 1
+                translate_protocol_simple_fun(protocol_name, meth_name, arg_lists.first)
+              else
+                translate_protocol_multi_fun(protocol_name, meth_name, arg_lists)
+              end
+        ex = ident("exports/#{meth_name}")
+        ass = AssignmentExpression.new(ex, fn)
+        @builder << make_decl(make_ident(meth_name), ass)
+      end
     end
 
     def translate_protocol_simple_fun(protocol_name, name, arg_list)
@@ -761,143 +766,152 @@ module Shin
     DEFTYPE_PATTERN         = ":sym :str? :vec? :expr*".freeze
 
     def translate_deftype(list)
-      matches?(list, DEFTYPE_PATTERN) do |name, doc, fields, body|
-        decl = VariableDeclaration.new
-        dtor = VariableDeclarator.new(make_ident(name.value))
+      matches = matches?(list, DEFTYPE_PATTERN)
+      ser!("Invalid deftype form", list) unless matches
 
-        wrapper = FunctionExpression.new
-        block = wrapper.body
-        dtor.init = CallExpression.new(wrapper)
+      name, doc, fields, body = matches
+      decl = VariableDeclaration.new
+      dtor = VariableDeclarator.new(make_ident(name.value))
 
-        # TODO: members / params
-        ctor = FunctionExpression.new
+      wrapper = FunctionExpression.new
+      block = wrapper.body
+      dtor.init = CallExpression.new(wrapper)
 
-        this_id = make_ident("this")
-        fields.inner.each do |field|
-          next if field.meta?  # FIXME: woooooooooo #28
+      # TODO: members / params
+      ctor = FunctionExpression.new
 
-          fname = field.value
-          fname_id = make_ident(fname)
-          ctor.params << fname_id
-          slot = MemberExpression.new(this_id, fname_id, false)
-          ass = AssignmentExpression.new(slot, fname_id)
-          ctor.body << ExpressionStatement.new(ass)
-        end if fields
+      this_id = make_ident("this")
+      fields.inner.each do |field|
+        next if field.meta?  # FIXME: woooooooooo #28
 
-        block << make_decl(name.value, ctor)
+        fname = field.value
+        fname_id = make_ident(fname)
+        ctor.params << fname_id
+        slot = MemberExpression.new(this_id, fname_id, false)
+        ass = AssignmentExpression.new(slot, fname_id)
+        ctor.body << ExpressionStatement.new(ass)
+      end if fields
 
-        prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
+      block << make_decl(name.value, ctor)
 
-        # naked methods won't have arity suffixes or whatever.
-        naked = false
+      prototype_mexpr = MemberExpression.new(make_ident(name.value), make_ident("prototype"), false)
 
-        @builder.into(block, :statement) do
-          body.each do |limb|
-            case
-            when limb.list?
-              id = limb.inner.first
-              fn = nil
+      # naked methods won't have arity suffixes or whatever.
+      naked = false
 
-              type_scope = Scope.new
+      @builder.into(block, :statement) do
+        body.each do |limb|
+          case
+          when limb.list?
+            id = limb.inner.first
+            fn = nil
 
-              args_len = -1
+            type_scope = Scope.new
 
-              @builder.with_scope(type_scope) do
-                self_name = fresh("self")
-                fields.inner.each do |field|
-                  next if field.meta?  # FIXME: woooooooooo #28
-                  type_scope[field.value] = "#{self_name}/#{field.value}"
-                end if fields
+            args_len = -1
 
-                fn = nil
-                matches?(limb.inner.drop(1), FN_PATTERN) do |name, args, body|
-                  args_len = args.inner.length
+            @builder.with_scope(type_scope) do
+              self_name = fresh("self")
+              fields.inner.each do |field|
+                next if field.meta?  # FIXME: woooooooooo #28
+                type_scope[field.value] = "#{self_name}/#{field.value}"
+              end if fields
 
-                  if naked
-                    t = id.token
-                    do_vec = Hamster.vector(AST::Symbol.new(t, "do"))
-                    body.each do |child|
-                      do_vec <<= child
-                    end
-                    do_block = AST::List.new(t, do_vec)
-                    this_as_vec = Hamster.vector(AST::Symbol.new(t, "this-as"),
-                                                 args.inner.first,
-                                                 do_block)
-                    this_as = AST::List.new(t, this_as_vec)
+              # FIXME: oh god, no out-args please
+              args_len_out = []
+              fn = translate_deftype_method(limb, naked, args_len_out)
+              args_len = args_len_out[0]
 
-                    remaining_args = AST::Vector.new(t, args.inner.drop(1))
-                    fn = translate_fn_inner(remaining_args, [this_as], :name => (name ? name.value : nil))
-                  else
-                    fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
-                  end
-                end or ser!("Invalid fn form in deftype: #{limb}", list)
+              self_decl = VariableDeclaration.new
+              self_dtor = VariableDeclarator.new(ident(self_name), ident("this"))
+              self_decl.declarations << self_dtor
+              fn.body.body.unshift(self_decl)
+            end
 
-                self_decl = VariableDeclaration.new
-                self_dtor = VariableDeclarator.new(ident(self_name), ident("this"))
-                self_decl.declarations << self_dtor
-                fn.body.body.unshift(self_decl)
-              end
+            raise "Internal error" if args_len == -1
+            arity_aware_slot_name = naked ? id.value : "#{id.value}$arity#{args_len}"
+            slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
+            ass = AssignmentExpression.new(slot, fn)
+            @builder << ExpressionStatement.new(ass)
+          when limb.sym?
+            # listing a protocol the type implements
 
-              raise "Internal error" if args_len == -1
-              arity_aware_slot_name = naked ? id.value : "#{id.value}$arity#{args_len}"
-              slot = MemberExpression.new(prototype_mexpr, make_ident(arity_aware_slot_name), false)
+            # new way
+            proto = ident(limb.value)
+            protocol_name = MemberExpression.new(proto, ident("protocol-name"), false)
+            slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
+            ass = AssignmentExpression.new(slot, make_literal(true))
+            @builder << ass
+
+            # Object is special, cf. #76
+            if limb.value == "Object"
+              naked = true
+            else
+              naked = false
+            end
+
+            # IFn is special, cf. #50
+            if limb.value == "IFn"
+              fn = FunctionExpression.new(nil)
+              invoke_apply = MemberExpression.new(ident("-invoke"), Identifier.new("apply"), false)
+              arguments = Identifier.new("arguments")
+              this_id = Identifier.new("this")
+              array_proto = MemberExpression.new(Identifier.new("Array"), Identifier.new("prototype"), false)
+              slice = MemberExpression.new(array_proto, Identifier.new("slice"), false)
+              slice_apply = MemberExpression.new(slice, Identifier.new("call"), false)
+              sliced_args = CallExpression.new(slice_apply, [arguments, make_literal(1)])
+
+              this_array = ArrayExpression.new([this_id])
+              this_concat = MemberExpression.new(this_array, Identifier.new("concat"), false)
+              concat = CallExpression.new(this_concat, [sliced_args])
+
+              apply_args = [make_literal(nil),
+                            concat]
+              apply_call = CallExpression.new(invoke_apply, apply_args)
+              fn << ReturnStatement.new(apply_call)
+              slot = MemberExpression.new(prototype_mexpr, Identifier.new("call"), false)
               ass = AssignmentExpression.new(slot, fn)
               @builder << ExpressionStatement.new(ass)
-            when limb.sym?
-              # listing a protocol the type implements
-
-              # new way
-              proto = ident(limb.value)
-              protocol_name = MemberExpression.new(proto, ident("protocol-name"), false)
-              slot = MemberExpression.new(prototype_mexpr, protocol_name, true)
-              ass = AssignmentExpression.new(slot, make_literal(true))
-              @builder << ass
-
-              # Object is special, cf. #76
-              if limb.value == "Object"
-                naked = true
-              else
-                naked = false
-              end
-
-              # IFn is special, cf. #50
-              if limb.value == "IFn"
-                fn = FunctionExpression.new(nil)
-                invoke_apply = MemberExpression.new(ident("-invoke"), Identifier.new("apply"), false)
-                arguments = Identifier.new("arguments")
-                this_id = Identifier.new("this")
-                array_proto = MemberExpression.new(Identifier.new("Array"), Identifier.new("prototype"), false)
-                slice = MemberExpression.new(array_proto, Identifier.new("slice"), false)
-                slice_apply = MemberExpression.new(slice, Identifier.new("call"), false)
-                sliced_args = CallExpression.new(slice_apply, [arguments, make_literal(1)])
-
-                this_array = ArrayExpression.new([this_id])
-                this_concat = MemberExpression.new(this_array, Identifier.new("concat"), false)
-                concat = CallExpression.new(this_concat, [sliced_args])
-
-                apply_args = [make_literal(nil),
-                              concat]
-                apply_call = CallExpression.new(invoke_apply, apply_args)
-                fn << ReturnStatement.new(apply_call)
-                slot = MemberExpression.new(prototype_mexpr, Identifier.new("call"), false)
-                ass = AssignmentExpression.new(slot, fn)
-                @builder << ExpressionStatement.new(ass)
-              end
-            else
-              ser!("Unrecognized thing in deftype", limb)
             end
+          else
+            ser!("Unrecognized thing in deftype", limb)
           end
         end
+      end
 
-        # return our new type.
-        block.body << ReturnStatement.new(ident(name.value))
+      # return our new type.
+      block.body << ReturnStatement.new(ident(name.value))
 
-        ex = ident("exports/#{name}")
-        dtor.init = AssignmentExpression.new(ex, dtor.init)
-        decl.declarations << dtor
+      ex = ident("exports/#{name}")
+      dtor.init = AssignmentExpression.new(ex, dtor.init)
+      decl.declarations << dtor
 
-        @builder << decl
-      end or ser!("Invalid deftype form", list)
+      @builder << decl
+    end
+
+    def translate_deftype_method(limb, naked, args_len_out)
+      fn = nil
+      matches = matches?(limb.inner.drop(1), FN_PATTERN)
+      ser!("Invalid fn form in deftype: #{limb}", list) unless matches
+
+      name, args, body = matches
+      args_len_out << args.inner.length
+
+      if naked
+        t = limb.token
+        do_vec = Hamster::Vector.new([AST::Symbol.new(t, "do")] + body)
+        do_block = AST::List.new(t, do_vec)
+        this_as_vec = Hamster.vector(AST::Symbol.new(t, "this-as"),
+                                      args.inner.first,
+                                      do_block)
+        this_as = AST::List.new(t, this_as_vec)
+
+        remaining_args = AST::Vector.new(t, args.inner.drop(1))
+        fn = translate_fn_inner(remaining_args, [this_as], :name => (name ? name.value : nil))
+      else
+        fn = translate_fn_inner(args, body, :name => (name ? name.value : nil))
+      end
+      fn
     end
 
     def translate_declare(list)
