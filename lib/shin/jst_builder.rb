@@ -69,6 +69,10 @@ module Shin
       @vases.head << candidate
     end
 
+    def vase
+      @vases.head
+    end
+
     def to_s
       res = ""
       xs = @scopes
@@ -88,7 +92,7 @@ module Shin
     include Shin::JST
 
     attr_reader :into
-    attr_reader :mode
+    attr_accessor :mode
 
     VALID_MODES = %i(expression statement return)
 

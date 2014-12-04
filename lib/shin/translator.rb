@@ -1258,12 +1258,13 @@ module Shin
       last_index = body.length - 1
       
       @builder.into(block, :statement) do
-        body.each_with_index do |expr, i|
-          if last_index == i
-            @builder.into(block, :return) { tr(expr) }
-          else
-            tr(expr)
+        index = 0
+        body.each do |expr|
+          if last_index == index
+            @builder.vase.mode = :return
           end
+          tr(expr)
+          index += 1
         end
       end
     end
