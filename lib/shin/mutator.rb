@@ -23,6 +23,7 @@ module Shin
       @mod = mod
       @seed = 0
       @expands = 0
+      @fast_mutator = FastMutator.new(@compiler, @mod)
     end
 
     def mutate
@@ -62,8 +63,7 @@ module Shin
 
             # if first.value == "fast-mutator-test"
             if true
-              fm = FastMutator.new(@compiler, @mod)
-              expanded_ast = fm.expand(invoc, info, js_context)
+              expanded_ast = @fast_mutator.expand(invoc, info, js_context)
             else
               eval_mod = make_macro_module(invoc, info)
               debug "========== [Mutator] ======================="

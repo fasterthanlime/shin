@@ -6,13 +6,13 @@
   ([] nil)
   ([x] x)
   ([x & rest]
-   `(let [x# ~x] (if x# x# (or ~@rest)))))
+   `(let [x# ~x] (if x# x# ~(apply or rest)))))
 
 (defmacro and
   ([] true)
   ([x] x)
   ([x & rest]
-   `(let [x# ~x] (if (not x#) x# (and ~@rest)))))
+   `(let [x# ~x] (if (not x#) x# ~(apply and rest)))))
 
 (defmacro binding
   ([bindings & body]
@@ -70,7 +70,7 @@
      nil))
 
 (defmacro when-not [cond & body]
-  `(when (not ~cond) ~@body))
+  (apply when `(not ~cond) body))
 
 (defmacro if-not [cond & body]
   `(if (not ~cond) ~@body))

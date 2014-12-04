@@ -11,27 +11,30 @@ module Shin
     def initialize(compiler, mod)
       @compiler = compiler
       @mod = mod
+      @expands = 0
     end
 
     def expand(invoc, info, context)
       debug "Expanding #{invoc}" if DEBUG
 
-      deps = @compiler.collect_deps(info[:module])
-      all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
-      unless all_in_cache
-        raise "Not all deps in cache: #{deps.keys}"
-      end
+      t0 = 1000 * Benchmark.realtime do
+        deps = @compiler.collect_deps(info[:module])
+        all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
+        unless all_in_cache
+          raise "Not all deps in cache: #{deps.keys}"
+        end
 
-      deps.each do |slug, dep|
-        Shin::NsParser.new(dep).parse unless dep.ns
-        Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
-        Shin::Translator.new(@compiler, dep).translate unless dep.jst
-        Shin::Generator.new(dep).generate unless dep.code
-      end
+        deps.each do |slug, dep|
+          Shin::NsParser.new(dep).parse unless dep.ns
+          Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
+          Shin::Translator.new(@compiler, dep).translate unless dep.jst
+          Shin::Generator.new(dep).generate unless dep.code
+        end
 
-      deps.each do |slug, dep|
-        unless context.spec_loaded?(context.parse_spec(slug))
-          context.load(slug)
+        deps.each do |slug, dep|
+          unless context.spec_loaded?(context.parse_spec(slug))
+            context.load(slug)
+          end
         end
       end
 
@@ -56,11 +59,24 @@ module Shin
       macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
       debug "macro_gifted_args: #{macro_gifted_args.join(", ")}" if DEBUG
 
-      macro_ret = macro_func.call(*macro_gifted_args)
-      debug "macro_ret: #{macro_ret}" if DEBUG
+      macro_ret = nil
+      t1 = 1000 * Benchmark.realtime do
+        macro_ret = macro_func.call(*macro_gifted_args)
+        debug "macro_ret: #{macro_ret}" if DEBUG
+      end
 
-      macro_ret_unquoted = unquote(macro_ret, invoc.token)
-      debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
+      macro_ret_unquoted = nil
+      t2 = 1000 * Benchmark.realtime do
+        macro_ret_unquoted = unquote(macro_ret, invoc.token)
+        debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
+      end
+
+#       puts "#{t0.round(2)}," +
+#         "#{t1.round(2)}," +
+#         "#{t2.round(2)}," +
+#         "#{@expands += 1}," +
+#         "#{invoc}," +
+#         "#{macro_sexp}"
 
       macro_ret_unquoted
     end
