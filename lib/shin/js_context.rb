@@ -3,6 +3,7 @@ require 'therubyracer'
 require 'oj'
 require 'pathname'
 require 'fileutils'
+require 'set'
 
 module Shin
   class JsContext
@@ -19,6 +20,7 @@ module Shin
       @file_provider = FileJsProvider.new
       @file_provider.sourcepath << File.expand_path("../js", __FILE__)
       @providers = [@file_provider]
+      @loaded = Set.new
 
       @context.eval %Q{
         this.$kir = {
@@ -43,8 +45,9 @@ module Shin
       @context.eval(source)
     end
 
-    def spec_loaded?(spec)
-      @context.eval("$kir.modules[#{escape(spec.name)}] != null")
+    def spec_loaded?(spec_name)
+      return true if @loaded.include?(spec_name)
+      @context.eval("$kir.modules[#{escape(spec_name)}] != null")
     end
 
     def fresh_seed
@@ -65,6 +68,8 @@ module Shin
         }
         return
       end
+
+      @loaded << spec.name
 
       # use globals so we can use V8::Context.load
       # and retain stack trace information.
@@ -151,7 +156,7 @@ module Shin
           # workaround for hamt
           js << "null, "
         else
-          unless spec_loaded?(dep_spec)
+          unless spec_loaded?(dep_spec.name)
             load(dep_spec.input)
           end
           js << "$kir.modules[#{escape(dep_spec.name)}].exports, "

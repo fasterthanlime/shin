@@ -30,12 +30,9 @@ module Shin
       end
 
       deps.each do |slug, dep|
-        context.load(slug)
-      end
-
-      all_loaded = deps.keys.all? { |slug| context.spec_loaded?(context.parse_spec(slug)) }
-      unless all_loaded
-        raise "Not all loaded!"
+        unless context.spec_loaded?(context.parse_spec(slug))
+          context.load(slug)
+        end
       end
 
       macro_slug = info[:module].slug
