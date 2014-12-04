@@ -91,13 +91,7 @@ module Shin
 
       # ClojureScript data structures -> AST nodes
       def wrap(val)
-        case val
-        when Shin::AST::Node
-          node
-        when Fixnum, Float, String
-          # using our token.. better than muffin!
-          Shin::AST::Literal.new(token, val)
-        when V8::Object
+        if val.respond_to?(:native)
           type = v8_type(val)
           case type
           when :keyword
@@ -110,7 +104,15 @@ module Shin
             raise "Unknown V8 type: #{type}"
           end
         else
-          raise "Not sure how to wrap: #{val} of type #{val.class.name}"
+          case val
+          when Shin::AST::Node
+            node
+          when Fixnum, Float, String
+            # using our token.. better than muffin!
+            Shin::AST::Literal.new(token, val)
+          else
+            raise "Not sure how to wrap: #{val} of type #{val.class.name}"
+          end
         end
       end
 
