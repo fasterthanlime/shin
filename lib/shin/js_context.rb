@@ -61,15 +61,15 @@ module Shin
         parse_spec(spec_input)
       end
 
-      if spec.text?
-        text_content = File.read(resource_path(spec.name))
+      if spec[:text?]
+        text_content = File.read(resource_path(spec[:name]))
         @context.eval %Q{
-          $kir.define(#{escape(spec.name)}, [], null).exports = #{escape(text_content)};
+          $kir.define(#{escape(spec[:name])}, [], null).exports = #{escape(text_content)};
         }
         return
       end
 
-      @loaded << spec.name
+      @loaded << spec[:name]
 
       # use globals so we can use V8::Context.load
       # and retain stack trace information.
@@ -81,22 +81,22 @@ module Shin
         this.define = function (a, b, c) {
           $define_called = true; 
           if (typeof a === 'function') {
-            $kir.define(#{escape(spec.name)}, [], a);
+            $kir.define(#{escape(spec[:name])}, [], a);
           } else if (typeof a === 'string') {
             $kir.define(a, b, c);
           } else {
-            $kir.define(#{escape(spec.name)}, a, b);
+            $kir.define(#{escape(spec[:name])}, a, b);
           }
         }
         this.define.amd = true;
       }
 
       if inline
-        debug "Loading #{spec.name} inline:\n\n#{spec_input}\n\n"
-        @context.eval(spec_input, spec.name)
+        debug "Loading #{spec[:name]} inline:\n\n#{spec_input}\n\n"
+        @context.eval(spec_input, spec[:name])
       else
         done = false
-        name = spec.name + ".js"
+        name = spec[:name] + ".js"
         @providers.each do |provider|
           res = provider.provide_js_module(name)
           case res
@@ -109,22 +109,22 @@ module Shin
           else
             debug "Loading #{name} from memory"
             if hardcore_debug?
-              path = ".hardcore-debug/#{spec.name}.js"
+              path = ".hardcore-debug/#{spec[:name]}.js"
               FileUtils.mkdir_p(File.dirname(path))
               File.open(path, 'w') { |f| f.write(res) }
             else
               debug "(use JSCONTEXT_DEBUG=2 to dump in .hardcore-debug/)"
             end
 
-            @context.eval(res, spec.name)
+            @context.eval(res, spec[:name])
             done = true
           end
         end
-        throw "JS file not found: #{spec.name}" unless done
+        throw "JS file not found: #{spec[:name]}" unless done
       end
 
       mod = @context.eval %Q{
-        var name = #{escape(spec.name)};
+        var name = #{escape(spec[:name])};
 
         if (!$define_called) {
           $kir.define(name, [], null);
@@ -136,7 +136,7 @@ module Shin
       }
 
       if mod[:factory].nil?
-        debug "#{spec.name} doesn't look AMD-ready."
+        debug "#{spec[:name]} doesn't look AMD-ready."
 
         # we have no factory to run.
         return
@@ -149,28 +149,28 @@ module Shin
 
       mod[:deps].each do |dep|
         dep_spec = parse_spec(dep)
-        if dep_spec.exports?
+        if dep_spec[:name] == 'exports'
           uses_exports = true
-          js << "$kir.modules[#{escape(spec.name)}].exports, "
-        elsif dep_spec.name == 'require'
+          js << "$kir.modules[#{escape(spec[:name])}].exports, "
+        elsif dep_spec[:name] == 'require'
           # workaround for hamt
           js << "null, "
         else
-          unless spec_loaded?(dep_spec.name)
-            load(dep_spec.input)
+          unless spec_loaded?(dep_spec[:name])
+            load(dep_spec[:input])
           end
-          js << "$kir.modules[#{escape(dep_spec.name)}].exports, "
+          js << "$kir.modules[#{escape(dep_spec[:name])}].exports, "
         end
       end
       js << "];"
 
-      js << "var result = $kir.modules[#{escape(spec.name)}].factory.apply(null, deps);"
+      js << "var result = $kir.modules[#{escape(spec[:name])}].factory.apply(null, deps);"
 
       # not requesting 'exports' and just returning an object
       # is valid AMD apparently. It won't work with circular 
       # references but whatever.
       unless uses_exports
-        js << "$kir.modules[#{escape(spec.name)}].exports = result;"
+        js << "$kir.modules[#{escape(spec[:name])}].exports = result;"
       end
 
       # actually call the factory!
@@ -196,9 +196,11 @@ module Shin
 
     def parse_spec(spec_input)
       _, text, _, name = /^(text!)?(\.\/)?(.*)$/.match(spec_input).to_a
-      Struct.
-        new(:input, :name, :exports?, :text?).
-        new(spec_input, name, name == 'exports', !!text)
+      {
+        :input => spec_input,
+        :name => name,
+        :text => !!text
+      }
     end
 
     private
