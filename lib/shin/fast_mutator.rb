@@ -57,7 +57,7 @@ module Shin
       end
       debug "macro_func: #{macro_func}" if DEBUG
 
-      macro_args = invoc.inner.drop(1).to_a
+      macro_args = invoc.inner.to_a.drop(1)
       debug "macro_args: #{macro_args.join(", ")}" if DEBUG
 
       macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
