@@ -115,20 +115,18 @@ module Shin
       end
 
       def eql?(other)
-        if other.respond_to?(:native)
+        case other
+        when V8::Object
           eq = other[method_sym('-equiv', 2)]
           if eq
             eq.methodcall(other, other, self)
           else
             false
           end
+        when List, Vector
+          inner.eql?(other.inner)
         else
-          case other
-          when List, Vector
-            inner.eql?(other.inner)
-          else
-            false
-          end
+          false
         end
       end
 
@@ -274,20 +272,18 @@ module Shin
       end
 
       def eql?(other)
-        if other.respond_to?(:native)
+        case other
+        when V8::Object
           eq = other[method_sym('-equiv', 2)]
           if eq
             eq.methodcall(other, other, self)
           else
             false
           end
+        when List, Vector
+          inner.eql?(other.inner)
         else
-          case other
-          when List, Vector
-            inner.eql?(other.inner)
-          else
-            false
-          end
+          false
         end
       end
 
@@ -453,15 +449,13 @@ module Shin
       end
 
       def eql?(other)
-        if other.respond_to?(:native)
+        case other
+        when V8::Object
           raise "comparing AST::Map with V8 object: stub"
+        when Map
+          as_hash.eql?(other.as_hash)
         else
-          case other
-          when Map
-            as_hash.eql?(other.as_hash)
-          else
-            false
-          end
+          false
         end
       end
 
@@ -470,7 +464,7 @@ module Shin
       end
 
       # ClojureScript protocols
-
+      
       include Shin::Utils::Mimic
 
       implement :IAssociative do
@@ -559,20 +553,18 @@ module Shin
       end
 
       def eql?(other)
-        if other.respond_to?(:native)
+        case other
+        when V8::Object
           eq = other[method_sym('-equiv', 2)]
           if eq
             eq.methodcall(other, other, self)
           else
             false
           end
+        when Symbol
+          value == other.value
         else
-          case other
-          when Symbol
-            value == other.value
-          else
-            false
-          end
+          false
         end
       end
 
@@ -585,7 +577,7 @@ module Shin
       include Shin::Utils::Mimic
 
       implement :ISymbol
-
+      
       implement :INamed do
         defn '-name' do |s|
           value
@@ -649,20 +641,18 @@ module Shin
       end
 
       def eql?(other)
-        if other.respond_to?(:native)
+        case other
+        when V8::Object
           eq = other[method_sym('-equiv', 2)]
           if eq
             eq.methodcall(other, other, self)
           else
             false
           end
+        when Keyword
+          value == other.value
         else
-          case other
-          when Keyword
-            value == other.value
-          else
-            false
-          end
+          false
         end
       end
 
@@ -675,7 +665,7 @@ module Shin
       include Shin::Utils::Mimic
 
       implement :IKeyword
-
+      
       implement :INamed do
         defn '-name' do |s|
           value
@@ -734,7 +724,7 @@ module Shin
         return true unless value
         inner && inner.kw?(value)
       end
-
+      
       def to_s
         "^#{inner}"
       end

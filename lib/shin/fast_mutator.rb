@@ -67,7 +67,12 @@ module Shin
     end
 
     def unquote(node, token)
-      if node.respond_to?(:native)
+      case node
+      when Fixnum, Float, String, true, false, nil
+        Shin::AST::Literal.new(token, node)
+      when Shin::AST::Node
+        node
+      when V8::Object
         type = v8_type(node)
         case type
         when :list
@@ -86,13 +91,6 @@ module Shin
         else
           raise "Dunno how to dequote a V8 object of type #{type}"
         end
-      else
-        case node
-        when Fixnum, Float, String, true, false, nil
-          Shin::AST::Literal.new(token, node)
-        when Shin::AST::Node
-          node
-        end
       end
     end
     
@@ -104,7 +102,8 @@ module Shin
       while xs
         el = nil
         
-        if xs.respond_to?(:native)
+        case xs
+        when V8::Object
           el = js_invoke(xs, '-first')
           xs = js_invoke(xs, '-next')
         else
@@ -119,7 +118,8 @@ module Shin
     def unquote_indexed(node, token)
       acc = []
 
-      if node.respond_to?(:native)
+      case node
+      when V8::Object
         xs = node
         count = js_invoke(xs, '-count')
         (0...count).each do |i|
@@ -135,10 +135,13 @@ module Shin
     end
 
     def spliceful_append(acc, el, token)
-      if el.respond_to?(:native) && (v8_type(el) == :unquote) && el['splice']
+      if (V8::Object === el) && (v8_type(el) == :unquote) && el['splice']
         inner = el['inner']
 
-        if inner.respond_to?(:native)
+        case inner
+        when nil
+          # well that's good, just don't append anything.
+        when V8::Object
           inner_type = v8_type(inner)
           case inner_type
           when :list
@@ -148,15 +151,10 @@ module Shin
           else
             raise "Invalid use of splice on non-sequence V8 object #{inner_type} #{inner['toString'].methodcall(inner)}"
           end
-        elsif inner.nil?
-          # well that's good, just don't append anything.
+        when AST::List, AST::Vector
+          inner.inner.each { |x| acc << x }
         else
-          case inner
-          when AST::List, AST::Vector
-            inner.inner.each { |x| acc << x }
-          else
-            raise "Invalid use of splice on non-sequence #{inner.inspect}"
-          end
+          raise "Invalid use of splice on non-sequence #{inner.inspect}"
         end
       else
         acc << unquote(el, token)
