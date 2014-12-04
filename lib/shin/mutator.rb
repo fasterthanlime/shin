@@ -17,7 +17,6 @@ module Shin
 
     attr_reader :mod
     @@sym_seed = 2121
-    @@depth = 0
 
     def initialize(compiler, mod)
       @compiler = compiler
@@ -34,19 +33,14 @@ module Shin
         return
       end
 
-      @@depth += 1
-      t = (1000 * Benchmark.realtime do
-        debug "Mutating #{mod.slug}"
-        mod.mutating = true
-        mod.ast2 = mod.ast.map { |x| expand(x) }
+      debug "Mutating #{mod.slug}"
+      mod.mutating = true
+      mod.ast2 = mod.ast.map { |x| expand(x) }
 
-        # we've probably been generating ourselves while mutating, so null those
-        # so that the compiler doesn't over-cache things.
-        mod.jst = nil
-        mod.code = nil
-      end)
-      # puts "Mutating #{mod.slug.center(30)}\t ##{@@depth}\t #{t.round(0).to_s.+("ms").center(20)}\t#{@expands} expands\t #{(@expands == 0 ? 0 : (t / @expands)).round(0).to_s.+("ms / exps")}"
-      @@depth -= 1
+      # we've probably been generating ourselves while mutating, so null those
+      # so that the compiler doesn't over-cache things.
+      mod.jst = nil
+      mod.code = nil
     end
 
     protected
@@ -149,22 +143,9 @@ module Shin
       end
 
       eval_mod.source = @mod.source
-      t1 = 1000 * Benchmark.realtime do
-        Shin::NsParser.new(eval_mod).parse
-      end
-      t2 = 1000 * Benchmark.realtime do
-        Shin::Translator.new(@compiler, eval_mod).translate
-      end
-      t3 = 1000 * Benchmark.realtime do
-        Shin::Generator.new(eval_mod).generate
-      end
-      if @compiler.opts[:profile]
-        puts "-> #{macro_sym.to_s.center(15)} #{mod.slug.center(25)}" +
-          "\t#{t1.round(0).to_s.+("ms (ns)").center(9)}" +
-          "\t#{t2.round(0).to_s.+("ms (tr)").center(9)}" +
-          "\t#{t3.round(0).to_s.+("ms (cg)").center(9)}" +
-          "\t#{eval_mod.code.bytesize.to_s.+(" bytes").center(8)}"
-      end
+      Shin::NsParser.new(eval_mod).parse
+      Shin::Translator.new(@compiler, eval_mod).translate
+      Shin::Generator.new(eval_mod).generate
 
       deps = @compiler.collect_deps(eval_mod)
 

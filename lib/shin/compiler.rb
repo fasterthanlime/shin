@@ -40,52 +40,39 @@ module Shin
     end
 
     def compile(source, additionals = {})
-      main = nil
-      parse_time = Benchmark.measure do
-        main = parse_module(source, additionals)
-      end
-      puts "Parsing\t#{parse_time}" if @opts[:profile]
+      main = parse_module(source, additionals)
 
       all_mods = collect_deps(main)
-      mutate_time = Benchmark.measure do
-        all_mods.each do |slug, mod|
-          if mod.ast2
-            next
-          end
-          Shin::Mutator.new(self, mod).mutate
+      all_mods.each do |slug, mod|
+        if mod.ast2
+          next
         end
+        Shin::Mutator.new(self, mod).mutate
       end
-      puts "Mutating\t#{mutate_time}" if @opts[:profile]
 
       if opts[:ast2]
         puts main.ast2.join("\n")
         exit 0
       end
 
-      translate_time = Benchmark.measure do
-        all_mods.each do |slug, mod|
-          if mod.jst
-            next
-          end
-          Shin::Translator.new(self, mod).translate
+      all_mods.each do |slug, mod|
+        if mod.jst
+          next
         end
+        Shin::Translator.new(self, mod).translate
       end
-      puts "Translating\t#{translate_time}" if @opts[:profile]
 
       if opts[:jst]
         puts Oj.dump(main.jst, :mode => :object, :indent => 2)
         exit 0
       end
 
-      generate_time = Benchmark.measure do
-        all_mods.each do |slug, mod|
-          if mod.code
-            next
-          end
-          Shin::Generator.new(mod).generate
+      all_mods.each do |slug, mod|
+        if mod.code
+          next
         end
+        Shin::Generator.new(mod).generate
       end
-      puts "Generation\t#{generate_time}" if @opts[:profile]
 
       if opts[:js]
         puts main.code
