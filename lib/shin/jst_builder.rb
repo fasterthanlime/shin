@@ -15,37 +15,26 @@ module Shin
       @anchors = Hamster.deque
     end
 
-    def with_anchor(anchor, &block)
+    def with_anchor(anchor)
       old_anchors = @anchors
-
-      begin
-        @anchors = @anchors.unshift(anchor)
-        block.call
-      ensure
-        @anchors = old_anchors
-      end
+      @anchors = @anchors.unshift(anchor)
+      yield
+      @anchors = old_anchors
     end
 
-    def with_scope(scope, &block)
+    def with_scope(scope)
       old_scopes = @scopes
-
-      begin
-        @scopes = @scopes.unshift(scope)
-        block.call
-      ensure
-        @scopes = old_scopes
-      end
+      @scopes = @scopes.unshift(scope)
+      yield
+      @scopes = old_scopes
     end
 
     def into(recipient, mode = :expression, &block)
       vase = Vase.new(recipient, mode)
       old_vases = @vases
-      begin
-        @vases = @vases.unshift(vase)
-        block.call
-      ensure
-        @vases = old_vases
-      end
+      @vases = @vases.unshift(vase)
+      yield
+      @vases = old_vases
       recipient
     end
 
@@ -53,25 +42,19 @@ module Shin
       self << into(recipient, mode, &block)
     end
 
-    REQUIRED_VASE_ARGS = %i(into mode)
-
     def anchor
-      raise "Trying to get anchor in anchorless builder" if @anchors.empty?
-      @anchors.first
+      @anchors.first or raise "Trying to get anchor in anchorless builder"
     end
 
     def mode
-      raise "Trying to get mode in no-vase builder" if @vases.empty?
       @vases.first.mode
     end
 
     def recipient
-      raise "Trying to get recipient in no-vase builder" if @vases.empty?
       @vases.first.into
     end
 
     def declare(name, aka)
-      raise "Trying to declare #{name} into no-scope builder" if @scopes.empty?
       @scopes.first[name] = aka
     end
 
@@ -84,7 +67,6 @@ module Shin
     end
 
     def << (candidate)
-      raise "Trying to << into no-vase builder" if @vases.empty?
       @vases.first << candidate
     end
 
@@ -110,10 +92,6 @@ module Shin
     VALID_MODES = %i(expression statement return)
 
     def initialize(into, mode)
-      raise unless VALID_MODES.include?(mode)
-
-      raise "Invalid recipient in vase, should respond to :<<" unless into.respond_to?(:<<)
-      raise "Nil recipient in vase!" if into.nil?
       @into = into
       @mode = mode
     end
@@ -125,7 +103,6 @@ module Shin
         when ThrowStatement
           # it's okay, there's no going back anyway...
         when Statement
-          # raise "[expr mode] Expected expression, got statement:\n\n #{candidate}"
           raise "[expr mode] Expected expression, got statement:\n\n #{Oj.dump(candidate, :mode => :object, :indent => 2)}"
         end
         into << candidate
