@@ -1,30 +1,27 @@
 
 require 'shin/jst'
-require 'shin/utils/hamster_tools'
-require 'hamster/deque'
+require 'hamster/list'
 require 'set'
 
 module Shin
   # Keeps track of things like scoping, context, etc.
   class JstBuilder
-    include Shin::Utils::HamsterTools
-
     def initialize
-      @scopes  = Hamster.deque
-      @vases   = Hamster.deque
-      @anchors = Hamster.deque
+      @scopes  = Hamster.list
+      @vases   = Hamster.list
+      @anchors = Hamster.list
     end
 
     def with_anchor(anchor)
       old_anchors = @anchors
-      @anchors = @anchors.unshift(anchor)
+      @anchors = @anchors.cons(anchor)
       yield
       @anchors = old_anchors
     end
 
     def with_scope(scope)
       old_scopes = @scopes
-      @scopes = @scopes.unshift(scope)
+      @scopes = @scopes.cons(scope)
       yield
       @scopes = old_scopes
     end
@@ -32,7 +29,7 @@ module Shin
     def into(recipient, mode = :expression, &block)
       vase = Vase.new(recipient, mode)
       old_vases = @vases
-      @vases = @vases.unshift(vase)
+      @vases = @vases.cons(vase)
       yield
       @vases = old_vases
       recipient
@@ -43,37 +40,41 @@ module Shin
     end
 
     def anchor
-      @anchors.first or raise "Trying to get anchor in anchorless builder"
+      @anchors.head or raise "Trying to get anchor in anchorless builder"
     end
 
     def mode
-      @vases.first.mode
+      @vases.head.mode
     end
 
     def recipient
-      @vases.first.into
+      @vases.head.into
     end
 
     def declare(name, aka)
-      @scopes.first[name] = aka
+      @scopes.head[name] = aka
     end
 
     def lookup(name)
-      walk_deque(@scopes) do |scope|
-        res = scope[name]
+      xs = @scopes
+      until xs.empty?
+        res = xs.head[name]
         return res if res
+        xs = xs.tail
       end
       nil
     end
 
     def << (candidate)
-      @vases.first << candidate
+      @vases.head << candidate
     end
 
     def to_s
       res = ""
-      walk_deque(@scopes) do |scope|
-        res += "<- #{scope} "
+      xs = @scopes
+      until xs.empty?
+        res += "<- #{xs.head} "
+        xs = xs.tail
       end
       res
     end
