@@ -16,6 +16,7 @@ module Shin
     include Shin::AST
 
     attr_reader :mod
+    @@total_expand = 0
     @@sym_seed = 2121
 
     def initialize(compiler, mod)
@@ -56,16 +57,19 @@ module Shin
           if info
             expanded_ast = nil
 
-            if USE_FAST
-              expanded_ast = @fast_mutator.expand(invoc, info)
-            else
-              eval_mod = make_macro_module(invoc, info)
-              debug "========== [Mutator] ======================="
-              debug "; Macro :\n#{info[:macro]}\n\n" if DEBUG
+            @@total_expand += Benchmark.realtime do
+              if USE_FAST
+                expanded_ast = @fast_mutator.expand(invoc, info)
+              else
+                eval_mod = make_macro_module(invoc, info)
+                debug "========== [Mutator] ======================="
+                debug "; Macro :\n#{info[:macro]}\n\n" if DEBUG
 
-              debug "; Original AST:\n#{invoc}\n\n" if DEBUG
-              expanded_ast = eval_macro_module(eval_mod)
+                debug "; Original AST:\n#{invoc}\n\n" if DEBUG
+                expanded_ast = eval_macro_module(eval_mod)
+              end
             end
+            puts "Total time spent expanding: #{(@@total_expand * 1000).round(0)}ms"
 
             @expands += 1
             node = expand(expanded_ast)

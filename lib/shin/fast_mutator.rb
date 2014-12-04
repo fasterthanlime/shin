@@ -9,6 +9,9 @@ module Shin
     DEBUG = ENV['FAST_MUTATOR_DEBUG']
 
     attr_reader :context
+    @@total_prep = 0
+    @@total_call = 0
+    @@total_unquote = 0
 
     def initialize(compiler, mod, context)
       @compiler = compiler
@@ -20,54 +23,72 @@ module Shin
     def expand(invoc, info)
       debug "Expanding #{invoc}" if DEBUG
 
-      deps = @compiler.collect_deps(info[:module])
-      all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
-      unless all_in_cache
-        raise "Not all deps in cache: #{deps.keys}"
-      end
+      macro_gifted_args = nil
+      macro_func = nil
 
-      deps.each do |slug, dep|
-        Shin::NsParser.new(dep).parse unless dep.ns
-        Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
-        Shin::Translator.new(@compiler, dep).translate unless dep.jst
-        Shin::Generator.new(dep).generate unless dep.code
-      end
-
-      deps.each do |slug, dep|
-        unless context.spec_loaded?(context.parse_spec(slug))
-          context.load(slug)
+      @@total_prep += Benchmark.realtime do
+        deps = @compiler.collect_deps(info[:module])
+        all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
+        unless all_in_cache
+          raise "Not all deps in cache: #{deps.keys}"
         end
+
+        deps.each do |slug, dep|
+          Shin::NsParser.new(dep).parse unless dep.ns
+          Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
+          Shin::Translator.new(@compiler, dep).translate unless dep.jst
+          Shin::Generator.new(dep).generate unless dep.code
+        end
+
+        deps.each do |slug, dep|
+          unless context.spec_loaded?(slug)
+            context.load(slug)
+          end
+        end
+
+        unless @to_array
+          @to_array = context.eval("$kir.modules['cljs.core'].exports.to$_array")
+          raise "to-array not a func?" unless V8::Function === @to_array
+        end
+
+        macro_slug = info[:module].slug
+        debug "macro_slug: #{macro_slug}" if DEBUG
+
+        macro_name = invoc.inner.first.value
+        debug "macro_name: #{macro_name}" if DEBUG
+
+        macro_sexp = info[:macro]
+        debug "macro_sexp: #{macro_sexp}" if DEBUG
+
+        macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
+        unless macro_func
+          raise "Could not retrieve macro_func"
+        end
+        debug "macro_func: #{macro_func}" if DEBUG
+
+        macro_args = invoc.inner.to_a.drop(1)
+        debug "macro_args: #{macro_args.join(", ")}" if DEBUG
+
+        macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
+        debug "macro_gifted_args: #{macro_gifted_args.join(", ")}" if DEBUG
       end
 
-      @to_array = context.eval("$kir.modules['cljs.core'].exports.to$_array")
-      raise "to-array blerg" unless V8::Function === @to_array
+      macro_ret = nil
+      macro_ret_unquoted = nil
 
-      macro_slug = info[:module].slug
-      debug "macro_slug: #{macro_slug}" if DEBUG
-
-      macro_name = invoc.inner.first.value
-      debug "macro_name: #{macro_name}" if DEBUG
-
-      macro_sexp = info[:macro]
-      debug "macro_sexp: #{macro_sexp}" if DEBUG
-
-      macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
-      unless macro_func
-        raise "Could not retrieve macro_func"
+      @@total_call += Benchmark.realtime do
+        macro_ret = macro_func.call(*macro_gifted_args)
+        debug "macro_ret: #{macro_ret}" if DEBUG
       end
-      debug "macro_func: #{macro_func}" if DEBUG
 
-      macro_args = invoc.inner.to_a.drop(1)
-      debug "macro_args: #{macro_args.join(", ")}" if DEBUG
-
-      macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
-      debug "macro_gifted_args: #{macro_gifted_args.join(", ")}" if DEBUG
-
-      macro_ret = macro_func.call(*macro_gifted_args)
-      debug "macro_ret: #{macro_ret}" if DEBUG
-
-      macro_ret_unquoted = unquote(macro_ret, invoc.token)
-      debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
+      @@total_unquote += Benchmark.realtime do
+        macro_ret_unquoted = unquote(macro_ret, invoc.token)
+        debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
+      end
+      puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
+      puts "Total call:    #{(1000 * @@total_call).round(0)}ms"
+      puts "Total unquote: #{(1000 * @@total_unquote).round(0)}ms"
+      puts "Total        : #{(1000 * (@@total_prep + @@total_call + @@total_unquote)).round(0)}ms"
 
       macro_ret_unquoted
     end
@@ -93,7 +114,7 @@ module Shin
           if node.splice
             raise "Invalid usage of splice outside a collection"
           end
-          unquote(node['inner'], token)
+          unquote(node.inner, token)
         else
           raise "Dunno how to dequote a V8 object of type #{type}"
         end
