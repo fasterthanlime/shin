@@ -11,6 +11,16 @@ RSpec.describe "Language", "meta" do
              }).to have_output(%w(true false Xzibit))
     end
 
+    it "PersistentArrayMap" do
+      expect(%Q{
+           (let [m {}
+                 mm (with-meta m {:key "Xzibit"})]
+             (print (nil? (meta m)))
+             (print (nil? (meta mm)))
+             (print (:key (meta mm))))
+             }).to have_output(%w(true false Xzibit))
+    end
+
     it "PersistentVector" do
       expect(%Q{
            (let [v []
@@ -45,22 +55,22 @@ RSpec.describe "Language", "meta" do
 
     it "Cons" do
       expect(%Q{
-           (let [l (cons 1 nil)
-                 lm (with-meta l {:key "Xzibit"})]
-             (assert (instance? Cons l))
-             (print (nil? (meta l)))
-             (print (nil? (meta lm)))
-             (print (:key (meta lm))))
+           (let [c (cons 1 nil)
+                 cm (with-meta c {:key "Xzibit"})]
+             (assert (instance? Cons c))
+             (print (nil? (meta c)))
+             (print (nil? (meta cm)))
+             (print (:key (meta cm))))
              }).to have_output(%w(true false Xzibit))
     end
 
     it "Symbol" do
       expect(%Q{
-           (let [l 'hello
-                 lm (with-meta l {:key "Xzibit"})]
-             (print (nil? (meta l)))
-             (print (nil? (meta lm)))
-             (print (:key (meta lm))))
+           (let [s 'hello
+                 sm (with-meta s {:key "Xzibit"})]
+             (print (nil? (meta s)))
+             (print (nil? (meta sm)))
+             (print (:key (meta sm))))
              }).to have_output(%w(true false Xzibit))
     end
   end
@@ -79,11 +89,21 @@ RSpec.describe "Language", "meta" do
   describe "shin-only types supporting meta" do
     it "Unquote" do
       expect(%Q{
-           (let [l (--unquote nil false)
-                 lm (with-meta l {:key "Xzibit"})]
-             (print (nil? (meta l)))
-             (print (nil? (meta lm)))
-             (print (:key (meta lm))))
+           (let [u (--unquote nil false)
+                 um (with-meta u {:key "Xzibit"})]
+             (print (nil? (meta u)))
+             (print (nil? (meta um)))
+             (print (:key (meta um))))
+             }).to have_output(%w(true false Xzibit))
+    end
+
+    it "QuotedRegexp" do
+      expect(%Q{
+           (let [r (--quoted-re nil false)
+                 rm (with-meta r {:key "Xzibit"})]
+             (print (nil? (meta r)))
+             (print (nil? (meta rm)))
+             (print (:key (meta rm))))
              }).to have_output(%w(true false Xzibit))
     end
   end
