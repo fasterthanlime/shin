@@ -51,10 +51,6 @@ module Shin
         self.class.core_proto_name(name)
       end
 
-      def invoke(name, *args)
-        send(method_sym(name, args.length + 1), *([self].concat(args)))
-      end
-
       def js_invoke(val, name, *args)
         name = method_sym(name, args.length + 1)
         f = val[name]

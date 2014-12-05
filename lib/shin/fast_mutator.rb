@@ -10,10 +10,8 @@ module Shin
 
     attr_reader :context
     @@total_prep = 0
-    @@total_serial = 0
-    @@total_serial2 = 0
-    @@total_serial3 = 0
-    @@total_unquote = 0
+    @@total_call = 0
+    @@total_deserialize = 0
     @@total_nsp = 0      
     @@total_mut = 0    
     @@total_trn = 0
@@ -28,13 +26,13 @@ module Shin
     end
 
     def expand(invoc, info)
-      debug "Expanding #{invoc}" if DEBUG
-
       macro_gifted_args = nil
       macro_func = nil
       macro_slug = nil
 
       @@total_prep += Benchmark.realtime do
+        debug "==============================================="
+
         deps = @compiler.collect_deps(info[:module])
         all_in_cache = deps.keys.all? { |slug| @compiler.modules.include?(slug) }
         unless all_in_cache
@@ -55,174 +53,53 @@ module Shin
         end
 
         unless @to_array
-          @to_array = context.eval("$kir.modules['cljs.core'].exports.to$_array")
-          raise "to-array not a func?" unless V8::Function === @to_array
-
-          @__serialize = context.eval("$kir.modules['cljs.core'].exports.$_$_serialize")
-          raise "--serialize not a func?" unless V8::Function === @__serialize
-
-          @__serialize_macro = context.eval("$kir.modules['cljs.core'].exports.$_$_serialize$_macro")
+          @__serialize_macro = context.eval(
+            "$kir.modules['cljs.core'].exports.$_$_serialize$_macro")
           raise "--serialize-macro not a func?" unless V8::Function === @__serialize_macro
         end
 
         macro_slug = info[:module].slug
-        debug "macro_slug: #{macro_slug}" if DEBUG
-
         macro_sexp = info[:macro]
-        debug "macro_sexp: #{macro_sexp}" if DEBUG
+        debug "Macro sexp:\n\n  #{macro_sexp}\n\n" if DEBUG
 
         macro_args = invoc.inner.to_a.drop(1)
-        debug "macro_args: #{macro_args.join(", ")}" if DEBUG
-
         macro_gifted_args = macro_args.map { |arg| unwrap(arg) }
-        debug "macro_gifted_args: #{macro_gifted_args.join(", ")}" if DEBUG
       end
 
-      macro_ret = nil
-      macro_ret_unquoted = nil
-
+      serialized_output = nil
       macro_name = invoc.inner.first.value
-      debug "macro_name: #{macro_name}" if DEBUG
 
-      @@total_serial += Benchmark.realtime do
-        num_args = macro_gifted_args.length
-        arg_list = (0...num_args).map { |i| "arg#{i}" }.join(", ")
-
-        serial_macro_func = @v8.eval(%Q{
-          var core = $kir.modules['cljs.core'].exports;
-          var womb = $kir.modules['#{macro_slug}'].exports;
-          var f = function (#{arg_list}) {
-            return core.$_$_serialize(womb.#{mangle(macro_name)}(#{arg_list}));
-          };
-          f
-        })
-        serialized_output = serial_macro_func.call(*macro_gifted_args)
-
-        # yay experimental stuff
-        @v8.enter do
-          deser = deserialize(serialized_output.native, invoc.token)
-          # puts "deser = #{deser}"
-        end
-      end
-
-      @@total_serial2 += Benchmark.realtime do
-        macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
-        unless macro_func
-          raise "Could not retrieve macro_func"
-        end
-        serial_macro_ret = macro_func.call(*macro_gifted_args)
-        serialized_output = @__serialize.call(serial_macro_ret)
-
-        # yay experimental stuff
-        @v8.enter do
-          deser = deserialize(serialized_output.native, invoc.token)
-          # puts "deser = #{deser}"
-        end
-      end
-
-      @@total_serial3 += Benchmark.realtime do
+      @@total_call += Benchmark.realtime do
         macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
         unless macro_func
           raise "Could not retrieve macro_func"
         end
         serialized_output = @__serialize_macro.call(macro_func, macro_gifted_args)
+      end
 
-        # yay experimental stuff
+      expanded_ast = nil
+
+      @@total_deserialize += Benchmark.realtime do
         @v8.enter do
-          deser = deserialize(serialized_output.native, invoc.token)
-          # puts "deser = #{deser}"
+          expanded_ast = deserialize(serialized_output.native, invoc.token)
         end
+        debug "Original AST:\n\n  #{invoc}\n\n" if DEBUG
+        debug "Expanded AST:\n\n  #{expanded_ast}\n\n" if DEBUG
       end
 
-      @@total_unquote += Benchmark.realtime do
-        macro_func = context.eval("$kir.modules['#{macro_slug}'].exports.#{mangle(macro_name)}")
-        unless macro_func
-          raise "Could not retrieve macro_func"
-        end
-        debug "macro_func: #{macro_func}" if DEBUG
-        macro_ret = macro_func.call(*macro_gifted_args)
-        debug "macro_ret: #{macro_ret}" if DEBUG
+#       puts "Total prep:           #{(1000 * @@total_prep).round(0)}ms"
+#       puts "  Total nsp:          #{(1000 * @@total_nsp).round(0)}ms"
+#       puts "  Total mut:          #{(1000 * @@total_mut).round(0)}ms"
+#       puts "  Total trn:          #{(1000 * @@total_trn).round(0)}ms"
+#       puts "  Total gen:          #{(1000 * @@total_gen).round(0)}ms"
+#       puts "Total call:           #{(1000 * @@total_call).round(0)}ms"
+#       puts "Total deserialize:    #{(1000 * @@total_deserialize).round(0)}ms"
 
-        macro_ret_unquoted = unquote(macro_ret, invoc.token)
-        debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
-      end
-      # puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
-      # puts "  Total nsp:    #{(1000 * @@total_nsp).round(0)}ms"
-      # puts "  Total mut:    #{(1000 * @@total_mut).round(0)}ms"
-      # puts "  Total trn:    #{(1000 * @@total_trn).round(0)}ms"
-      # puts "  Total gen:    #{(1000 * @@total_gen).round(0)}ms"
-      puts "#{(1000 * @@total_serial).round(0)} ms  - Total serial"
-      puts "#{(1000 * @@total_serial2).round(0)} ms - Total serial2"
-      puts "#{(1000 * @@total_serial3).round(0)} ms - Total serial3"
-      puts "#{(1000 * @@total_unquote).round(0)} ms - Total unquote"
-
-      macro_ret_unquoted
+      expanded_ast
     end
 
-    def unquote(node, token)
-      case node
-      when Fixnum, Float, String, true, false, nil
-        Shin::AST::Literal.new(token, node)
-      when Shin::AST::Node
-        node
-      when V8::Object
-        type = v8_type(node)
-        case type
-        when :list
-          acc = unquote_coll(node, token)
-          Shin::AST::List.new(token, Hamster::Vector.new(acc))
-        when :vector
-          acc = unquote_coll(node, token)
-          Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
-        when :symbol
-          Shin::AST::Symbol.new(token, node['_name'])
-        when :unquote
-          if node['splice']
-            raise "Invalid usage of splice outside a collection"
-          end
-          unquote(node['inner'], token)
-        else
-          raise "Dunno how to dequote a V8 object of type #{type}"
-        end
-      end
-    end
     
     private
-
-    def unquote_coll(node, token)
-      acc = []
-      @to_array.call(node).each do |el|
-        spliceful_append(acc, el, token)
-      end
-      acc
-    end
-
-    def spliceful_append(acc, el, token)
-      if (V8::Object === el) && (v8_type(el) == :unquote) && el['splice']
-        inner = el['inner']
-
-        case inner
-        when nil
-          # well that's good, just don't append anything.
-        when V8::Object
-          inner_type = v8_type(inner)
-          case inner_type
-          when :list, :vector
-            acc.concat(unquote_coll(inner, token))
-          else
-            raise "Invalid use of splice on non-sequence V8 object #{inner_type} #{inner['toString'].methodcall(inner)}"
-          end
-        when AST::List, AST::Vector
-          inner.inner.each { |x| acc << x }
-        else
-          raise "Invalid use of splice on non-sequence #{inner.inspect}"
-        end
-      else
-        acc << unquote(el, token)
-      end
-    end
-
-    # yay experimental stuff
 
     def deserialize(node, token)
       raise "Expected V8::C::Array" unless V8::C::Array === node
@@ -237,11 +114,11 @@ module Shin
         @v8.to_ruby(inner)
       when 1 # vector
         acc = []
-        deserialize_all(inner, token, acc)
+        deserialize_v8_array(inner, token, acc)
         Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
       when 2 # list
         acc = []
-        deserialize_all(inner, token, acc)
+        deserialize_v8_array(inner, token, acc)
         Shin::AST::List.new(token, Hamster::Vector.new(acc))
       when 3 # map
         raise "map"
@@ -265,7 +142,7 @@ module Shin
       end
     end
 
-    def deserialize_all(arr, token, acc)
+    def deserialize_v8_array(arr, token, acc)
       len = arr.Length
       i = 0
 
@@ -273,9 +150,20 @@ module Shin
         el = arr.Get(i)
         type  = el.Get(0)
 
-        if type == 7
+        case type
+        when 7 # splicing unquote
           # splicing unquote
-          deserialize_all(el.Get(1), token, acc)
+          inner = el.Get(1)
+          case inner_type = inner.Get(0)
+          when 0 # AST node
+            @v8.to_ruby(inner.Get(1)).inner.each { |x| acc << x }
+          when 1, 2 # list
+            deserialize_v8_array(inner.Get(1), token, acc)
+          when 74 # nil
+            # muffin!
+          else
+            raise "Invalid usage of splicing unquote on type #{inner_type}"
+          end
         else
           acc << deserialize(el, token)
         end
@@ -285,7 +173,7 @@ module Shin
     end
 
     def debug(*args)
-      puts("[FAST MUTATOR] #{args.join(" ")}") if DEBUG
+      puts("[FM] #{args.join(" ")}") if DEBUG
     end
 
   end
