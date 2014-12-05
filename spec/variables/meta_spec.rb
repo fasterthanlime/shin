@@ -1,6 +1,6 @@
 
 RSpec.describe "Language", "meta" do
-  it "functions" do
+  it "MetaFn" do
     expect(%Q{
            (let [f  (fn [])
                  fm (with-meta f {:key "Xzibit"})]
@@ -10,13 +10,46 @@ RSpec.describe "Language", "meta" do
            }).to have_output(%w(true false Xzibit))
   end
 
-  it "vectors" do
+  it "PersistentVector" do
     expect(%Q{
            (let [v []
                  vm (with-meta v {:key "Xzibit"})]
              (print (nil? (meta v)))
              (print (nil? (meta vm)))
              (print (:key (meta vm))))
+           }).to have_output(%w(true false Xzibit))
+  end
+
+  it "EmptyList" do
+    expect(%Q{
+           (let [l ()
+                 lm (with-meta l {:key "Xzibit"})]
+             (assert (instance? EmptyList l))
+             (print (nil? (meta l)))
+             (print (nil? (meta lm)))
+             (print (:key (meta lm))))
+           }).to have_output(%w(true false Xzibit))
+  end
+
+  it "List" do
+    expect(%Q{
+           (let [l (conj () 1)
+                 lm (with-meta l {:key "Xzibit"})]
+             (assert (instance? List l))
+             (print (nil? (meta l)))
+             (print (nil? (meta lm)))
+             (print (:key (meta lm))))
+           }).to have_output(%w(true false Xzibit))
+  end
+
+  it "Cons" do
+    expect(%Q{
+           (let [l (cons 1 nil)
+                 lm (with-meta l {:key "Xzibit"})]
+             (assert (instance? Cons l))
+             (print (nil? (meta l)))
+             (print (nil? (meta lm)))
+             (print (:key (meta lm))))
            }).to have_output(%w(true false Xzibit))
   end
 end
