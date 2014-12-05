@@ -267,6 +267,10 @@ module Shin
     def slug
       "#{ns}#{macro ? '__macro' : ''}"
     end
+
+    def core_require
+      @requires.find(&:core?)
+    end
   end
 
   class ModuleCache

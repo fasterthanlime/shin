@@ -220,14 +220,30 @@ module Shin
     end
   end
 
+  class FilteredScope
+    def initialize(req, mod)
+      @req = req
+      @mod = mod
+    end
+
+    def [](x)
+      res = @mod.scope[x]
+      if res && !@req.excludes.include?(x)
+        res
+      else
+        nil
+      end
+    end
+  end
+
   class CompositeScope < Scope
     def initialize
       super
-      @referred = []
+      @scopes = []
     end
 
-    def attach!(referred)
-      @referred << referred
+    def attach!(scope)
+      @scopes << scope
     end
 
     def [](x)
@@ -235,8 +251,8 @@ module Shin
       return ours if ours
 
       # more recent requires shadow the others
-      @referred.reverse_each do |ref|
-        theirs = ref[x]
+      @scopes.reverse_each do |scope|
+        theirs = scope[x]
         return theirs if theirs
       end
       
@@ -244,7 +260,7 @@ module Shin
     end
 
     def to_s
-      "(CompositeScope with #{@referred.length} referred)"
+      "(CompositeScope with #{@scopes.length} scopes)"
     end
   end
 

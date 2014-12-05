@@ -48,9 +48,33 @@ module Shin
       type = list.first.value rescue nil
 
       raise "invalid spec" unless type
-      valid_directives = %w(use require require-macros)
+      valid_directives = %w(use require require-macros refer-clojure)
       unless valid_directives.include? type
         raise "invalid spec type #{type}: expected one of #{valid_directives.join(", ")}"
+      end
+
+      if type == 'refer-clojure'
+        rest = list.drop(1)
+        until rest.empty?
+          directive = rest.first
+          rest = rest.drop(1)
+
+          raise "expected keyword as refer-clojure directive" unless directive.kw?
+          case directive.value
+          when "exclude"
+            excludes = rest.first
+            rest = rest.drop(1)
+            raise "expected vector for :exclude directive in refer-clojure" unless excludes.vector?
+            core_req = mod.core_require
+            excludes.inner.each do |sym|
+              raise "expected symbol to exclude, got #{sym}" unless sym.sym?
+              core_req.excludes << sym.value
+            end
+          else
+            raise "invalid refer-clojure directive: #{directive}"
+          end
+        end
+        return
       end
 
       macro = false
@@ -194,6 +218,7 @@ module Shin
     attr_accessor :as
     attr_accessor :js
     attr_accessor :macro
+    attr_accessor :excludes
 
     def initialize(ns, refer: [], as: nil, macro: false)
       @js = false
@@ -207,6 +232,7 @@ module Shin
       @as = as || ns
       @refer = refer
       @macro = macro
+      @excludes = Set.new
     end
 
     def all?
@@ -219,6 +245,10 @@ module Shin
 
     def macro?
       @macro
+    end
+
+    def core?
+      !macro? && (ns == "cljs.core")
     end
 
     def slug
