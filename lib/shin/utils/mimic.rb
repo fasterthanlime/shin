@@ -10,8 +10,6 @@ module Shin
       module ClassMethod
         include Shin::Utils::Mangler
 
-        attr_reader :protocols
-
         def core_proto_name(proto)
           "cljs$dcore$v#{proto}"
         end
@@ -37,10 +35,6 @@ module Shin
 
         def defn(name, &block)
           sym = self.method_sym(name, block.arity)
-          # define_method(sym) do |*args|
-          #   puts name
-          #   self.instance_exec(*args, &block)
-          # end
           define_method(sym, &block)
         end
       end
@@ -48,12 +42,6 @@ module Shin
       def self.included(base)
         base.extend(ClassMethod)
       end
-
-#       def [](x)
-#         return true if self.class.protocols.include?(x)
-#         puts "[#{self.class.name}] does not implement Clojure protocol #{x}" if DEBUG
-#         nil
-#       end
 
       def method_sym(name, arity)
         self.class.method_sym(name, arity)
