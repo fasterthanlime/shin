@@ -40,7 +40,7 @@ module Shin
     end
 
     def anchor
-      @anchors.head or raise "Trying to get anchor in anchorless builder"
+      @anchors.head
     end
 
     def mode
