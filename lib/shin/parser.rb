@@ -172,8 +172,33 @@ module Shin
           when '"'
             heap = heap.cons(token).cons("")
             state = state.cons(:regexp)
+          when 'j'
+            state = state.cons(:sharp_j)
           else
             ser!("Unexpected char after #: #{c}")
+          end
+        when :sharp_j
+          case c
+          when 's'
+            state = state.tail
+
+            # js reader literal
+            heap = heap.cons([])
+            state = state.cons(:close_js).cons(:expr_one)
+          else
+            ser!("Invalid reader literal")
+          end
+        when :close_js
+          state = state.tail
+          inner = heap.head[0]; heap = heap.tail
+          mark = AST::Symbol.new(inner.token, '$')
+          case inner
+          when AST::Map
+            heap.head << AST::Map.new(inner.token, inner.inner.insert(0, mark))
+          when AST::Vector
+            heap.head << AST::Vector.new(inner.token, inner.inner.insert(0, mark))
+          else
+            ser!("Invalid reader literal before: #{inner}")
           end
         when :named_escape
           case c

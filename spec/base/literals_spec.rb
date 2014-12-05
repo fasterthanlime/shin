@@ -35,5 +35,21 @@ RSpec.describe "Language", "literals" do
     expect(%q{(print (get {:a 42} :a))}).to have_output "42"
   end
 
+  it "has working js map literals (ki)" do
+    expect(%q{(print (aget {$ "a" 42} "a"))}).to have_output "42"
+  end
+
+  it "has working js array literals (ki)" do
+    expect(%q{(print (aget [$ 42] 0))}).to have_output "42"
+  end
+
+  it "has working js map literals (cljs)" do
+    expect(%q{(print (aget #js{"a" 42} "a"))}).to have_output "42"
+  end
+
+  it "has working js array literals (cljs)" do
+    expect(%q{(print (aget #js[42] 0))}).to have_output "42"
+  end
+
 end
 
