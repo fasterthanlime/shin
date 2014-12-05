@@ -197,10 +197,14 @@ module Shin
       when 8 # literal
         inner = node.Get(1)
         case inner
-        when Fixnum, Float, true, false, nil
-          AST::Literal.new(token, inner)
+        when Fixnum, Float
+          AST::Number.new(token, inner)
+        when true
+          AST::Symbol.new(token, "true")
+        when false
+          AST::Symbol.new(token, "false")
         when V8::C::String
-          AST::Literal.new(token, @v8.to_ruby(inner))
+          AST::String.new(token, @v8.to_ruby(inner))
         else
           raise "Unknown literal: #{inner}"
         end
