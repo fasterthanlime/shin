@@ -52,5 +52,48 @@ RSpec.describe "Language", "builtins" do
             }).to have_output("")
     end.to raise_error(V8::Error)
   end
+
+  describe "has working case" do
+    it "no default" do
+      expect(%Q{
+          (defn foobar [i]
+            (case i
+              0 "My"
+              1 "heart"
+              2 "is"))
+           (print (foobar 0))
+           (print (foobar 1))
+           (print (foobar 2))
+           (print (nil? (foobar 3)))
+             }).to have_output(%w(My heart is true))
+    end
+
+    it "with default" do
+      expect(%Q{
+          (defn foobar [i]
+            (case i
+              0 "My"
+              1 "heart"
+              2 "is"
+              "you"))
+           (print (foobar 0))
+           (print (foobar 1))
+           (print (foobar 2))
+           (print (foobar 3))
+             }).to have_output(%w(My heart is you))
+    end
+
+    it "with multiple constants" do
+      expect(%Q{
+          (defn foobar [i]
+            (case i
+              (0 1) "nothing,"
+              2 "will ever be the same"))
+           (print (foobar 0))
+           (print (foobar 1))
+           (print (foobar 2))
+             }).to have_output("nothing, nothing, will ever be the same")
+    end
+  end
 end
 

@@ -109,3 +109,19 @@
 (defmacro js-delete [obj prop]
   `(*js-uop delete (aget ~obj ~prop)))
 
+(defmacro case [x & clauses]
+  (let [cases     (partition 2 clauses)
+        un-cases  (map
+                    #(let [[l r] %]
+                       (if (list? l)
+                         (interleave l (repeat r))
+                         %))
+                    cases)
+        default   (if
+                    (odd? (count clauses))
+                    (last clauses)
+                    'nil)]
+    `(condp = ~x
+       ~@(apply concat un-cases) ; poor ☃'s flatten 
+       :else ~default)))
+

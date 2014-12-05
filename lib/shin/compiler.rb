@@ -137,7 +137,8 @@ module Shin
       if macros = additionals[:macros]
         macros_source = "(ns #{mod.ns})\n#{macros}"
         parse_module(macros_source, :macro => true)
-        mod.requires << Require.new(mod.ns, :macro => true, :refer => :all)
+        # add first, so it overrides core macros if needed.
+        mod.requires.unshift Require.new(mod.ns, :macro => true, :refer => :all)
       end
 
       parse_reqs(mod)
