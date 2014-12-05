@@ -1135,14 +1135,22 @@ module Shin
       bindings_vec = Hamster.vector(inner_sym, inner_fn, variadic_sym, varargs_prepared)
       bindings = AST::Vector.new(t, bindings_vec)
 
-      inner_call_vec = Hamster.vector(inner_sym)
+      this_alias = AST::Symbol.new(t, fresh("this_as"))
+      this_as_vec = Hamster.vector(AST::Symbol.new(t, "this-as"), this_alias)
+
+      apply_sym = AST::Symbol.new(t, ".call")
+      inner_call_vec = Hamster.vector(apply_sym, inner_sym, this_alias)
       arg_names.each do |name|
         inner_call_vec <<= AST::Symbol.new(t, name)
       end
       inner_call_vec <<= variadic_sym
       inner_call = AST::List.new(t, inner_call_vec)
+
       let_vec = Hamster.vector(let_sym, bindings, inner_call)
-      outer_body = AST::List.new(t, let_vec)
+      let = AST::List.new(t, let_vec)
+      this_as_vec <<= let
+
+      outer_body = AST::List.new(t, this_as_vec)
 
       if DEBUG
         debug "=========================================================="

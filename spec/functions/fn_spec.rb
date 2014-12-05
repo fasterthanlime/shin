@@ -68,6 +68,24 @@ RSpec.describe "Language", "fn" do
     end
   end
 
+  describe "this binding" do
+    it "is retained on simple functions" do
+      expect(%Q{
+             (let [sentinel {$}
+                   f (fn [] (this-as c (print (== sentinel c))))]
+               (.call f sentinel))
+             }).to have_output(%w(true))
+    end
+
+    it "is retained on variadic functions" do
+      expect(%Q{
+             (let [sentinel {$}
+                   f (fn [& args] (this-as c (print (== sentinel c))))]
+               (.call f sentinel))
+             }).to have_output(%w(true))
+    end
+  end
+
   describe "recursive functions" do
     it "works with fixed-args functions" do
       expect(%Q{
