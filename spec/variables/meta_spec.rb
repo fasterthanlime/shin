@@ -52,5 +52,14 @@ RSpec.describe "Language", "meta" do
              (print (:key (meta lm))))
            }).to have_output(%w(true false Xzibit))
   end
+
+  it "Keyword" do
+    expect do
+      expect(%Q{
+           (let [l :hello
+                 lm (with-meta l {:key "Xzibit"})])
+             }).to have_output(%w(true false Xzibit))
+    end.to raise_error V8::Error, /IWithMeta/
+  end
 end
 
