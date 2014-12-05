@@ -102,35 +102,35 @@ module Shin
     private
 
     def deserialize(node, token)
-      raise "Expected V8::C::Array" unless V8::C::Array === node
+      raise "Expected V8::C::Array, got #{node.class}: #{@v8.to_ruby(node)}" unless V8::C::Array === node
 
-      type =  node.Get(0)
-      inner = node.Get(1)
+      type = node.Get(0)
 
       case type
       when 74 # nil
         Shin::AST::Symbol.new(token, nil)
       when 0 # mimic
-        @v8.to_ruby(inner)
+        @v8.to_ruby(node.Get(1))
       when 1 # vector
         acc = []
-        deserialize_v8_array(inner, token, acc)
+        deserialize_v8_array(node, token, acc)
         Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
       when 2 # list
         acc = []
-        deserialize_v8_array(inner, token, acc)
+        deserialize_v8_array(node, token, acc)
         Shin::AST::List.new(token, Hamster::Vector.new(acc))
       when 3 # map
         raise "map"
       when 4 # symbol
-        Shin::AST::Symbol.new(token, @v8.to_ruby(inner))
+        Shin::AST::Symbol.new(token, @v8.to_ruby(node.Get(1)))
       when 5 # keyword
-        Shin::AST::Keyword.new(token, @v8.to_ruby(inner))
+        Shin::AST::Keyword.new(token, @v8.to_ruby(node.Get(1)))
       when 6 # non-spliced unquote
-        deserialize(inner, token)
+        deserialize(node.Get(1), token)
       when 7 # splicing unquote
         raise "Invalid use of splicing unquote"
       when 8 # literal
+        inner = node.Get(1)
         case inner
         when Fixnum, Float, true, false, nil
           Shin::AST::Literal.new(token, inner)
@@ -144,7 +144,7 @@ module Shin
 
     def deserialize_v8_array(arr, token, acc)
       len = arr.Length
-      i = 0
+      i = 1
 
       while i < len do
         el = arr.Get(i)
@@ -158,7 +158,7 @@ module Shin
           when 0 # AST node
             @v8.to_ruby(inner.Get(1)).inner.each { |x| acc << x }
           when 1, 2 # list
-            deserialize_v8_array(inner.Get(1), token, acc)
+            deserialize_v8_array(inner, token, acc)
           when 74 # nil
             # muffin!
           else
