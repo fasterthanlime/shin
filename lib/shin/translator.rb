@@ -588,6 +588,31 @@ module Shin
       end
     end
 
+    def translate_aset(rest)
+      object = rest.first
+      props = rest.drop(1)
+
+      curr = as_expr(object)
+      while props.size > 1
+        prop = props.first; props = props.drop(1)
+        curr = MemberExpression.new(curr, as_expr(prop), true)
+      end
+      val = props.first
+      @builder << AssignmentExpression.new(curr, as_expr(val))
+    end
+
+    def translate_aget(rest)
+      object = rest.first
+      props = rest.drop(1)
+
+      curr = as_expr(object)
+      until props.empty?
+        prop = props.first; props = props.drop(1)
+        curr = MemberExpression.new(curr, as_expr(prop), true)
+      end
+      @builder << curr
+    end
+
     def translate_recur(values)
       anchor = @builder.anchor or ser!("Recur with no anchor: #{expr}", first)
 
@@ -1540,26 +1565,9 @@ module Shin
           property, val = rest
           @builder << make_decl(as_expr(property), as_expr(val))
         when "aset"
-          object = rest.first
-          props = rest.drop(1)
-
-          curr = as_expr(object)
-          while props.size > 1
-            prop = props.first; props = props.drop(1)
-            curr = MemberExpression.new(curr, as_expr(prop), true)
-          end
-          val = props.first
-          @builder << AssignmentExpression.new(curr, as_expr(val))
+          translate_aset(rest)
         when "aget"
-          object = rest.first
-          props = rest.drop(1)
-
-          curr = as_expr(object)
-          until props.empty?
-            prop = props.first; props = props.drop(1)
-            curr = MemberExpression.new(curr, as_expr(prop), true)
-          end
-          @builder << curr
+          translate_aget(rest)
         when "instance?"
           r, l = rest
           @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
