@@ -90,11 +90,13 @@ module Shin
 
         case state.head
         when :expr, :expr_one
+          save_state = state
           state = state.tail if state.head == :expr_one
 
           case c
           when ' ', "\t", "\n", ','
-            # muffin
+            # muffin, but wait! don't close expr_one.
+            state = save_state
           when '@'
             heap = heap.cons(Deref).cons(token).cons([])
             state = state.cons(:close_one).cons(:expr_one)
@@ -191,6 +193,7 @@ module Shin
         when :close_js
           state = state.tail
           inner = heap.head[0]; heap = heap.tail
+
           mark = AST::Symbol.new(inner.token, '$')
           case inner
           when AST::Map
@@ -200,6 +203,7 @@ module Shin
           else
             ser!("Invalid reader literal before: #{inner}")
           end
+          redo
         when :named_escape
           case c
           when /[a-z]/
