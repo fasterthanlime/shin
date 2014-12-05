@@ -58,11 +58,19 @@ module Shin
         first = node.inner.first
         case first
         when AST::Symbol
-          invoc = node
           info = resolve_macro(first.value)
-          if info
-            expanded_ast = invoke_macro(invoc, info)
-            node = expand(expanded_ast)
+          while info
+            node = invoke_macro(node, info)
+            if AST::List === node
+              first = node.inner.first
+              if AST::Symbol === first
+                info = resolve_macro(first.value)
+              else
+                info = nil
+              end
+            else
+              info = nil
+            end
           end
         end
       end
