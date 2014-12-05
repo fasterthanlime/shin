@@ -82,7 +82,7 @@ generate correct and readable code, quickly.
   - `parser.rb` - text to `Shin::AST` representation
   - `ns_parser.rb` - recognizes `ns` form, populates `requires` and
   generate anonynmous ns name if lack of ns form.
-  - `mutator.rb` - expands macros, potential for an optimizer there
+  - `macro_expander.rb` - expands macros
   - `translator.rb` - translates `Shin::AST` to `Shin::JST`, which is
   [Mozilla Parser API][moz-parser-api] in disguise.
   - `generator.rb` - generates actual JavaScript from the JST, via
@@ -345,7 +345,9 @@ that, keep `shin.js` in sync.
 ## Macros
 
 Basic idea: macros are executable code, so let's compile & execute them.
-That's `mutator.rb`'s job.
+That's `macro_expander.rb`'s job.
+
+*The following description is out of date since the fast-macros branch*
 
 When macro expansion is required:
 
@@ -382,11 +384,6 @@ And it'll be transformed (at parse time) to something like that:
     `(let [~d2121 (str ~a ~b)]
       (print ~d2121 ~c ~d2121))))
 ```
-
-Due to the way the AST is passed to "macros compiled to JS code", we lose
-location information inside the macro invocation. This could be fixed
-with metadata, if we had metadata support. Or with a reverse lookup map
-on the mutator's side.
 
 ## Destructuring
 
@@ -519,7 +516,7 @@ Run `shin -h` and it'll tell you all about it. Subject to changes.
 flexible pipeline, concise code yet. Time will tell.
 
 But basically, use `compiler.rb` or roll your own pipeline by running
-Parser, NsParser, Mutator, Translator, Generator, and outputting yourself.
+Parser, NsParser, MacroExpander, Translator, Generator, and outputting yourself.
 
 ## Thanks
 

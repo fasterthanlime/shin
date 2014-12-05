@@ -2,7 +2,7 @@
 require 'benchmark'
 require 'shin/parser'
 require 'shin/ns_parser'
-require 'shin/mutator'
+require 'shin/macro_expander'
 require 'shin/translator'
 require 'shin/generator'
 require 'shin/utils'
@@ -47,7 +47,7 @@ module Shin
         if mod.ast2
           next
         end
-        Shin::Mutator.new(self, mod).mutate
+        Shin::MacroExpander.new(self, mod).expand_macros
       end
 
       if opts[:ast2]

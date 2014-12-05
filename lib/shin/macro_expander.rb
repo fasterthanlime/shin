@@ -1,14 +1,18 @@
 
+require 'shin/ast'
+require 'shin/js_context'
 require 'shin/utils/mangler'
 
 module Shin
-  class FastMutator
+  class MacroExpander
     include Shin::Utils::Mangler
     include Shin::Utils::Mimic
 
-    DEBUG = ENV['FAST_MUTATOR_DEBUG']
+    DEBUG = ENV['MACRO_DEBUG']
 
     attr_reader :context
+    attr_reader :mod
+
     @@total_prep = 0
     @@total_call = 0
     @@total_deserialize = 0
@@ -17,15 +21,70 @@ module Shin
     @@total_trn = 0
     @@total_gen = 0
 
-    def initialize(compiler, mod, context)
+    def initialize(compiler, mod)
       @compiler = compiler
       @mod = mod
-      @expands = 0
-      @context = context
+      @seed = 0
+      @context = js_context
       @v8 = @context.context
     end
 
-    def expand(invoc, info)
+    def expand_macros
+      if mod.mutating
+        # FIXME oh god this is a terrible workaround.
+        mod.ast2 = mod.ast
+        return
+      end
+
+      debug "Expanding macros #{mod.slug}"
+      mod.mutating = true
+      mod.ast2 = mod.ast.map do |x|
+        expand(x)
+      end
+      mod.mutating = false
+
+      # we've probably been generating ourselves while mutating, so null those
+      # so that the compiler doesn't over-cache things.
+      mod.jst = nil
+      mod.code = nil
+      context.unload!(mod.slug)
+    end
+
+    private
+
+    def expand(node)
+      case node
+      when AST::List
+        first = node.inner.first
+        case first
+        when AST::Symbol
+          invoc = node
+          info = resolve_macro(first.value)
+          if info
+            expanded_ast = invoke_macro(invoc, info)
+            node = expand(expanded_ast)
+          end
+        end
+      end
+
+      if AST::Sequence === node
+        inner = node.inner
+        index = 0
+        inner.each do |child|
+          poster_child = expand(child)
+          inner = inner.set(index, poster_child) if poster_child != child
+          index += 1
+        end
+
+        if inner != node.inner
+          node = node.class.new(node.token, inner)
+        end
+      end
+
+      node
+    end
+
+    def invoke_macro(invoc, info)
       macro_gifted_args = nil
       macro_func = nil
       macro_slug = nil
@@ -40,23 +99,20 @@ module Shin
         end
 
         deps.each do |slug, dep|
-          @@total_nsp += Benchmark.realtime { Shin::NsParser.new(dep).parse unless dep.ns }
-          @@total_mut += Benchmark.realtime { Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2 }
-          @@total_trn += Benchmark.realtime { Shin::Translator.new(@compiler, dep).translate unless dep.jst }
-          @@total_gen += Benchmark.realtime { Shin::Generator.new(dep).generate unless dep.code }
+          @@total_nsp += Benchmark.realtime { NsParser.new(dep).parse unless dep.ns }
+          @@total_mut += Benchmark.realtime { MacroExpander.new(@compiler, dep).expand_macros unless dep.ast2 }
+          @@total_trn += Benchmark.realtime { Translator.new(@compiler, dep).translate unless dep.jst }
+          @@total_gen += Benchmark.realtime { Generator.new(dep).generate unless dep.code }
         end
 
         deps.each do |slug, dep|
-          unless context.spec_loaded?(slug)
+          unless context.loaded?(slug)
             context.load(slug)
           end
         end
 
-        unless @to_array
-          @__serialize_macro = context.eval(
-            "$kir.modules['cljs.core'].exports.$_$_serialize$_macro")
-          raise "--serialize-macro not a func?" unless V8::Function === @__serialize_macro
-        end
+        @__serialize_macro = context.eval("$kir.modules['cljs.core'].exports.$_$_serialize$_macro")
+        raise "--serialize-macro not a func?" unless V8::Function === @__serialize_macro
 
         macro_slug = info[:module].slug
         macro_sexp = info[:macro]
@@ -109,23 +165,23 @@ module Shin
 
       case type
       when 74 # nil
-        Shin::AST::Symbol.new(token, "nil")
+        AST::Symbol.new(token, "nil")
       when 0 # mimic
         @v8.to_ruby(node.Get(1))
       when 1 # vector
         acc = []
         deserialize_v8_array(node, token, acc)
-        Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
+        AST::Vector.new(token, Hamster::Vector.new(acc))
       when 2 # list
         acc = []
         deserialize_v8_array(node, token, acc)
-        Shin::AST::List.new(token, Hamster::Vector.new(acc))
+        AST::List.new(token, Hamster::Vector.new(acc))
       when 3 # map
         raise "map"
       when 4 # symbol
-        Shin::AST::Symbol.new(token, @v8.to_ruby(node.Get(1)))
+        AST::Symbol.new(token, @v8.to_ruby(node.Get(1)))
       when 5 # keyword
-        Shin::AST::Keyword.new(token, @v8.to_ruby(node.Get(1)))
+        AST::Keyword.new(token, @v8.to_ruby(node.Get(1)))
       when 6 # non-spliced unquote
         deserialize(node.Get(1), token)
       when 7 # splicing unquote
@@ -134,9 +190,9 @@ module Shin
         inner = node.Get(1)
         case inner
         when Fixnum, Float, true, false, nil
-          Shin::AST::Literal.new(token, inner)
+          AST::Literal.new(token, inner)
         when V8::C::String
-          Shin::AST::Literal.new(token, @v8.to_ruby(inner))
+          AST::Literal.new(token, @v8.to_ruby(inner))
         else
           raise "Unknown literal: #{inner}"
         end
@@ -173,8 +229,36 @@ module Shin
       end
     end
 
+
+    def resolve_macro(name)
+      @mod.requires.each do |req|
+        next unless req.macro?
+
+        dep = @compiler.modules[req]
+        res = dep.scope.form_for(name)
+        if res
+          # debug "Found '#{name}' in #{dep.slug}, which has defs #{defs.keys.join(", ")}" if DEBUG
+          return {:macro => res, :module => dep}
+        end
+      end
+
+      nil
+    end
+
+    def js_context
+      unless defined?(@@js_context)
+        js = @@js_context = Shin::JsContext.new
+        js.context['debug'] = lambda do |_, *args|
+          debug "[from JS] #{args.join(" ")}"
+        end
+
+        js.providers << @compiler
+      end
+      @@js_context
+    end
+
     def debug(*args)
-      puts("[FM] #{args.join(" ")}") if DEBUG
+      puts("[MACRO] #{args.join(" ")}") if DEBUG
     end
 
   end

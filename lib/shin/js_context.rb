@@ -45,9 +45,21 @@ module Shin
       @context.eval(source)
     end
 
-    def spec_loaded?(spec_name)
-      return true if @loaded.include?(spec_name)
-      @context.eval("$kir.modules[#{escape(spec_name)}] != null")
+    def loaded?(spec_name)
+      @loaded.include?(spec_name)
+    end
+
+    def unload!(spec_name)
+      return unless loaded?(spec_name)
+      debug "Unloading #{spec_name}"
+      @loaded.delete(spec_name)
+      @context.eval("delete $kir.modules[#{escape(spec_name)}]")
+
+      mods = @context.eval("$kir.modules")
+      mods.each do |dep, mod|
+        unload!(dep) if mod['deps'].include?(spec_name)
+      end
+
     end
 
     def fresh_seed
@@ -156,7 +168,7 @@ module Shin
           # workaround for hamt
           js << "null, "
         else
-          unless spec_loaded?(dep_spec[:name])
+          unless loaded?(dep_spec[:name])
             load(dep_spec[:input])
           end
           js << "$kir.modules[#{escape(dep_spec[:name])}].exports, "

@@ -1,6 +1,5 @@
 
 require 'shin/ast'
-require 'shin/mutator'
 require 'shin/utils'
 require 'hamster/list'
 
@@ -364,7 +363,7 @@ module Shin
           end
 
           name = node.value[0..-2]
-          sym = candidate.lazy_make(name)
+          sym = candidate.lazy_make(self, name)
           return Unquote.new(t, Symbol.new(t, sym))
         end
         node
@@ -407,7 +406,7 @@ module Shin
         num_args = arg_map.keys.max || 0
         args = Hamster.vector
         (0..num_args).map do |index|
-          name = arg_map[index] || "aarg#{Shin::Mutator.fresh_sym}#{index}-"
+          name = arg_map[index] || "aarg#{fresh_sym}#{index}-"
           args <<= Shin::AST::Symbol.new(t, name)
         end
         arg_vec = Vector.new(t, args)
@@ -415,6 +414,12 @@ module Shin
       else
         node
       end
+    end
+
+    @@sym_seed = 2727
+
+    def fresh_sym
+      "_#{@@sym_seed += 1}"
     end
 
     def desugar_closure_inner(node, arg_map)
@@ -438,7 +443,7 @@ module Shin
           index = closure_arg_to_index(node)
           name = arg_map[index]
           unless name
-            name = arg_map[index] = "aarg#{Shin::Mutator.fresh_sym}#{index}-"
+            name = arg_map[index] = "aarg#{fresh_sym}#{index}-"
           end
           return Symbol.new(node.token, name)
         end
@@ -476,10 +481,10 @@ module Shin
       @cache = {}
     end
 
-    def lazy_make(name)
+    def lazy_make(parser, name)
       sym = @cache[name]
       unless sym
-        sym = "#{name}#{Shin::Mutator.fresh_sym}"
+        sym = "#{name}#{parser.fresh_sym}"
         @cache[name] = sym
         @decls_inner << Symbol.new(@t, sym)
         @decls_inner << gensym_call(name)
