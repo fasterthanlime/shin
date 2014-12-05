@@ -103,9 +103,10 @@ module Shin
       ast.each do |node|
         case node
         when AST::List
-          first = node.inner.first
+          list = node.inner.to_a
+          first = list.first
           if first && first.sym?
-            rest = node.inner.drop(1)
+            rest = list.drop(1)
             case first.value
             when "def"
               translate_def(rest)
@@ -176,7 +177,7 @@ module Shin
 
     def destructure_vector(inner, rhs, mode)
       done = false
-      list = inner
+      list = inner.to_a
       rhs_memo = fresh("rhsmemo")
       @builder << make_decl(rhs_memo, rhs)
       rhs_sym = AST::Symbol.new(rhs.token, rhs_memo)
@@ -396,23 +397,40 @@ module Shin
     end
 
     def translate_try(list)
-      exprs   = list.take_while { |x| !is_catch?(x) && !is_finally?(x) }
-      clauses = list.drop(exprs.length).take_while { |x| is_catch?(x) }
-      rest    = list.drop(exprs.length + clauses.length)
-      final   = nil
+      state = :expr
+      exprs = []; clauses = []; final = nil
 
-      case rest.length
-      when 0
-        # all good
-      when 1
-        final = rest.first
-        ser!("Expected finally form", final) unless is_finally?(final)
-      else
-        ser!("Expected only one finally form", rest)
-      end
-
-      if final.nil? && clauses.empty?
-        ser!("Try block needs at least one catch clause or a finally", list)
+      i = 0; len = list.length
+      while i < len
+        el = list[i]
+        case true
+        when is_catch?(el)
+          case state
+          when :expr, :catch
+            clauses << el
+            state = :catch
+          else
+            ser!("Unexpected catch clause", el)
+          end
+        when is_finally?(el)
+          case state
+          when :expr, :catch
+            if final.nil?
+              final = el
+            else
+              ser!("Duplicate finally block", el)
+            end
+            state = :finally
+          end
+        else
+          case state
+          when :expr
+            exprs << el
+          else
+            ser!("In try, expected catch or finally", el)
+          end
+        end
+        i += 1
       end
       
       mode = @builder.mode
@@ -557,7 +575,7 @@ module Shin
         lhs = list[i]
         unless lhs.kw?('else')
           inner = Hamster.vector(form, lhs, rhs)
-          list = list.set(i, List.new(lhs.token, inner))
+          list[i] = List.new(lhs.token, inner)
         end
         i += 2
       end
@@ -1420,7 +1438,7 @@ module Shin
     end
 
     def translate_listform(expr)
-      list = expr.inner
+      list = expr.inner.to_a
       first = list.first
 
       unless first
