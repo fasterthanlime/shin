@@ -79,13 +79,10 @@ module Shin
 
       # AST nodes -> ClojureScript data structures
       def unwrap(node)
-        case node
-        when Shin::AST::Literal
+        if node.literal?
           node.value
-        when Shin::AST::Sequence, Shin::AST::Keyword, Shin::AST::Symbol
-          node
         else
-          raise "Not sure how to unwrap: #{node.inspect}"
+          node
         end
       end
 
