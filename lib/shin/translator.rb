@@ -1516,7 +1516,7 @@ module Shin
           end
 
           values = list.drop(1)
-          block = RecurBlockStatement.new
+          block = BlockStatement.new
           @builder << block
 
           @builder.into(block, :statement) do

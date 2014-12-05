@@ -138,10 +138,6 @@ module Shin
       end
     end
 
-    # dummy subclass of BlockStatement, for internal checks.
-    class RecurBlockStatement < BlockStatement
-    end
-
     class Identifier < Node
       attr_reader :name
 
