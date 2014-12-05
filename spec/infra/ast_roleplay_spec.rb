@@ -6,11 +6,11 @@ RSpec.describe "Infrastructure", "AST roleplay" do
   include Shin
   include Shin::Utils::Mangler
   include Shin::Utils::AstMaker
+  include Shin::Utils::GlobalCache
 
   before(:all) do
-    compiler = Shin::Compiler.new({})
-    core_path = compiler.find_module("cljs.core")
-    compiler.compile(File.read(core_path))
+    compiler = Shin::Compiler.new(:cache => global_cache)
+    compiler.compile("(ns roleplay)")
 
     @ctx = Shin::JsContext.new
     @ctx.providers << compiler

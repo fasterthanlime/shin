@@ -3,7 +3,10 @@ require 'shin/js_context'
 require 'shin/compiler'
 require 'shin/parser'
 require 'shin/utils/matcher'
+require 'shin/utils/global_cache'
+
 include Shin::Utils::Matcher
+include Shin::Utils::GlobalCache
 
 RSpec::Matchers.define :ast_match do |pattern|
 
@@ -20,7 +23,7 @@ RSpec::Matchers.define :ast_match do |pattern|
   end
 end
 
-cache = Shin::ModuleCache.new
+# cache = Shin::ModuleCache.new
 js = Shin::JsContext.new
 js.context['debug'] = lambda do |_, *args|
   puts "[debug] #{args.join(" ")}"
@@ -41,7 +44,7 @@ RSpec::Matchers.define :have_output do |expected_output|
       macros = actual[:macros]
     end
 
-    compiler = Shin::Compiler.new(:cache => cache)
+    compiler = Shin::Compiler.new(:cache => global_cache)
     res = compiler.compile(source, :macros => macros)
 
     js.providers << compiler
