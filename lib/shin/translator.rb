@@ -1362,8 +1362,11 @@ module Shin
           lit = make_literal(expr.value)
           @builder << CallExpression.new(ident("symbol"), [lit])
         else
-          if expr.value == 'nil'
+          case expr.value
+          when 'nil'
             @builder << make_literal(nil)
+          when 'js-arguments'
+            @builder << Identifier.new("arguments")
           else
             @builder << ident(expr.value)
           end
