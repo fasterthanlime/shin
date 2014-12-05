@@ -138,12 +138,32 @@ module Shin
         inner.hash
       end
 
-      def first
+      def _first
         inner.first
       end
 
-      def next
+      def _next
         (inner.length > 1) ? List.new(token, inner.drop(1)) : nil
+      end
+
+      def _rest
+        List.new(token, inner.drop(1))
+      end
+
+      def _reduce(f, start)
+        case inner.length
+        when 0
+          start
+        else
+          a = start
+          xs = inner
+          until xs.empty?
+            b = unwrap(xs.first)
+            a = f.call(a, b)
+            xs = xs.drop(1)
+          end
+          a
+        end
       end
 
       # ClojureScript protocols
@@ -155,23 +175,23 @@ module Shin
       implement :ASeq
       implement :ISeq do
         defn '-first' do |s|
-          unwrap(inner.first)
+          unwrap(_first)
         end
 
         defn '-rest' do |s|
-          List.new(token, inner.drop(1))
+          _rest
         end
       end
 
       implement :INext do
         defn '-next' do |s|
-          (inner.length > 1) ? List.new(token, inner.drop(1)) : nil
+          _next
         end
       end
 
       implement :IStack do
         defn '-peek' do |s|
-          unwrap(inner.first)
+          unwrap(_first)
         end
 
         defn '-pop' do |s|
@@ -198,27 +218,31 @@ module Shin
         end
       end
 
+      def _nth(n, not_found = nil)
+        if n >= 0 && n < inner.length
+          unwrap(inner[n])
+        else
+          nil
+        end
+      end
+
       implement :IIndexed do
         defn '-nth' do |s, n|
-          unwrap(inner[n])
+          _nth(n)
         end
         defn '-nth' do |s, n, not_found|
-          if n >= 0 && n < inner.length
-            unwrap(inner[n])
-          else
-            nil
-          end
+          _nth(n, not_found)
         end
       end
 
       implement :ILookup do
         defn '-lookup' do |s, n|
           return nil unless Fixnum == n
-          invoke('-nth', n)
+          _nth(n)
         end
         defn '-lookup' do |s, n, not_found|
           return nil unless Fixnum == n
-          invoke('-nth', n, not_found)
+          _nth(n, not_found)
         end
       end
 
@@ -239,23 +263,11 @@ module Shin
             a = unwrap(inner[0])
             b = unwrap(inner[1])
             zero = f.call(a, b)
-            invoke('-rest').invoke('-rest').invoke('-reduce', f, zero)
+            _rest._rest._reduce(f, zero)
           end
         end
         defn '-reduce' do |s, f, start|
-          case inner.length
-          when 0
-            start
-          else
-            a = start
-            xs = inner
-            until xs.empty?
-              b = unwrap(xs.first)
-              a = f.call(a, b)
-              xs = xs.drop(1)
-            end
-            a
-          end
+          _reduce(f, start)
         end
       end
 
@@ -295,6 +307,34 @@ module Shin
         inner.hash
       end
 
+      def _first
+        inner.first
+      end
+
+      def _next
+        (inner.length > 1) ? Vector.new(token, inner.drop(1)) : nil
+      end
+
+      def _rest
+        Vector.new(token, inner.drop(1))
+      end
+
+      def _reduce(f, start)
+        case inner.length
+        when 0
+          start
+        else
+          a = start
+          xs = inner
+          until xs.empty?
+            b = unwrap(xs.first)
+            a = f.call(a, b)
+            xs = xs.drop(1)
+          end
+          a
+        end
+      end
+
       # ClojureScript protocols
 
       include Shin::Utils::Mimic
@@ -317,23 +357,23 @@ module Shin
       implement :ASeq
       implement :ISeq do
         defn '-first' do |s|
-          unwrap(inner.first)
+          unwrap(_first)
         end
 
         defn '-rest' do |s|
-          Vector.new(token, inner.drop(1))
+          _rest
         end
       end
 
       implement :INext do
         defn '-next' do |s|
-          (inner.length > 1) ? Vector.new(token, inner.drop(1)) : nil
+          _next
         end
       end
 
       implement :IStack do
         defn '-peek' do |s|
-          unwrap(inner.first)
+          unwrap(_first)
         end
 
         defn '-pop' do |s|
@@ -377,23 +417,11 @@ module Shin
             a = unwrap(inner[0])
             b = unwrap(inner[1])
             zero = f.call(a, b)
-            invoke('-rest').invoke('-rest').invoke('-reduce', f, zero)
+            _rest._rest._reduce(f, zero)
           end
         end
         defn '-reduce' do |s, f, start|
-          case inner.length
-          when 0
-            start
-          else
-            a = start
-            xs = inner
-            until xs.empty?
-              b = unwrap(xs.first)
-              a = f.call(a, b)
-              xs = xs.drop(1)
-            end
-            a
-          end
+          _reduce(f, start)
         end
       end
 

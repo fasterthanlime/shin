@@ -78,6 +78,7 @@ module Shin
       end
 
       expanded_ast = nil
+      debug "Serialized output: #{serialized_output}" if DEBUG
 
       @@total_deserialize += Benchmark.realtime do
         @v8.enter do
@@ -108,7 +109,7 @@ module Shin
 
       case type
       when 74 # nil
-        Shin::AST::Symbol.new(token, nil)
+        Shin::AST::Symbol.new(token, "nil")
       when 0 # mimic
         @v8.to_ruby(node.Get(1))
       when 1 # vector

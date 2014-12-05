@@ -95,21 +95,14 @@ module Shin
         end
       end
 
-      @@total_v8type = 0
       @@identity_cache = {}
 
       def v8_type(val)
-        res = nil
-        @@total_v8type += Benchmark.realtime do
-          res = val.instance_variable_get(:@context).enter do
-            vn = val.native
-            hash = vn.Get('constructor').GetIdentityHash
-            @@identity_cache[hash] ||= sniff_v8type(vn)
-          end
+        val.instance_variable_get(:@context).enter do
+          vn = val.native
+          hash = vn.Get('constructor').GetIdentityHash
+          @@identity_cache[hash] ||= sniff_v8type(vn)
         end
-        puts "Total v8type:  #{(1000 * @@total_v8type).round(0)}ms (cache size: #{@@identity_cache.length})"
-
-        res
       end
 
       def sniff_v8type(vn)
