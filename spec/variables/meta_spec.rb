@@ -73,6 +73,16 @@ RSpec.describe "Language", "meta" do
              (print (:key (meta sm))))
              }).to have_output(%w(true false Xzibit))
     end
+
+    it "Atom" do
+      expect(%Q{
+           (let [a (atom nil)
+                 am (with-meta a {:key "Xzibit"})]
+             (print (nil? (meta a)))
+             (print (nil? (meta am)))
+             (print (:key (meta am))))
+             }).to have_output(%w(true false Xzibit))
+    end
   end
 
   describe "types not supporting meta" do
