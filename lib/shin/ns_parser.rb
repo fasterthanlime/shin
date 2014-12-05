@@ -179,7 +179,15 @@ module Shin
 
         if first.sym? && DEF_NAMES.include?(first.value)
           raise Shin::SyntaxError, "Invalid def: #{node}" unless node.inner.length >= 2
-          name = node.inner[1].value
+
+          i = 1
+          def_sym = node.inner[1]
+          while AST::MetaData === def_sym && i < node.inner.length
+            i += 1
+            def_sym = node.inner[i]
+          end
+          name = def_sym.value
+
           scope[name] = node
 
           # protocols define some methods that are top-level symbols too cf. #70
