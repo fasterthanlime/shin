@@ -1516,33 +1516,32 @@ module Shin
           end
 
           values = list.drop(1)
-          block = BlockStatement.new
-          @builder << block
 
-          @builder.into(block, :statement) do
-            t = expr.token
-            tmps = []
+          old_mode = @builder.vase.mode
+          @builder.vase.mode = :statement
+          t = expr.token
+          tmps = []
 
-            # TODO: fix that. cf #56
-            # lhs_vec = AST::Vector.new(t, anchor.bindings)
-            # rhs_vec = AST::Vector.new(t, values)
-            # destructure(lhs_vec, rhs_vec)
+          # TODO: fix that. cf #56
+          # lhs_vec = AST::Vector.new(t, anchor.bindings)
+          # rhs_vec = AST::Vector.new(t, values)
+          # destructure(lhs_vec, rhs_vec)
 
-            anchor.bindings.each_with_index do |lhs, i|
-              rhs = values[i]
-              ser!("Missing value in recur", values) unless rhs
-              tmp = AST::Symbol.new(t, fresh("G__"))
-              destructure(tmp, rhs)
-              tmps << tmp
-            end
-
-            anchor.bindings.each_with_index do |lhs, i|
-              tmp = tmps[i]
-              destructure(lhs, tmp, :mode => :assign)
-            end
-            ass = AssignmentExpression.new(anchor.sentinel, make_literal(true))
-            @builder << ass
+          anchor.bindings.each_with_index do |lhs, i|
+            rhs = values[i]
+            ser!("Missing value in recur", values) unless rhs
+            tmp = AST::Symbol.new(t, fresh("G__"))
+            destructure(tmp, rhs)
+            tmps << tmp
           end
+
+          anchor.bindings.each_with_index do |lhs, i|
+            tmp = tmps[i]
+            destructure(lhs, tmp, :mode => :assign)
+          end
+          ass = AssignmentExpression.new(anchor.sentinel, make_literal(true))
+          @builder << ass
+          @builder.vase.mode = old_mode
         when "set!"
           property, val = rest
           @builder << AssignmentExpression.new(as_expr(property), as_expr(val))
