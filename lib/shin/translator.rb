@@ -334,9 +334,7 @@ module Shin
                @builder << CallExpression.new(fn)
                fn
              when :statement, :return
-               block = BlockStatement.new
-               @builder << block
-               block
+               @builder.recipient
              else
                raise "let in unknown builder mode: #{@builder.mode}"
              end
@@ -614,7 +612,9 @@ module Shin
       mode = @builder.mode
       support = case @builder.mode
                 when :expression
-                  FunctionExpression.new
+                  fn = FunctionExpression.new
+                  @builder << CallExpression.new(fn)
+                  fn
                 when :statement, :return
                   @builder.recipient
                 else
@@ -655,15 +655,6 @@ module Shin
             end
           end
         end
-      end
-
-      case @builder.mode
-      when :expression
-        @builder << CallExpression.new(support)
-      when :statement, :return
-        # all good.
-      else
-        raise "loop in unknown builder mode: #{@builder.mode}"
       end
     end
 
