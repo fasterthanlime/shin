@@ -95,7 +95,7 @@ module Shin
         super(token)
         raise "Sequence needs immutable vector" unless Hamster::Vector === inner
         inner.each do |child|
-          raise "Non-node in AST: #{child.inspect}" unless Node === child
+          raise "Non-node in AST: #{child.nil? ? "nil" : child}" unless Node === child
         end
 
         @inner = inner

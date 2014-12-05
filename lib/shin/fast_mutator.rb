@@ -92,9 +92,11 @@ module Shin
       @@total_serial += Benchmark.realtime do
         # yay experimental stuff
         macro_ser = @__serialize.call(macro_ret)
-        deser = deserialize(macro_ser, invoc.token)
-        puts "deser = #{deser}"
         # puts "#{macro_ser}"
+        context.context.enter do
+          deser = deserialize(macro_ser.native, invoc.token)
+          puts "deser = #{deser}"
+        end
       end
 
       @@total_unquote += Benchmark.realtime do
@@ -180,14 +182,16 @@ module Shin
     # yay experimental stuff
 
     def deserialize(node, token)
-      type =  node[0]
-      inner = node[1]
+      raise "Expected V8::C::Array" unless V8::C::Array === node
+
+      type =  node.Get(0)
+      inner = node.Get(1)
 
       case type
       when 74 # nil
         Shin::AST::Symbol.new(token, nil)
       when 0 # mimic
-        inner
+        context.context.to_ruby(inner)
       when 1 # vector
         acc = []
         deserialize_all(inner, token, acc)
@@ -199,33 +203,40 @@ module Shin
       when 3 # map
         raise "map"
       when 4 # symbol
-        Shin::AST::Symbol.new(token, inner)
+        Shin::AST::Symbol.new(token, context.context.to_ruby(inner))
       when 5 # keyword
-        Shin::AST::Keyword.new(token, inner)
+        Shin::AST::Keyword.new(token, context.context.to_ruby(inner))
       when 6 # non-spliced unquote
         deserialize(inner, token)
       when 7 # splicing unquote
         raise "Invalid use of splicing unquote"
       when 8 # literal
-        case inner
+        ruby_inner = context.context.to_ruby(inner)
+        case ruby_inner
         when Fixnum, Float, String, true, false, nil
-          Shin::AST::Literal.new(token, inner)
+          Shin::AST::Literal.new(token, ruby_inner)
         else
-          raise "Unknown literal: #{inner['constructor']}"
+          raise "Unknown literal: #{inner}"
         end
       end
     end
 
     def deserialize_all(arr, token, acc)
-      arr.each do |el|
-        type  = el[0]
+      len = arr.Get('length')
+      i = 0
+
+      while i < len do
+        el = arr.Get(i)
+        type  = el.Get(0)
 
         if type == 7
           # splicing unquote
-          deserialize_all(el[1], token, acc)
+          deserialize_all(el.Get(1), token, acc)
         else
           acc << deserialize(el, token)
         end
+
+        i += 1
       end
     end
 
