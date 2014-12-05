@@ -17,6 +17,7 @@ module Shin
         "list" => List,
         "map"  => Map,
         "kw"   => Keyword,
+        "meta" => MetaData,
       }
 
       @@ast_cache = {}

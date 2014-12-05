@@ -1016,8 +1016,8 @@ module Shin
       @builder << make_decl(make_ident(name.value), ass)
     end
 
-    DEFN_PATTERN       = ":sym :str? [:expr*] :expr*".freeze
-    DEFN_MULTI_PATTERN = ":sym :str? :list+".freeze
+    DEFN_PATTERN       = ":sym :meta? :str? [:expr*] :expr*".freeze
+    DEFN_MULTI_PATTERN = ":sym :meta? :str? :list+".freeze
 
     def translate_defn(list, export: true)
       f = nil
@@ -1025,13 +1025,13 @@ module Shin
 
       simple_matches = matches?(list, DEFN_PATTERN)
       if simple_matches
-        name, doc, args, body = simple_matches
+        name, meta, doc, args, body = simple_matches
         _name = name
         f = translate_fn_inner(args, body, :name => name.value)
       else
         multi_matches = matches?(list, DEFN_MULTI_PATTERN)
         if multi_matches
-          name, doc, variants = multi_matches
+          name, meta, doc, variants = multi_matches
           _name = name
           f = translate_fn_inner_multi(variants, :name => name.value)
         else
