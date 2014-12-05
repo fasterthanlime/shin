@@ -1,4 +1,5 @@
 language: ruby
 rvm:
   - 2.1.4
-  - rbx-2
+  # soon, my pretties, soon.
+  # - rbx-2
