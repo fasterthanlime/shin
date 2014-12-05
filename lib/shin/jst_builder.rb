@@ -35,6 +35,15 @@ module Shin
       recipient
     end
 
+    def single
+      vase = SingleVase.new
+      old_vases = @vases
+      @vases = @vases.cons(vase)
+      yield
+      @vases = old_vases
+      vase.recipient
+    end
+
     def into!(recipient, mode = :expression, &block)
       self << into(recipient, mode, &block)
     end
@@ -139,6 +148,32 @@ module Shin
 
     def to_s
       "<){ #{@mode} -> #{@into} }(>"
+    end
+  end
+
+  class SingleVase
+    attr_reader :recipient
+
+    def << (candy)
+      if @recipient
+        raise "SingleVase already filled!"
+      elsif JST::Statement === candy
+        raise "SingleVase wants an expr!"
+      else
+        @recipient = candy
+      end
+    end
+
+    def mode
+      :expression
+    end
+
+    def into
+      self
+    end
+
+    def empty!
+      @recipient = nil
     end
   end
 

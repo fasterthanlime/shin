@@ -143,11 +143,9 @@ module Shin
     end
 
     def as_expr(expr)
-      arr = []
-      @builder.into(arr, :expression) do
+      @builder.single do
         tr(expr)
       end
-      arr[0]
     end
 
     def as_specified(expr, mode)
