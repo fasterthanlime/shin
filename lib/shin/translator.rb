@@ -430,9 +430,11 @@ module Shin
       mode = @builder.mode
       support = case mode
                 when :expression
-                  FunctionExpression.new
+                  fn = FunctionExpression.new
+                  @builder << CallExpression.new(fn)
+                  fn
                 when :statement, :return
-                  BlockStatement.new
+                  @builder.recipient
                 else
                   raise "try in unknown mode: #{mode}"
                 end
@@ -501,13 +503,7 @@ module Shin
       end
 
       support << trie
-
-      case mode
-      when :expression
-        @builder << CallExpression.new(support)
-      else
-        @builder << support
-      end
+      nil
     end
 
     def translate_if(list)
