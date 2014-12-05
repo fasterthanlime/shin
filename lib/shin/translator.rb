@@ -588,6 +588,12 @@ module Shin
       end
     end
 
+    VALID_IDENT_RE = /^[A-Za-z_\$]+$/
+
+    def valid_ident?(name)
+      name =~ VALID_IDENT_RE
+    end
+
     def translate_aset(rest)
       object = rest.first
       props = rest.drop(1)
@@ -595,7 +601,11 @@ module Shin
       curr = as_expr(object)
       while props.size > 1
         prop = props.first; props = props.drop(1)
-        curr = MemberExpression.new(curr, as_expr(prop), true)
+        if AST::String === prop && valid_ident?(prop.value)
+          curr = MemberExpression.new(curr, make_ident(prop.value), false)
+        else
+          curr = MemberExpression.new(curr, as_expr(prop), true)
+        end
       end
       val = props.first
       @builder << AssignmentExpression.new(curr, as_expr(val))
@@ -608,7 +618,11 @@ module Shin
       curr = as_expr(object)
       until props.empty?
         prop = props.first; props = props.drop(1)
-        curr = MemberExpression.new(curr, as_expr(prop), true)
+        if AST::String === prop && valid_ident?(prop.value)
+          curr = MemberExpression.new(curr, make_ident(prop.value), false)
+        else
+          curr = MemberExpression.new(curr, as_expr(prop), true)
+        end
       end
       @builder << curr
     end
