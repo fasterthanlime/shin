@@ -373,13 +373,9 @@ module Shin
         trbody(list, anon.body)
         @builder << CallExpression.new(anon)
       when :statement
-        @builder.into!(BlockStatement.new, :statement) do
-          treach(list)
-        end
+        treach(list)
       when :return
-        block = BlockStatement.new
-        trbody(list, block)
-        @builder << block
+        trbody(list, @builder.recipient)
       else
         raise "do in unknown builder mode: #{@builder.mode}"
       end
