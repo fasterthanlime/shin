@@ -75,5 +75,17 @@ RSpec.describe "Language", "meta" do
       end.to raise_error V8::Error, /IWithMeta/
     end
   end
+
+  describe "shin-only types supporting meta" do
+    it "Unquote" do
+      expect(%Q{
+           (let [l (--unquote nil false)
+                 lm (with-meta l {:key "Xzibit"})]
+             (print (nil? (meta l)))
+             (print (nil? (meta lm)))
+             (print (:key (meta lm))))
+             }).to have_output(%w(true false Xzibit))
+    end
+  end
 end
 
