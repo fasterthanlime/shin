@@ -167,6 +167,8 @@ module Shin
 
     ########################
     # Def parsing
+    
+    DEF_NAMES = ::Set.new %w(def defn defmacro deftype defprotocol)
 
     def parse_defs(nodes)
       scope = NsScope.new(@mod.slug)
@@ -175,10 +177,7 @@ module Shin
         next unless node.list? && !node.inner.empty?
         first = node.inner.first
 
-        # a non-private def
-        if first.sym? &&
-            first.value.start_with?("def") &&
-            !first.value.end_with?("-")
+        if first.sym? && DEF_NAMES.include?(first.value)
           raise Shin::SyntaxError, "Invalid def: #{node}" unless node.inner.length >= 2
           name = node.inner[1].value
           scope[name] = node

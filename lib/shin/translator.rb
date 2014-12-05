@@ -50,7 +50,7 @@ module Shin
 
       bound_factory = CallExpression.new(
         MemberExpression.new(make_ident('factory'), make_ident('bind'), false),
-        [make_ident('this')])
+        [Identifier.new('this')])
       define_call.arguments << bound_factory
       load_shim.body << ExpressionStatement.new(define_call)
 
@@ -150,7 +150,7 @@ module Shin
     def as_expr(expr)
       @builder.single do
         tr(expr)
-      end
+      end or ser!("Expected expression from #{expr}, got nothing.", expr)
     end
 
     def as_specified(expr, mode)
@@ -755,7 +755,7 @@ module Shin
     def translate_protocol_simple_fun(protocol_name, name, arg_list)
       arity = arg_list.inner.length
       fn = FunctionExpression.new(name ? make_ident(name) : nil)
-      arguments = make_ident('arguments')
+      arguments = Identifier.new('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
       slot_aware_name = "#{name}$arity#{arg_list.inner.length}"
@@ -771,11 +771,11 @@ module Shin
       fn.body << if_notimpl
 
       # TODO: don't always use apply, just relay args if non-variadic
-      apply_acc = MemberExpression.new(meth_acc, make_ident('apply'), false)
+      apply_acc = MemberExpression.new(meth_acc, Identifier.new('apply'), false)
       first_arg = MemberExpression.new(arguments, make_literal(0), true)
       meth_call = CallExpression.new(apply_acc)
       meth_call.arguments << first_arg
-      meth_call.arguments << make_ident('arguments')
+      meth_call.arguments << Identifier.new('arguments')
       fn.body << ReturnStatement.new(meth_call)
 
       return fn
@@ -783,10 +783,10 @@ module Shin
 
     def translate_protocol_multi_fun(protocol_name, name, arg_lists)
       fn = FunctionExpression.new(name ? make_ident(name) : nil)
-      arguments = make_ident('arguments')
+      arguments = Identifier.new('arguments')
       this_access = MemberExpression.new(arguments, make_literal(0), true)
 
-      numargs = MemberExpression.new(arguments, make_ident('length'), false)
+      numargs = MemberExpression.new(arguments, Identifier.new('length'), false)
       sw = SwitchStatement.new(numargs)
       fn << sw
 
@@ -797,7 +797,7 @@ module Shin
         caze = SwitchCase.new(variadic_args?(arg_list) ?  nil : make_literal(arity))
         sw.cases << caze
 
-        slot_id = ident(slot_aware_name)
+        slot_id = make_ident(slot_aware_name)
         meth_acc = MemberExpression.new(this_access, slot_id, false)
 
         # err if not implemented
@@ -814,7 +814,7 @@ module Shin
         first_arg = MemberExpression.new(arguments, make_literal(0), true)
         meth_call = CallExpression.new(apply_acc)
         meth_call.arguments << first_arg
-        meth_call.arguments << make_ident('arguments')
+        meth_call.arguments << Identifier.new('arguments')
         caze << ReturnStatement.new(meth_call)
       end
 
@@ -838,11 +838,15 @@ module Shin
       # TODO: members / params
       ctor = FunctionExpression.new
 
-      this_id = make_ident("this")
+      field_names = {}
+
+      this_id = Identifier.new('this')
       fields.inner.each do |field|
         next if field.meta?  # FIXME: woooooooooo #28
 
-        fname = field.value
+        fname = reserved?(field.value) ? mangle(field.value) : field.value
+        field_names[field.value] = fname
+
         fname_id = make_ident(fname)
         ctor.params << fname_id
         slot = MemberExpression.new(this_id, fname_id, false)
@@ -872,7 +876,8 @@ module Shin
               self_name = fresh("self")
               fields.inner.each do |field|
                 next if field.meta?  # FIXME: woooooooooo #28
-                type_scope[field.value] = "#{self_name}/#{field.value}"
+                fname = field_names[field.value]
+                type_scope[field.value] = "#{self_name}/#{fname}"
               end if fields
 
               # FIXME: oh god, no out-args please
@@ -881,7 +886,7 @@ module Shin
               args_len = args_len_out[0]
 
               self_decl = VariableDeclaration.new
-              self_dtor = VariableDeclarator.new(ident(self_name), ident("this"))
+              self_dtor = VariableDeclarator.new(make_ident(self_name), Identifier.new('this'))
               self_decl.declarations << self_dtor
               fn.body.body.unshift(self_decl)
             end
@@ -912,7 +917,7 @@ module Shin
             if limb.value == "IFn"
               fn = FunctionExpression.new(nil)
               invoke_apply = MemberExpression.new(ident("-invoke"), Identifier.new("apply"), false)
-              arguments = Identifier.new("arguments")
+              arguments = Identifier.new('arguments')
               this_id = Identifier.new("this")
               array_proto = MemberExpression.new(Identifier.new("Array"), Identifier.new("prototype"), false)
               slice = MemberExpression.new(array_proto, Identifier.new("slice"), false)
@@ -959,6 +964,8 @@ module Shin
         t = limb.token
         do_vec = Hamster::Vector.new([AST::Symbol.new(t, "do")] + body)
         do_block = AST::List.new(t, do_vec)
+
+        ser!("Function method needs at list one argument", t) if args.inner.empty?
         this_as_vec = Hamster.vector(AST::Symbol.new(t, "this-as"),
                                       args.inner.first,
                                       do_block)
@@ -978,7 +985,7 @@ module Shin
         ser!("Expected symbol in declare", el) unless el.sym?
         ex = make_ident("exports/#{el.value}")
         ass = AssignmentExpression.new(ex, Identifier.new("null"))
-        @builder << make_decl(ident(el.value), ass)
+        @builder << make_decl(make_ident(el.value), ass)
       end
     end
 
@@ -1109,13 +1116,13 @@ module Shin
 
       gt_sym = AST::Symbol.new(t, ">")
       arglen_vec = Hamster.vector(AST::Symbol.new(t, ".-length"),
-                                  AST::Symbol.new(t, "arguments"))
+                                  AST::Symbol.new(t, "js-arguments"))
       arglen = AST::List.new(t, arglen_vec)
       arg_comp_vec = Hamster.vector(gt_sym, arglen, num_fixed_args)
       arg_comp = AST::List.new(t, arg_comp_vec)
 
       rest_of_args_vec = Hamster.vector(AST::Symbol.new(t, "IndexedSeq."),
-                                        AST::Symbol.new(t, "arguments"),
+                                        AST::Symbol.new(t, "js-arguments"),
                                         num_fixed_args)
       rest_of_args = AST::List.new(t, rest_of_args_vec)
 
@@ -1176,7 +1183,7 @@ module Shin
           t = args.token
           lhs = AST::Vector.new(t, args.inner)
           iseq      = AST::Symbol.new(t, "IndexedSeq.")
-          arguments = AST::Symbol.new(t, "arguments")
+          arguments = AST::Symbol.new(t, "js-arguments")
           zero      = AST::Literal.new(t, 0)
           rhs = AST::List.new(t, Hamster.vector(iseq, arguments, zero))
 
@@ -1185,7 +1192,7 @@ module Shin
           end
         else
           args.inner.each do |arg|
-            scope[arg.value] = arg.value
+            @builder.declare(arg.value, arg.value)
             fn.params << make_ident(arg.value)
           end
         end
@@ -1198,7 +1205,8 @@ module Shin
 
           args.inner.each do |arg|
             sym = AST::Symbol.new(t, arg.value)
-            bindings += [sym, sym]
+            bindings << sym
+            bindings << sym
           end
 
           @builder.with_scope(scope) do
@@ -1255,7 +1263,7 @@ module Shin
             @builder << decl
           end
 
-          numargs = MemberExpression.new(make_ident('arguments'), make_ident('length'), false)
+          numargs = MemberExpression.new(Identifier.new('arguments'), Identifier.new('length'), false)
           sw = SwitchStatement.new(numargs)
 
           arg_names = []
@@ -1287,12 +1295,12 @@ module Shin
             if arity == -1
               mexp = MemberExpression.new(make_ident(tmp), make_ident('apply'), false)
               call = CallExpression.new(mexp)
-              call << make_ident('this')
-              call << make_ident('arguments')
+              call << Identifier.new('this')
+              call << Identifier.new('arguments')
             else
               mexp = MemberExpression.new(make_ident(tmp), make_ident('call'), false)
               call = CallExpression.new(mexp)
-              call << make_ident('this')
+              call << Identifier.new('this')
               (0...arity).each do |i|
                 call << make_ident(arg_names[i])
               end
@@ -1350,7 +1358,7 @@ module Shin
 
     def trbody(body, block)
       last_index = body.length - 1
-      
+
       @builder.into(block, :statement) do
         index = 0
         body.each do |expr|
@@ -1491,7 +1499,7 @@ module Shin
       when AST::Closure
         ser!("Closures are supposed to be gone by the time we reach the translator", expr)
       else
-        ser!("Unknown expr form #{expr}", expr)
+        ser!("Unknown expr form #{expr} of type #{expr.class}", expr)
       end
     end
 
@@ -1600,7 +1608,7 @@ module Shin
           r, l = rest
           @builder << BinaryExpression.new('instanceof', as_expr(l), as_expr(r))
         when "throw"
-          arg = rest.first
+          arg = rest.first or ser!("Throw what? Throw who? Throw how!", expr)
           @builder << ThrowStatement.new(as_expr(arg))
         when "*js-uop"
           op, arg = rest

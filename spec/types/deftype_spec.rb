@@ -124,12 +124,12 @@ RSpec.describe "Language", "defprotocol and deftype" do
              Object
              (llanfair [o]
                (print (.-sentinel o))
-               (print (alength arguments)))
+               (print (alength js-arguments)))
 
              IKalamazoo
              (-kalamazoo [o]
                (print (.-sentinel o))
-               (print (alength arguments))))
+               (print (alength js-arguments))))
            (let [t (Tester. "cookie")]
              (.llanfair t)
              (-kalamazoo t))
