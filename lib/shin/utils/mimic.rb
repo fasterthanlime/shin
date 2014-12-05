@@ -112,29 +112,32 @@ module Shin
       end
 
       @@total_v8type = 0
+      @@identity_cache = {}
 
       def v8_type(val)
         res = nil
         @@total_v8type += Benchmark.realtime do
-          res = case true
-                when val[core_proto_name("IVector")]
-                  :vector
-                when val[core_proto_name("ISeq")]
-                  :list
-                when val[core_proto_name("ISymbol")]
-                  :symbol
-                when val[core_proto_name("IKeyword")]
-                  :keyword
-                when val[core_proto_name("IMap")]
-                  :map
-                when val[core_proto_name("IUnquote")]
-                  :unquote
-                else
-                  :unknown
-                end
+          res = val.instance_variable_get(:@context).enter do
+            vn = val.native
+            hash = vn.Get('constructor').GetIdentityHash
+            @@identity_cache[hash] ||= sniff_v8type(vn)
+          end
         end
-        # puts "Total v8type:  #{(1000 * @@total_v8type).round(0)}ms"
+        puts "Total v8type:  #{(1000 * @@total_v8type).round(0)}ms (cache size: #{@@identity_cache.length})"
+
         res
+      end
+
+      def sniff_v8type(vn)
+        case true
+        when vn.Get(core_proto_name("IVector"))  then :vector
+        when vn.Get(core_proto_name("ISeq"))     then :list
+        when vn.Get(core_proto_name("ISymbol"))  then :symbol
+        when vn.Get(core_proto_name("IKeyword")) then :keyword
+        when vn.Get(core_proto_name("IMap"))     then :map
+        when vn.Get(core_proto_name("IUnquote")) then :unquote
+        else :unknown
+        end
       end
 
       def pr_str(val)
