@@ -275,7 +275,7 @@ module Shin
         until heap.empty?
           type = heap.head; heap = heap.tail
           if Class === type
-            ser!("Unclosed #{type.name.split('::')[0]}")
+            ser!("Unclosed #{type.name.split('::').last}")
             break
           end
         end

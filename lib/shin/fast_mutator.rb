@@ -11,7 +11,12 @@ module Shin
     attr_reader :context
     @@total_prep = 0
     @@total_call = 0
+    @@total_serial = 0
     @@total_unquote = 0
+    @@total_nsp = 0      
+    @@total_mut = 0    
+    @@total_trn = 0
+    @@total_gen = 0
 
     def initialize(compiler, mod, context)
       @compiler = compiler
@@ -34,10 +39,10 @@ module Shin
         end
 
         deps.each do |slug, dep|
-          Shin::NsParser.new(dep).parse unless dep.ns
-          Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2
-          Shin::Translator.new(@compiler, dep).translate unless dep.jst
-          Shin::Generator.new(dep).generate unless dep.code
+          @@total_nsp += Benchmark.realtime { Shin::NsParser.new(dep).parse unless dep.ns }
+          @@total_mut += Benchmark.realtime { Shin::Mutator.new(@compiler, dep).mutate unless dep.ast2 }
+          @@total_trn += Benchmark.realtime { Shin::Translator.new(@compiler, dep).translate unless dep.jst }
+          @@total_gen += Benchmark.realtime { Shin::Generator.new(dep).generate unless dep.code }
         end
 
         deps.each do |slug, dep|
@@ -49,6 +54,9 @@ module Shin
         unless @to_array
           @to_array = context.eval("$kir.modules['cljs.core'].exports.to$_array")
           raise "to-array not a func?" unless V8::Function === @to_array
+
+          @__serialize = context.eval("$kir.modules['cljs.core'].exports.$_$_serialize")
+          raise "--serizalize not a func?" unless V8::Function === @__serialize
         end
 
         macro_slug = info[:module].slug
@@ -81,14 +89,27 @@ module Shin
         debug "macro_ret: #{macro_ret}" if DEBUG
       end
 
+      @@total_serial += Benchmark.realtime do
+        # yay experimental stuff
+        macro_ser = @__serialize.call(macro_ret)
+        deser = deserialize(macro_ser, invoc.token)
+        puts "deser = #{deser}"
+        # puts "#{macro_ser}"
+      end
+
       @@total_unquote += Benchmark.realtime do
         macro_ret_unquoted = unquote(macro_ret, invoc.token)
         debug "unquoted macro_ret: #{macro_ret_unquoted}" if DEBUG
       end
-      # puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
-      # puts "Total call:    #{(1000 * @@total_call).round(0)}ms"
-      # puts "Total unquote: #{(1000 * @@total_unquote).round(0)}ms"
-      # puts "Total        : #{(1000 * (@@total_prep + @@total_call + @@total_unquote)).round(0)}ms"
+      puts "Total prep:    #{(1000 * @@total_prep).round(0)}ms"
+      puts "  Total nsp:    #{(1000 * @@total_nsp).round(0)}ms"
+      puts "  Total mut:    #{(1000 * @@total_mut).round(0)}ms"
+      puts "  Total trn:    #{(1000 * @@total_trn).round(0)}ms"
+      puts "  Total gen:    #{(1000 * @@total_gen).round(0)}ms"
+      puts "Total call:    #{(1000 * @@total_call).round(0)}ms"
+      puts "Total serial:  #{(1000 * @@total_serial).round(0)}ms"
+      puts "Total unquote: #{(1000 * @@total_unquote).round(0)}ms"
+      puts "Total        : #{(1000 * (@@total_prep + @@total_call + @@total_unquote)).round(0)}ms"
 
       macro_ret_unquoted
     end
@@ -153,6 +174,58 @@ module Shin
         end
       else
         acc << unquote(el, token)
+      end
+    end
+
+    # yay experimental stuff
+
+    def deserialize(node, token)
+      type =  node[0]
+      inner = node[1]
+
+      case type
+      when 74 # nil
+        Shin::AST::Symbol.new(token, nil)
+      when 0 # mimic
+        inner
+      when 1 # vector
+        acc = []
+        deserialize_all(inner, token, acc)
+        Shin::AST::Vector.new(token, Hamster::Vector.new(acc))
+      when 2 # list
+        acc = []
+        deserialize_all(inner, token, acc)
+        Shin::AST::List.new(token, Hamster::Vector.new(acc))
+      when 3 # map
+        raise "map"
+      when 4 # symbol
+        Shin::AST::Symbol.new(token, inner)
+      when 5 # keyword
+        Shin::AST::Keyword.new(token, inner)
+      when 6 # non-spliced unquote
+        deserialize(inner, token)
+      when 7 # splicing unquote
+        raise "Invalid use of splicing unquote"
+      when 8 # literal
+        case inner
+        when Fixnum, Float, String, true, false, nil
+          Shin::AST::Literal.new(token, inner)
+        else
+          raise "Unknown literal: #{inner['constructor']}"
+        end
+      end
+    end
+
+    def deserialize_all(arr, token, acc)
+      arr.each do |el|
+        type  = el[0]
+
+        if type == 7
+          # splicing unquote
+          deserialize_all(el[1], token, acc)
+        else
+          acc << deserialize(el, token)
+        end
       end
     end
 

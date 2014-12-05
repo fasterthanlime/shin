@@ -114,23 +114,30 @@ module Shin
         end
       end
 
+      @@total_v8type = 0
+
       def v8_type(val)
-        case true
-        when val[core_proto_name("IVector")]
-          :vector
-        when val[core_proto_name("ISeq")]
-          :list
-        when val[core_proto_name("ISymbol")]
-          :symbol
-        when val[core_proto_name("IKeyword")]
-          :keyword
-        when val[core_proto_name("IMap")]
-          :map
-        when val[core_proto_name("IUnquote")]
-          :unquote
-        else
-          :unknown
+        res = nil
+        @@total_v8type += Benchmark.realtime do
+          res = case true
+                when val[core_proto_name("IVector")]
+                  :vector
+                when val[core_proto_name("ISeq")]
+                  :list
+                when val[core_proto_name("ISymbol")]
+                  :symbol
+                when val[core_proto_name("IKeyword")]
+                  :keyword
+                when val[core_proto_name("IMap")]
+                  :map
+                when val[core_proto_name("IUnquote")]
+                  :unquote
+                else
+                  :unknown
+                end
         end
+        # puts "Total v8type:  #{(1000 * @@total_v8type).round(0)}ms"
+        res
       end
 
       def pr_str(val)

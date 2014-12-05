@@ -82,6 +82,10 @@ module Shin
       def map?
         false
       end
+
+      def shinastsentinel
+        true
+      end
     end
 
     class Sequence < Node
