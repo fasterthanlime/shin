@@ -610,15 +610,13 @@ module Shin
     end
 
     def translate_loop_inner(bindings, body)
-      t = body.first.token
       scope = Scope.new
-
       mode = @builder.mode
       support = case @builder.mode
                 when :expression
                   FunctionExpression.new
                 when :statement, :return
-                  BlockStatement.new
+                  @builder.recipient
                 else
                   raise "loop in unknown builder mode: #{@builder.mode}"
                 end
@@ -663,7 +661,7 @@ module Shin
       when :expression
         @builder << CallExpression.new(support)
       when :statement, :return
-        @builder << support
+        # all good.
       else
         raise "loop in unknown builder mode: #{@builder.mode}"
       end
