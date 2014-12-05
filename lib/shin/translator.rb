@@ -36,6 +36,7 @@ module Shin
       end
 
       program = Program.new
+
       load_shim = FunctionExpression.new
       load_shim.params << make_ident('root');
       load_shim.params << make_ident('factory')
@@ -65,10 +66,14 @@ module Shin
       program.body << ExpressionStatement.new(shim_call)
 
       body = factory.body
+      use_strict = make_literal("use strict");
+      body << ExpressionStatement.new(use_strict)
 
       requires.each do |req|
         next if req.macro? && !@mod.macro?
-        body << make_decl(make_ident(req.as_sym), make_ident(req.slug))
+        if req.as_sym != req.slug
+          body << make_decl(make_ident(req.as_sym), make_ident(req.slug))
+        end
       end
 
       top_scope = CompositeScope.new
