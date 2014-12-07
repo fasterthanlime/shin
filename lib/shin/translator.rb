@@ -1079,12 +1079,12 @@ module Shin
       arg_vec = Hamster.vector
       arg_names = []
       fixed_args.each do |arg|
-        name = if arg.sym?
+        arg_name = if arg.sym?
                  arg.value
                else
                  fresh("darg")
                end
-        arg_names << name
+        arg_names << arg_name
         arg_vec <<= arg
       end
       variadic_name = if variadic_arg.sym?
@@ -1103,8 +1103,8 @@ module Shin
       inner_fn = AST::List.new(t, inner_fn_vec)
 
       outer_arg_vec = Hamster.vector
-      arg_names.each do |name|
-        outer_arg_vec <<= AST::Symbol.new(t, name)
+      arg_names.each do |arg_name|
+        outer_arg_vec <<= AST::Symbol.new(t, arg_name)
       end
       outer_args = AST::Vector.new(t, outer_arg_vec)
 
@@ -1147,8 +1147,8 @@ module Shin
 
       apply_sym = AST::Symbol.new(t, ".call")
       inner_call_vec = Hamster.vector(apply_sym, inner_sym, this_alias)
-      arg_names.each do |name|
-        inner_call_vec <<= AST::Symbol.new(t, name)
+      arg_names.each do |arg_name|
+        inner_call_vec <<= AST::Symbol.new(t, arg_name)
       end
       inner_call_vec <<= variadic_sym
       inner_call = AST::List.new(t, inner_call_vec)
