@@ -17,7 +17,8 @@ module Shin
     
     attr_reader :input
 
-    NUMBER_RE = /[0-9]+/
+    NUMBER_START_REGEXP = /[0-9]+/
+    NUMBER_INNER_REGEXP = /[0-9\.]+/
     OPEN_MAP = {
       '(' => List,
       '[' => Vector,
@@ -136,11 +137,13 @@ module Shin
               ser!("Wrong closing delimiter. Expected '#{ex}' got '#{c}'")
             end
             heap.head << type.new(tok.extend!(@pos), Hamster::Vector.new(els))
+          when "-"
+            state = state.cons(:minus)
           when SYM_START_REGEXP
             state = state.cons(:symbol)
             heap = heap.cons(token).cons("")
             redo
-          when NUMBER_RE
+          when NUMBER_START_REGEXP
             state = state.cons(:number)
             heap = heap.cons(token).cons("")
             redo
@@ -149,6 +152,18 @@ module Shin
             heap = heap.cons(token).cons("")
           else
             ser!("Unexpected char: #{c}")
+          end
+        when :minus
+          state = state.tail
+          case c
+          when NUMBER_START_REGEXP
+            state = state.cons(:number)
+            heap = heap.cons(token).cons("-")
+            redo
+          else
+            state = state.cons(:symbol)
+            heap = heap.cons(token).cons("-")
+            redo
           end
         when :close_one
           inner = heap.head; heap = heap.tail
@@ -247,7 +262,7 @@ module Shin
           end
         when :number
           case c
-          when NUMBER_RE
+          when NUMBER_INNER_REGEXP
             heap.head << c
           else
             value = heap.head; heap = heap.tail

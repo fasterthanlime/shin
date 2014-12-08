@@ -1397,7 +1397,7 @@ module Shin
         end
         nil
       when AST::Literal
-        @builder << make_literal(expr.value)
+        @builder << make_literal(expr)
         nil
       when AST::Deref
         t = expr.token
@@ -1701,8 +1701,16 @@ module Shin
       decl
     end
 
-    def make_literal(id)
-      Literal.new(id)
+    def make_literal(node)
+      if AST::Literal === node
+        if AST::Number === node && (node.value < 0)
+          UnaryExpression.new("-", Literal.new(-node.value))
+        else
+          Literal.new(node.value)
+        end
+      else
+        Literal.new(node)
+      end
     end
 
     def qualified?(name)
