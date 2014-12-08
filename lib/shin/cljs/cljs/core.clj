@@ -54,7 +54,10 @@
    (let [[y & ys] forms
          s        (if (list? y) y (list y))
          [b & a] s])
-   `(let [x# (~b ~x ~@a)] (if x# (some-> x# ~@ys) nil))))
+   `(if ~x
+      (let [x# (~b ~x ~@a)]
+        (some-> x# ~@ys))
+      nil)))
 
 (defmacro ->>
   ([x]

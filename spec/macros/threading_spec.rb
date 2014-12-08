@@ -33,6 +33,10 @@ RSpec.describe "Language", "threading" do
                                 (get :c)
                                 inc)))
           }).to have_output("true")
+    expect(%Q{
+           (print (nil? (some-> nil
+                                (.toString))))
+          }).to have_output("true")
   end
 
 end
