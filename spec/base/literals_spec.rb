@@ -1,6 +1,12 @@
 
 RSpec.describe "Language", "literals" do
 
+  it "has working number literals" do
+    expect(%Q{(print 1)}).to have_output "1"
+    expect(%Q{(print -1)}).to have_output "-1"
+    expect(%Q{(print 1.2)}).to have_output "1.2"
+  end
+
   it "has working string literals" do
     expect(%Q{(print "hello")}).to have_output "hello"
   end
