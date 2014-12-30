@@ -44,7 +44,7 @@ module Shin
     end
 
     def translate_spec(spec)
-      Shin::AST::List === spec or raise "invalid spec"
+      spec.respond_to?(:inner) or raise "invalid spec"
       list = spec.inner
       type = list.first.value rescue nil
 
