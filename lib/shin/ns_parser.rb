@@ -44,6 +44,7 @@ module Shin
     end
 
     def translate_spec(spec)
+      Shin::AST::List === spec or raise "invalid spec"
       list = spec.inner
       type = list.first.value rescue nil
 
@@ -151,7 +152,7 @@ module Shin
           else
             raise "Unknown directive: #{directive.value}"
           end
-        end 
+        end
       end
     end
 
@@ -167,7 +168,7 @@ module Shin
 
     ########################
     # Def parsing
-    
+
     DEF_NAMES = ::Set.new %w(def defn defmacro deftype defprotocol)
 
     def parse_defs(nodes)
