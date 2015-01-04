@@ -59,5 +59,11 @@ RSpec.describe "Language", "literals" do
     expect(%q{(print (aget #js [42] 0))}).to have_output "42"
   end
 
+  it "has working character literals" do
+    %w(& % * " + = a b c $ £).each do |n|
+      expect(%{(print \\#{n})}).to have_output n
+    end
+  end
+
 end
 

@@ -220,15 +220,19 @@ module Shin
           end
           redo
         when :named_escape
-          case c
-          when /[a-z]/
+          if heap.head.empty? || c =~ /[a-z]/
             heap.head << c
           else
             value = heap.head; heap = heap.tail
             tok   = heap.head; heap = heap.tail
             state = state.tail
 
-            real_value = NAMED_ESCAPES[value]
+            if value.size == 1
+              real_value = value
+            else
+              real_value = NAMED_ESCAPES[value]
+            end
+
             ser!("Unknown named escape: \\#{value}") unless real_value
             heap.head << String.new(tok.extend!(@pos), real_value)
             redo
